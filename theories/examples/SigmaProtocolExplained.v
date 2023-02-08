@@ -1,4 +1,3 @@
-
 (** *Introduction
 
 In order to get into SSProve, it makes sense to look at a "simple" protocol
@@ -97,41 +96,58 @@ Module Type SigmaProtocolAlgorithms (π : SigmaProtocolParams).
 
   Import π.
 
-  #[local] Open Scope package_scope.
+  #[local] Open Scope package_scope. 
+  (* ||||||| Open Scope package scope | not clear*)
 
-  #[local] Existing Instance Bool_pos.
-  #[local] Existing Instance Statement_pos.
-  #[local] Existing Instance Witness_pos.
-  #[local] Existing Instance Message_pos.
-  #[local] Existing Instance Challenge_pos.
-  #[local] Existing Instance Response_pos.
+  #[local] Existing Instance Bool_pos.          (*| calling instances from the SigmaProtocolParams Module above*)
+  #[local] Existing Instance Statement_pos.     (*| *)
+  #[local] Existing Instance Witness_pos.       (*| *)
+  #[local] Existing Instance Message_pos.       (*| *)
+  #[local] Existing Instance Challenge_pos.     (*| *)
+  #[local] Existing Instance Response_pos.      (*| *)   
 
-  Definition choiceWitness := 'fin #|Witness|.
-  Definition choiceStatement := 'fin #|Statement|.
-  Definition choiceMessage := 'fin #|Message|.
+
+(* |||||||| choice in name not clear*)
+  Definition choiceWitness := 'fin #|Witness|.      (* defining the instances again*)
+  Definition choiceStatement := 'fin #|Statement|.  (* using "choice" because of choice_type *)
+  Definition choiceMessage := 'fin #|Message|.      (* "'fin" is their own finite set definition with n>0, not n >= 0 *)
   Definition choiceChallenge := 'fin #|Challenge|.
   Definition choiceResponse := 'fin #|Response|.
   Definition choiceTranscript :=
-    chProd (chProd (chProd choiceStatement choiceMessage) choiceChallenge) choiceResponse.
+    chProd (chProd (chProd choiceStatement choiceMessage) choiceChallenge) choiceResponse. (* finite list of the above instances using chProd method*)
   Definition choiceBool := 'fin #|bool_choiceType|.
 
-  Parameter Sigma_locs : {fset Location}.
+  Parameter Sigma_locs : {fset Location}.     (* | Defining a finite set (fset) of elements of type Location*)
+  Parameter Simulator_locs : {fset Location}. (* | one such set for the actual protocol, one for the simulator*)
 
-  Parameter Simulator_locs : {fset Location}.
+(*| some explanations:*)
+(*| "Raw code as described above is well-typed but does not have any guarantees with respect to what it imports and which location it uses. 
+     We therefore define a notion of validity [=> valid_code] with respect to an import interface and a set of locations."*)
+(*| "An interface is a set of signatures (opsig) corresponding to the procedures that a piece of code can import and use."*)
+(*| "The set of locations is expected as an {fset Location } using the finite sets of the extructures library. For our purposes, 
+    it is advisable to write them directly as list which of locations which is then cast to an fset using the fset operation, as below:
+    fset [:: ℓ₀ ; ℓ₁ ; ℓ₂ ]" *)
+
 
   Parameter Commit :
     ∀ (h : choiceStatement) (w : choiceWitness),
-      code Sigma_locs [interface] choiceMessage.
+      code Sigma_locs [interface] choiceMessage. (*|||||| not clear what choiceMessage is. Is that the "name" one can refer to?*)
+      (*|>> "Validity of code c with respect to set of locations L and import interface I is denoted by the 
+      class ValidCode L I c. We derive from it the type code L I A of valid code."*)
+    (* defining Commit - which is the touple (h,w) - as code [locations] [interface] [name] *)
+    (* Wie legen wir den aktuellen Zustand in unseren Locations ab um ihn im nächsten Schritt "lesen" und bearbeiten zu können*)
 
   Parameter Response :
     ∀ (h : choiceStatement) (w : choiceWitness)
       (a : choiceMessage) (e : choiceChallenge),
       code Sigma_locs [interface] choiceResponse.
+      (*  ||||| same as above *)
 
   Parameter Verify :
     ∀ (h : choiceStatement) (a : choiceMessage) (e : choiceChallenge)
       (z : choiceResponse),
       choiceBool.
+      (* ||||||| why not monadic *)
 
   Parameter Simulate :
     ∀ (h : choiceStatement) (e : choiceChallenge),
@@ -142,6 +158,7 @@ Module Type SigmaProtocolAlgorithms (π : SigmaProtocolParams).
       (e : choiceChallenge) (e' : choiceChallenge)
       (z : choiceResponse) (z' : choiceResponse),
       'option choiceWitness.
+      (* Extractor outputs a chWitness (i.e., true), or a None (i.e, false) *)
 
   Parameter KeyGen : ∀ (w : choiceWitness), choiceStatement.
 
@@ -192,6 +209,7 @@ Module SigmaProtocol (π : SigmaProtocolParams)
   Notation " 'chSoundness' " :=
     (chProd choiceStatement (chProd choiceMessage (chProd Opening Opening)))
     (in custom pack_type at level 2).
+    (* |||| does the soundsness take the opening twice? *)
 
   Definition i_challenge := #|Challenge|.
   Definition i_witness := #|Witness|.
@@ -224,6 +242,7 @@ Module SigmaProtocol (π : SigmaProtocolParams)
 
   #[local] Existing Instance i_challenge_pos.
   #[local] Existing Instance i_witness_pos.
+  (* ||||| what does this do? (Considering that we just defined those two..) *)
 
   #[local] Open Scope package_scope.
 
@@ -239,10 +258,12 @@ Module SigmaProtocol (π : SigmaProtocolParams)
       #def #[ TRANSCRIPT ] (hwe : chInput) : chTranscript
       {
         let '(h,w,e) := hwe in
-        #assert (R (otf h) (otf w)) ;;
-        a ← Commit h w ;;
-        z ← Response h w a e ;;
-        @ret choiceTranscript (h,a,e,z)
+        #assert (R (otf h) (otf w)) ;; (*  |||| what is this line? *)
+        a ← Commit h w ;; (* Parameter Commit : ∀ (h : choiceStatement) (w : choiceWitness),
+                             code Sigma_locs [interface] choiceMessage.*)
+        z ← Response h w a e ;; (* Parameter Response : ∀ (h : choiceStatement) (w : choiceWitness)
+                        (a : choiceMessage) (e : choiceChallenge), code Sigma_locs [interface] choiceResponse.*)
+        @ret choiceTranscript (h,a,e,z) (* |||| why ret?*)
       }
     ].
 
