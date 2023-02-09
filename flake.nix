@@ -19,10 +19,12 @@
 #        };
 
 	      #ocamlPackages = pkgs.ocaml-ng.ocamlPackages_4_09;
+        ocamlPackages = pkgs.ocamlPackages;
 
         coq = pkgs.coq_8_14.override {
           #customOCamlPackages = ocamlPackages;
         };
+
         # See here: https://github.com/vellvm/vellvm/blob/dev/flake.nix
         coqPackages = pkgs.coqPackages_8_14.overrideScope'
           (self: super: {
@@ -43,24 +45,17 @@
             # basic tools
             (with pkgs; [ coq emacs gnumake ])
             ++
-#            (with ocamlPackages; [
-#              ocaml dune_2 findlib base core stdio parsexp hashcons zarith
-#            ])
-#            ++
+            (with ocamlPackages; [
+              dune_3
+            ])
+            ++
             (with coqPackages; [
               equations
               mathcomp-analysis
               mathcomp-ssreflect
               extructures
               deriving
-              # This did not work.
-                      #equations.override { version = "1.3"; }
-                      #mathcomp-analysis.override { version = "0.3.13"; }
-                      #mathcomp-ssreflect.override { version = "1.13.0"; }
-                      #extructures.override { version = "0.3.1"; }
-                      #deriving.override { version = "0.1"; }
-                      ]
-            );
+            ]);
 
           shellHook = ''
                     alias ll="ls -lasi"
