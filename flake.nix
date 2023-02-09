@@ -60,6 +60,7 @@
           shellHook = ''
                     alias ll="ls -lasi"
                     cd ssprove && make clean && make
+                    cd ..
                     '';
 #          shellHook = ''
 #            export XDG_CONFIG_HOME=$PWD/.config
