@@ -2,6 +2,17 @@
 (coq.theory
  (name vratls)
  (modules :standard)
- (flags "-Q" "ssprove/theories/" "SSProve")
+ ;; SSProve is not dune based.
+ ;; dune builds in '_build/default'.
+ ;; So we have to navigate out of the build dir to find SSProve!
+ ;; (flags "-R" "../../ssprove/theories/" "SSProve")
+ ;; Sadly, we can also not do the mapping as above because SSProve
+ ;; was already compiled and the libraries in the .vo files do not
+ ;; have the prefix SSProve.
+ ;; So all we can do is map it to the empty prefix.
+ (flags "-R" "../../ssprove/theories/" "")
+ ;; This is now fully working but rather unsatifactory because
+ ;; we do not see in the code which of the imported modules belong
+ ;; to SSProve.
  (theories )
 )

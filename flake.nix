@@ -27,6 +27,10 @@
         coqPackages = pkgs.coqPackages_8_14.overrideScope'
           (self: super: {
             equations          = super.equations.override { version = "1.3+8.14"; };
+            # I found out that Nix requires to specify mathcomp because all the other packages
+            # essentially build upon it. See here:
+            # https://github.com/NixOS/nixpkgs/blob/4e7bb552f35af407f8c9e5224daf463aab06b818/pkgs/top-level/coq-packages.nix#L71
+            # If I do not explicitly set it then weird stuff starts to happen.
             mathcomp           = super.mathcomp.override { version = "1.13.0"; };
             mathcomp-ssreflect = super.mathcomp-ssreflect.override { version = "1.13.0"; };
             mathcomp-analysis  = super.mathcomp-analysis.override { version = "0.3.13"; };
