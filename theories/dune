@@ -14,5 +14,12 @@
  ;; This is now fully working but rather unsatifactory because
  ;; we do not see in the code which of the imported modules belong
  ;; to SSProve.
+
+ ;; TODO Do a pull request for SSProve and include the following as
+ ;; the first line in their _CoqProject:
+ ;; ```-Q theories/ SSProve```
+ ;; (https://stackoverflow.com/questions/43138770/coq-makefile-top-prefix)
+ ;; TODO On the same note just add dune build support for SSProve.
+
  (theories )
 )
