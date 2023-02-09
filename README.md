@@ -19,6 +19,10 @@ nix develop
 Be prepared to wait a while because it will essentially build everything from scratch, even Coq itself.
 Once it finished, the SSProve was successfully compiled and you are all set.
 
+Currently there is no package for Spacemacs on Nix. Hence, we suggest to install it from inside the `nix shell`.
+[Here](https://www.spacemacs.org/#) you can find the command to install Spacemacs.
+Once installation is complete you need to [edit the config](https://develop.spacemacs.org/doc/QUICK_START.html) and [activate the Coq layer](https://develop.spacemacs.org/layers/+lang/coq/README.html).
+
 ## Development
 
 We use `dune` for building the project.
