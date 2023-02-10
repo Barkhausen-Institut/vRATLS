@@ -2,7 +2,7 @@
 
 In order to get into SSProve, it makes sense to look at a "simple" protocol
 implementation and its verification.
-I took this file straight from "ssprove/theories/Crypt/examples/SigmaProtocol.v" and copied it here such
+I took this file straight from 'ssprove/theories/Crypt/examples/SigmaProtocol.v' and copied it here such
 that I/we can add comments that will help us to understand.
 *)
 
@@ -98,7 +98,7 @@ Module Type SigmaProtocolAlgorithms (π : SigmaProtocolParams).
   Import π.
 
   #[local] Open Scope package_scope. 
-  (* ||||||| Open Scope package scope | not clear*)
+  (* sort of global definition (variables, func., ...), defined in the project*)
 
   #[local] Existing Instance Bool_pos.          (*| calling instances from the SigmaProtocolParams Module above*)
   #[local] Existing Instance Statement_pos.     (*| *)
@@ -108,7 +108,6 @@ Module Type SigmaProtocolAlgorithms (π : SigmaProtocolParams).
   #[local] Existing Instance Response_pos.      (*| *)   
 
 
-(* |||||||| choice in name not clear*)
   Definition choiceWitness := 'fin #|Witness|.      (* defining the instances again*)
   Definition choiceStatement := 'fin #|Statement|.  (* using "choice" because of choice_type *)
   Definition choiceMessage := 'fin #|Message|.      (* "'fin" is their own finite set definition with n>0, not n >= 0 *)
@@ -124,7 +123,7 @@ Module Type SigmaProtocolAlgorithms (π : SigmaProtocolParams).
 (*| some explanations:*)
 (*| "Raw code as described above is well-typed but does not have any guarantees with respect to what it imports and which location it uses. 
      We therefore define a notion of validity [=> valid_code] with respect to an import interface and a set of locations."*)
-(*| "An interface is a set of signatures (opsig) corresponding to the procedures that a piece of code can import and use."*)
+(*| "An  interfaceis a set of signatures (opsig) corresponding to the procedures that a piece of code can import and use."*)
 (*| "The set of locations is expected as an {fset Location } using the finite sets of the extructures library. For our purposes, 
     it is advisable to write them directly as list which of locations which is then cast to an fset using the fset operation, as below:
     fset [:: ℓ₀ ; ℓ₁ ; ℓ₂ ]" *)
@@ -132,7 +131,7 @@ Module Type SigmaProtocolAlgorithms (π : SigmaProtocolParams).
 
   Parameter Commit :
     ∀ (h : choiceStatement) (w : choiceWitness),
-      code Sigma_locs [interface] choiceMessage. (*|||||| not clear what choiceMessage is. Is that the "name" one can refer to?*)
+      code Sigma_locs [interface] choiceMessage. (* type of return*)
       (*|>> "Validity of code c with respect to set of locations L and import interface I is denoted by the 
       class ValidCode L I c. We derive from it the type code L I A of valid code."*)
     (* defining Commit - which is the touple (h,w) - as code [locations] [interface] [name] *)
@@ -142,17 +141,18 @@ Module Type SigmaProtocolAlgorithms (π : SigmaProtocolParams).
     ∀ (h : choiceStatement) (w : choiceWitness)
       (a : choiceMessage) (e : choiceChallenge),
       code Sigma_locs [interface] choiceResponse.
-      (*  ||||| same as above *)
+    
 
   Parameter Verify :
     ∀ (h : choiceStatement) (a : choiceMessage) (e : choiceChallenge)
       (z : choiceResponse),
-      choiceBool.
-      (* ||||||| why not monadic *)
+      choiceBool. (* only returns true / false anywaws*)
+
 
   Parameter Simulate :
     ∀ (h : choiceStatement) (e : choiceChallenge),
       code Simulator_locs [interface] choiceTranscript.
+
 
   Parameter Extractor :
     ∀ (h : choiceStatement) (a : choiceMessage)
@@ -243,7 +243,7 @@ Module SigmaProtocol (π : SigmaProtocolParams)
 
   #[local] Existing Instance i_challenge_pos.
   #[local] Existing Instance i_witness_pos.
-  (* ||||| what does this do? (Considering that we just defined those two..) *)
+  (* ||||| what does this do? (Considering that we just defined those two..) -> look in file soft. found. *)
 
   #[local] Open Scope package_scope.
 
@@ -260,11 +260,9 @@ Module SigmaProtocol (π : SigmaProtocolParams)
       {
         let '(h,w,e) := hwe in
         #assert (R (otf h) (otf w)) ;; (*  |||| what is this line? *)
-        a ← Commit h w ;; (* Parameter Commit : ∀ (h : choiceStatement) (w : choiceWitness),
-                             code Sigma_locs [interface] choiceMessage.*)
-        z ← Response h w a e ;; (* Parameter Response : ∀ (h : choiceStatement) (w : choiceWitness)
-                        (a : choiceMessage) (e : choiceChallenge), code Sigma_locs [interface] choiceResponse.*)
-        @ret choiceTranscript (h,a,e,z) (* |||| why ret?*)
+        a ← Commit h w ;; 
+        z ← Response h w a e ;; 
+        @ret choiceTranscript (h,a,e,z) 
       }
     ].
 
