@@ -132,11 +132,11 @@ Module SigmaProtocol (π : SigmaProtocolParams)
   Definition SOUNDNESS : nat := 4.
 
 
-  Definition skA : Location := (choicePrivKey ; 0%N).
-  Definition skB : Location := (choicePrivKey ; 1%N).
+  Definition sk_A : Location := (choicePrivKey ; 0%N).
+  Definition sk_B : Location := (choicePrivKey ; 1%N).
 
   Definition Protocol_locs' :=
-    fset [:: skA ; skB].
+    fset [:: sk_A ; sk_B].
 
   #[local] Open Scope package_scope.
 
@@ -149,15 +149,14 @@ Module SigmaProtocol (π : SigmaProtocolParams)
     #def #[ TRANSCRIPT ] (keys : chInput) : chTranscript
     {
      let g := keys in
-     skA2 <- get skA ;;
-     let e_a := (g^+ skA2) in
+     sk_A' ← get sk_A ;;
+     let e_a := (g^+ sk_A') in
      A ← Send_EphKey e_a ;;
-     (*skB2 <- get skB ;;
-     let e_b := g+ skB2 in
-     B ← Send_EphKey e_b ;; *)
-     @ret choiceTranscript (e_a)
-     (* @ret choiceTranscript (e_a, e_b) *)
-    }  
+     sk_B' ← get sk_B ;;
+     let e_b := g+ sk_B in
+     B ← Send_EphKey e_b ;;
+     @ret choiceTranscript (e_a, e_b)
+    }
   ].
 
   (** *** Simulated implementation
@@ -175,10 +174,10 @@ Module SigmaProtocol (π : SigmaProtocolParams)
     {
      let '(g, sk_A, sk_B) := keys in
      t ← Simulate g sk_A sk_B ;;
-     ret t   
-    }  
+     ret t
+    }
   ].
- 
+
   Definition ɛ_DH A := AdvantageE Diffie_Hellman_real Diffie_Hellman_ideal A.
 
  
