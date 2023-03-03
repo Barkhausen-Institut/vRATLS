@@ -43,7 +43,7 @@
         devShell = pkgs.mkShell {
           packages =
             # basic tools
-            (with pkgs; [ coq emacs gnumake ])
+            (with pkgs; [ coq gnumake ])
             ++
             (with ocamlPackages; [
               dune_3
