@@ -55,6 +55,7 @@
               mathcomp-ssreflect
               extructures
               deriving
+              coqide
             ]);
 
           shellHook = ''
