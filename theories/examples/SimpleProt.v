@@ -38,124 +38,153 @@ Import Order.POrderTheory.
 Import PackageNotation.
 
 #[local] Open Scope ring_scope.
+Import GroupScope GRing.Theory.
 
 (** Simple scheme: Diffie Hellmann Key Exchange
 
 The scheme: A, B agree on prime p and element g \in group G = Z_p
 
     A:                          B:
-samle a from G   
-A = g^a          ----A --->   
+sample a from G
+A = g^a          ----A --->
                              sample b from G
                              B = g^b
                 <----B-----
-k=B^a                        k'=A^b 
+k=B^a                        k'=A^b
 
 Lemma: k = k'
 **)
 
+Locate ">".
+Print cycle_group. (* Has Notation <[ g ]> *)
 
-Module Type SigmaProtocolParams.
+Locate "#[".
+Print order.
 
-  Parameter PubKey PrivKey EphKey Message Space: finType.
-  Parameter g : PubKey.
-  Parameter sk_A : PrivKey.
-  Parameter sk_B : PrivKey.
+(*
+  The math part:
+ *)
+Module Type GroupParams.
 
-  Parameter PubKey_pos : Positive #|PubKey|.
-  Parameter PrivKey_pos : Positive #|PrivKey|. 
-  Parameter EphKey_pos : Positive #|EphKey|.
+  Parameter gT : finGroupType.            (* We need a group type of finite size. *)
+  Definition ζ : {set gT} := [set : gT].  (* The group [Z_p] is a set of type finite group type. *)
+  Parameter g :  gT.                      (* This is the group element [g]. *)
+  Parameter g_gen : ζ = <[g]>.            (* Predicate: [Z_p] is equal to the cyclic group over [g]. *)
+  Parameter prime_order : prime #[g].     (* Property: The order of the group generated from [g] is a prime number. *)
+
+End GroupParams.
+
+Module Type DiffieHellmannProtocolParams.
+
+  Parameter Space: finType.
   Parameter Space_pos : Positive #|Space|.
 
-End SigmaProtocolParams.
+End DiffieHellmannProtocolParams.
 
 
-Module Type SigmaProtocolAlgorithms (π : SigmaProtocolParams).
+(*
+  Here, we would define abstractions.
+ *)
+Module Type SigmaProtocolAlgorithms (DDHP : DiffieHellmannProtocolParams) (GP : GroupParams).
 
-  Import π.
+  Import DDHP.
+  Import GP.
 
-  #[local] Open Scope package_scope. 
+  #[local] Open Scope package_scope.
 
-  #[local] Existing Instance PubKey_pos.    
-  #[local] Existing Instance PrivKey_pos.
-  #[local] Existing Instance EphKey_pos.
   #[local] Existing Instance Space_pos.
 
-  Definition choicePubKey := 'fin #|PubKey|.      
-  Definition choicePrivKey := 'fin #|PrivKey|.
-  Definition choiceEphKey := 'fin #|EphKey|. (**  ephemeral keys: A=g^a and B=g^b   **)
-  Definition choiceTranscript :=
-    chProd (chProd (chProd (chProd choicePubKey choicePrivKey) choicePrivKey) choiceEphKey ) choiceEphKey.
+  (* We need to prove that #|GroupSpace| is positive. *)
+  Definition GroupSpace : finType := FinGroup.arg_finType gT.
+  #[local] Instance GroupSpace_pos : Positive #|GroupSpace|.
+  Proof.
+    apply /card_gt0P; by exists g.
+  (* Needs to be transparent to unify with local positivity proof? *)
+  Defined.
+
+  Definition chGroup : choice_type := 'fin #|GroupSpace|.
+  Notation " 'group " := (chGroup) (in custom pack_type at level 2).
+
+  (* [p] itself is derived from the DiffieHellmann Parameters. *)
+  Definition p := #|Space|.
+  Definition chPElem : choice_type := 'fin p.
 
   Parameter Protocol_locs : {fset Location}.    (* | Here I will note all the steps of the protocol *)
   Parameter Simulator_locs : {fset Location}.   (* | This is for the simulator || not used yet *)
 
- 
-  Parameter EphKey :
-  ∀ (g : choicePubKey),
-    code Protocol_locs [interface] choiceEphKey.
-
-  Parameter Send_EphKey :
-    ∀ (g : choiceEphKey),
-      code Protocol_locs [interface] choiceEphKey.
-    
+  (*
   Parameter Simulate :
     ∀ (g : choicePubKey) (sk_A : choicePrivKey) (sk_B : choicePrivKey),
       code Simulator_locs [interface] choiceTranscript.
+   *)
 
 End SigmaProtocolAlgorithms.
 
-Module SigmaProtocol (π : SigmaProtocolParams)
-  (Alg : SigmaProtocolAlgorithms π).
+Module SigmaProtocol
+  (DDHP : DiffieHellmannProtocolParams)
+  (GP : GroupParams)
+  (Alg : SigmaProtocolAlgorithms DDHP GP).
 
-  Import π.
   Import Alg.
+  Import GP. (* We actually only need [g], the group. *)
 
-  Notation " 'chPubKey' " :=
-    choicePubKey (in custom pack_type at level 2).
-  Notation " 'chPrivKey' " :=
-    choicePrivKey (in custom pack_type at level 2).
-  Notation " 'chTranscript' " :=
-    choiceTranscript (in custom pack_type at level 2).
-  (*Definition choiceInput :=  chProd (chProd choicePubKey choicePrivKey) choicePrivKey.)*)
-  Definition choiceInput :=  choicePubKey.
-  Notation " 'chInput' " := 
-    choiceInput (in custom pack_type at level 2).
+  (* This is a trick to give names to functions. *)
+  Definition DDH : nat := 0.
 
-  (**
-     This is a trick to give names to functions.
-   *)
-  Definition TRANSCRIPT : nat := 0.
-  Definition COM : nat := 1.
-  Definition VER : nat := 2.
-  Definition ADV : nat := 3.
-  Definition SOUNDNESS : nat := 4.
+  (* I want to store some elements of the group in the state. *)
+  Definition sk_A : Location := (chPElem ; 0%N).
+  Definition sk_B : Location := (chPElem ; 1%N).
 
-
-  Definition sk_A : Location := (choicePrivKey ; 0%N).
-  Definition sk_B : Location := (choicePrivKey ; 1%N).
-
-  Definition Protocol_locs' :=
-    fset [:: sk_A ; sk_B].
+  Definition Protocol_locs' := fset [:: sk_A ; sk_B].
 
   #[local] Open Scope package_scope.
+
+  Print fto.
 
   Definition Diffie_Hellman_real:
   package Protocol_locs'
     [interface] (** No procedures from other packages are imported. *)
-    [interface #val #[ TRANSCRIPT ] : chInput → chTranscript] (** The "TRANSCRIPT" proceducre is exported. *)
+    [interface #val #[ DDH ] : 'unit → 'group × 'group] (** The "DDH" proceducre is exported. *)
   :=
   [package
-    #def #[ TRANSCRIPT ] (keys : chInput) : chTranscript
+    #def #[ DDH ] (u : 'unit) : 'group × 'group
     {
-     let g := keys in
-     sk_A' ← get sk_A ;;
-     let e_a := (g^+ sk_A') in
-     A ← Send_EphKey e_a ;;
-     sk_B' ← get sk_B ;;
-     let e_b := g+ sk_B in
-     B ← Send_EphKey e_b ;;
-     @ret choiceTranscript (e_a, e_b)
+      (* Initially the state locations are empty. Let's fill them: *)
+      sk_alice ← sample uniform p ;;
+      sk_bob ← sample uniform p ;;
+      #put sk_A := sk_alice ;;
+      #put sk_B := sk_bob ;;
+
+      (* Now, let's start with the protocol. *)
+
+      (* Alice side: ephemeral key gen *)
+      sk_alice' ← get sk_A ;;
+      let e_a := (g^+ sk_alice') in
+
+      (* Bob side: ephemeral key gen *)
+      sk_bob' ← get sk_B ;;
+      let e_b := (g^+ sk_bob') in
+
+      (*
+        If we want to model this properly then we would also have a state
+        for the communication between Alice and Bob.
+        Right now, the [Send_EphKey] function does not make much sense.
+        It is essentially just [id].
+       *)
+      (*
+      e_a_at_bob ← Send_EphKey e_a ;;
+      e_b_at_alice ← Send_EphKey e_b ;;
+       *)
+      let e_a_at_bob := e_a in
+      let e_b_at_alice := e_b in
+
+      (* Alice side: final key gen *)
+      let fk_alice := (e_b_at_alice^+ sk_alice') in
+
+      (* Bob side: final key gen *)
+      let fk_bob := (e_a_at_bob^+ sk_bob') in
+
+     ret (fto fk_alice, fto fk_bob)
     }
   ].
 
