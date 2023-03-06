@@ -150,7 +150,7 @@ Module SigmaProtocol
     [interface #val #[ DDH ] : 'unit → 'group × 'group × 'group]  (** The "DDH" proceducre is exported. *)
   :=
   [package
-    #def #[ DDH ] (u : 'unit) : 'group × 'group × 'group
+    #def #[ DDH ] (_ : 'unit) : 'group × 'group × 'group
     {
       (* Initially the state locations are empty. Let's fill them: *)
       sk_alice ← sample uniform p ;;
@@ -201,25 +201,31 @@ Module SigmaProtocol
   ].
 
   (** *** Simulated implementation
-      Note that it uses the primitive [Simulate] that provides an
-      ideal simulation.
-  *)
+      Here, we really remove all the noise and just perform the mathematic
+      operations.
+   *)
 
   Definition Diffie_Hellman_ideal:
-  package Simulator_locs
+  package Protocol_locs'
     [interface] (** No procedures from other packages are imported. *)
-    [interface #val #[ TRANSCRIPT ] : chInput → chTranscript] (** The "TRANSCRIPT" proceducre is exported. *)
+    [interface #val #[ DDH ] : 'unit → 'group × 'group × 'group] (** The "DDH" proceducre is exported. *)
   :=
   [package
-    #def #[ TRANSCRIPT ] (keys : chInput) : chTranscript
+    #def #[ DDH ] (_ : 'unit) : 'group × 'group × 'group
     {
-     let '(g, sk_A, sk_B) := keys in
-     t ← Simulate g sk_A sk_B ;;
-     ret t
+      a ← sample uniform p ;;
+      b ← sample uniform p ;;
+      c ← sample uniform p ;;
+      #put sk_A := a ;;
+      #put sk_B := b ;;
+
+      (* We are saying the an attacker would not be able to differentiate between
+         our computed result and a randomly chosen one. *)
+      ret (fto (g^+ a), (fto (g^+ b), fto (g^+ c)))
     }
   ].
 
   Definition ɛ_DH A := AdvantageE Diffie_Hellman_real Diffie_Hellman_ideal A.
 
- 
+End SigmaProtocol.
 
