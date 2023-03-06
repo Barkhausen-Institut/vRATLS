@@ -137,8 +137,9 @@ Module SigmaProtocol
   (* I want to store some elements of the group in the state. *)
   Definition sk_A : Location := (chPElem ; 0%N).
   Definition sk_B : Location := (chPElem ; 1%N).
+  Definition fk : Location := (chPElem ; 2%N).
 
-  Definition Protocol_locs' := fset [:: sk_A ; sk_B].
+  Definition Protocol_locs' := fset [:: sk_A ; sk_B ; fk].
 
   #[local] Open Scope package_scope.
 
@@ -206,26 +207,51 @@ Module SigmaProtocol
    *)
 
   Definition Diffie_Hellman_ideal:
-  package Protocol_locs'
-    [interface] (** No procedures from other packages are imported. *)
-    [interface #val #[ DDH ] : 'unit → 'group × 'group × 'group] (** The "DDH" proceducre is exported. *)
-  :=
-  [package
-    #def #[ DDH ] (_ : 'unit) : 'group × 'group × 'group
-    {
-      a ← sample uniform p ;;
-      b ← sample uniform p ;;
-      c ← sample uniform p ;;
-      #put sk_A := a ;;
-      #put sk_B := b ;;
+    package Protocol_locs'
+      [interface] (** No procedures from other packages are imported. *)
+      [interface #val #[ DDH ] : 'unit → 'group × 'group × 'group]  (** The "DDH" proceducre is exported. *)
+    :=
+    [package
+       #def #[ DDH ] (_ : 'unit) : 'group × 'group × 'group
+         {
+           a ← sample uniform p ;;
+           b ← sample uniform p ;;
+           c ← sample uniform p ;;
 
-      (* We are saying the an attacker would not be able to differentiate between
-         our computed result and a randomly chosen one. *)
-      ret (fto (g^+ a), (fto (g^+ b), fto (g^+ c)))
-    }
-  ].
+           #put sk_A := a ;;
+           #put sk_B := b ;;
+           (* This was interesting:
+              When not putting [c] into the state, I received a cryptic error message.
+              It seems everything that was sampled needs to go into the state otherwise
+              the package is not valid.
+            *)
+           #put fk := c ;;
+
+           (* We are saying the an attacker would not be able to differentiate between
+              our computed result and a randomly chosen one. *)
+           ret (fto (g^+ a), (fto (g^+ b), fto (g^+ c)))
+         }
+    ].
 
   Definition ɛ_DH A := AdvantageE Diffie_Hellman_real Diffie_Hellman_ideal A.
+
+  (* I could not get any better error message with equations. *)
+  Fail Equations? foo : code Protocol_locs' [interface]
+                     (prod_choiceType
+                        (prod_choiceType
+                           (FinGroup.choiceType gT)
+                           (FinGroup.choiceType gT))
+                        (FinGroup.choiceType gT)) :=
+  foo := {code
+           a ← sample uniform p ;;
+           b ← sample uniform p ;;
+           c ← sample uniform p ;;
+
+           #put sk_A := a ;;
+           #put sk_B := b ;;
+
+           ret ((g^+ a), (g^+ b), (g^+ c))
+      }.
 
 End SigmaProtocol.
 
