@@ -60,7 +60,7 @@
 
           shellHook = ''
                     alias ll="ls -lasi"
-                    cd ssprove && make clean && make
+                    cd ssprove && make
                     cd ..
                     '';
 #          shellHook = ''
