@@ -188,11 +188,9 @@ Module SigmaProtocol
       let fk_bob := (e_a_at_bob^+ sk_bob') in
 
       (* To reason about the correctness of the protocol/program
-         just use assertions:
+         just use assertions (of type [bool] not [Prop]!):
        *)
-      (* FIXME equality for group elements?
-      assert (fk_alice = fk_bob) ;;
-      *)
+      assert (fk_alice == fk_bob) ;;
 
       (* Our output here is essentially our communication, i.e.,
          everything that the attacker should be able to see but hopefully
