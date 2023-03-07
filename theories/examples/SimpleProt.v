@@ -139,7 +139,9 @@ Module SigmaProtocol
   Definition sk_B : Location := (chPElem ; 1%N).
   Definition fk : Location := (chPElem ; 2%N).
 
-  Definition L__0 := fset [:: sk_A ; sk_B].
+  Definition L__0 := fset [:: sk_A ; sk_B ; fk].
+  (* Using [L__0 ≔ fset[:: sk_A ; sk_B] ] here will make the proof more complicated because then
+     we need to use another invariant over the heap. *)
   Definition L__1 := fset [:: sk_A ; sk_B ; fk].
 
   #[local] Open Scope package_scope.
@@ -154,7 +156,8 @@ Module SigmaProtocol
   Definition Game__Export : Interface := [interface #val #[ DDH ] : 'unit → 'group × 'group × 'group].
 
   Definition DH__real:
-  package L__0 Game__Import Game__Export
+    package L__0
+      Game__Import Game__Export
   :=
   [package
     #def #[ DDH ] (_ : 'unit) : 'group × 'group × 'group
@@ -277,7 +280,72 @@ Module SigmaProtocol
       fdisjoint L__A L__1 → (* the state of the attacker is disjoint to the state of 2nd package of the game pair. *)
       ɛ__DH A = 0. (* the attacker cannot distinguish between the two packages in the game. *)
   Proof.
-  Admitted.
+    intros.
+  (* Our goal now is to rewrite [epsilon__DH] with 0.
+     The doc states:
+     We need to prove a lemma of perfect indistinguishability of the two packages in the
+     Game Pair.
+   *)
+    eapply eq_rel_perf_ind_eq. (* Invariant: heaps are equal. *)
+    - exact H.
+    - exact H0.
+    - simplify_eq_rel x.  (* [x] becomes the argument to the procedure. *)
+      (* Check this state out in the editor!
+         The proof actually reasons about the state via pre and post conditions.
+         (Similar to Hoare logic.)
+         Here, it is called a relational judgement.
+       *)
+      ssprove_code_simpl_more.
+      (* The first two code steps are equal: *)
+      ssprove_sync_eq.
+      intros.
+      ssprove_sync_eq.
+      intros.
+      (* This one now is more tricky.
+         My strategy: I'm just going to delay dealing with the last sampling until the very end.
+       *)
+      ssprove_swap_rhs 0%N.
+      ssprove_sync_eq.
+      ssprove_swap_rhs 0%N.
+      ssprove_sync_eq.
+      (* Now, we have the differences between the two programs. *)
+      (* I would like to get rid of the [get]s now.
+         My strategy: I need to teach SSProve that [a = x0] and [a0 = x1].
+         I want SSProve to remember that we wrote these values to the locations.
+         This is only possible when I bring the code into a particular form where the
+         [put] is followed immediately by a [get].
+         I need to restart the proof.
+       *)
+      Restart.
+
+    intros.
+    eapply eq_rel_perf_ind_eq. (* Invariant: heaps are equal. *)
+    - exact H.
+    - exact H0.
+    - simplify_eq_rel x.
+      ssprove_code_simpl_more.
+      ssprove_sync_eq. intros.
+      ssprove_sync_eq. intros.
+      (* Remove the [get]s on the left-hand side. *)
+      ssprove_swap_lhs 1%N. (* Now we have the proper form for [get] removal. *)
+      ssprove_contract_put_get_lhs.
+      ssprove_swap_rhs 0%N. (* Go away [sample]! *)
+      ssprove_sync_eq. (* 1st [put] gone. *)
+      ssprove_contract_put_get_lhs. (* 2nd [get] gone. *)
+      ssprove_swap_rhs 0%N. (* Go away [sample]! *)
+      ssprove_sync_eq. (* 2nd [put] gone. *)
+      (* At this, we are left with the assertion (lhs) and the sampling (rhs). *)
+      (*
+        - There are rules still missing in SSProve. It would have helped to have
+          a lemma that just kicks out assertions that are not used anywhere.
+          I had to introduce the same assertion into the ideal version to make further progress.
+        - I also had to store the final key into the state in the real version.
+          The key lesson learned here is, if the states are different then we need to
+          use the other invariant. But we cannot just use the same state and not use
+          one of the state slots in one of the version. The problem that
+          we are facing is that we cannot drop a lonely [put].
+       *)
+      
 
 End SigmaProtocol.
 
