@@ -139,16 +139,22 @@ Module SigmaProtocol
   Definition sk_B : Location := (chPElem ; 1%N).
   Definition fk : Location := (chPElem ; 2%N).
 
-  Definition Protocol_locs' := fset [:: sk_A ; sk_B ; fk].
+  Definition L__0 := fset [:: sk_A ; sk_B].
+  Definition L__1 := fset [:: sk_A ; sk_B ; fk].
 
   #[local] Open Scope package_scope.
 
   Print fto.
 
-  Definition Diffie_Hellman_real:
-  package Protocol_locs'
-    [interface] (** No procedures from other packages are imported. *)
-    [interface #val #[ DDH ] : 'unit → 'group × 'group × 'group]  (** The "DDH" proceducre is exported. *)
+  (* We need these definitions multiple times below.
+     So just define them once here.
+     Note that a game package needs to export a procedure of type ['unit → t] where [t] is some choice type.
+   *)
+  Definition Game__Import : Interface := [interface].
+  Definition Game__Export : Interface := [interface #val #[ DDH ] : 'unit → 'group × 'group × 'group].
+
+  Definition DH__real:
+  package L__0 Game__Import Game__Export
   :=
   [package
     #def #[ DDH ] (_ : 'unit) : 'group × 'group × 'group
@@ -206,10 +212,8 @@ Module SigmaProtocol
       operations.
    *)
 
-  Definition Diffie_Hellman_ideal:
-    package Protocol_locs'
-      [interface] (** No procedures from other packages are imported. *)
-      [interface #val #[ DDH ] : 'unit → 'group × 'group × 'group]  (** The "DDH" proceducre is exported. *)
+  Definition DH__ideal:
+    package L__1 Game__Import Game__Export
     :=
     [package
        #def #[ DDH ] (_ : 'unit) : 'group × 'group × 'group
@@ -233,25 +237,47 @@ Module SigmaProtocol
          }
     ].
 
-  Definition ɛ_DH A := AdvantageE Diffie_Hellman_real Diffie_Hellman_ideal A.
-
-  (* I could not get any better error message with equations. *)
-  Fail Equations? foo : code Protocol_locs' [interface]
+  (* I could not get any better error messages with equations. *)
+  Equations ddh_ideal : code L__1 [interface]
                      (prod_choiceType
                         (prod_choiceType
                            (FinGroup.choiceType gT)
                            (FinGroup.choiceType gT))
                         (FinGroup.choiceType gT)) :=
-  foo := {code
+  ddh_ideal := {code
            a ← sample uniform p ;;
            b ← sample uniform p ;;
            c ← sample uniform p ;;
 
            #put sk_A := a ;;
            #put sk_B := b ;;
+           #put fk := c ;;
 
            ret ((g^+ a), (g^+ b), (g^+ c))
       }.
+
+  Check AdvantageE.
+
+  (*
+    Now, I can define an advantage, i.e., a game.
+    An attacker (package) [A] can not distinguish between the two (package) versions.
+   *)
+  Definition ɛ__DH A := AdvantageE DH__real DH__ideal A.
+
+  (* The exported interface for running the game via the attacker package is
+     predefined for us by SSProve.
+   *)
+  Check A_export.
+
+  Theorem DDH__security : ∀ L__A A,
+      ValidPackage L__0 Game__Import Game__Export DH__real → (* 1st game pair package is valid *)
+      ValidPackage L__1 Game__Import Game__Export DH__ideal → (* 2nd game pair package is valid *)
+      ValidPackage L__A Game__Export A_export A → (* the valid attacker package *)
+      fdisjoint L__A L__0 → (* the state of the attacker is disjoint to the state of 1st package of the game pair. *)
+      fdisjoint L__A L__1 → (* the state of the attacker is disjoint to the state of 2nd package of the game pair. *)
+      ɛ__DH A = 0. (* the attacker cannot distinguish between the two packages in the game. *)
+  Proof.
+  Admitted.
 
 End SigmaProtocol.
 
