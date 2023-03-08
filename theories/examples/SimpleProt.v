@@ -139,10 +139,11 @@ Module SigmaProtocol
   Definition sk_B : Location := (chPElem ; 1%N).
   Definition fk : Location := (chPElem ; 2%N).
 
-  Definition L__0 := fset [:: sk_A ; sk_B ; fk].
+  (* Definition L__0 := fset [:: sk_A ; sk_B ; fk]. *)
   (* Using [L__0 ≔ fset[:: sk_A ; sk_B] ] here will make the proof more complicated because then
      we need to use another invariant over the heap. *)
-  Definition L__1 := fset [:: sk_A ; sk_B ; fk].
+  Definition L__0 := fset [:: sk_A ; sk_B].
+  Definition L__1 := L__0 :|: fset [:: fk].
 
   #[local] Open Scope package_scope.
 
@@ -200,7 +201,20 @@ Module SigmaProtocol
       (* To reason about the correctness of the protocol/program
          just use assertions (of type [bool] not [Prop]!):
        *)
-      assert (fk_alice == fk_bob) ;;
+      (*
+      [assert (fk_alice == fk_bob) ;;]
+      Lesson learned: Don't define assertions that you do not use later on the code.
+      The "ideal" package will need to define those too.
+       *)
+
+      (* Lesson learned:
+         If the states look the same then I have to treat them in the same way.
+         It is currently not possible to remove "lonely" [put] calls.
+
+         I cannot put [fk_alice] blindly because obviously the type is not the
+         same as for yet another value sampled from the distribution.
+         [#put fk := fk_alice ;;]
+       *)
 
       (* Our output here is essentially our communication, i.e.,
          everything that the attacker should be able to see but hopefully
@@ -215,32 +229,81 @@ Module SigmaProtocol
       operations.
    *)
 
-  Definition DH__ideal:
-    package L__1 Game__Import Game__Export
-    :=
-    [package
-       #def #[ DDH ] (_ : 'unit) : 'group × 'group × 'group
-         {
-           a ← sample uniform p ;;
-           b ← sample uniform p ;;
-           c ← sample uniform p ;;
+  Lemma sk_A_in_L__1: sk_A \in L__1.
+  Proof.
+    unfold L__1. unfold L__0. (* Search "in_fset". *)
+    rewrite in_fsetU. (* Locate "||". Print orb. Search "fset". *)
+    apply /orP. left.
+    rewrite fset_cons.
+    rewrite in_fsetU.
+    apply /orP. left.
+    rewrite in_fset1.
+    apply /eqP.
+    reflexivity.
+  Qed.
 
-           #put sk_A := a ;;
-           #put sk_B := b ;;
-           (* This was interesting:
-              When not putting [c] into the state, I received a cryptic error message.
-              It seems everything that was sampled needs to go into the state otherwise
-              the package is not valid.
-            *)
-           #put fk := c ;;
+  Lemma sk_B_in_L__1: sk_B \in L__1.
+  Proof.
+    unfold L__1. unfold L__0.
+    rewrite in_fsetU.
+    apply /orP. left.
+    rewrite fset_cons.
+    rewrite in_fsetU.
+    apply /orP. right.
+    rewrite fset_cons.
+    rewrite in_fsetU.
+    apply /orP. left.
+    rewrite in_fset1.
+    apply /eqP.
+    reflexivity.
+  Qed.
 
-           (* We are saying the an attacker would not be able to differentiate between
-              our computed result and a randomly chosen one. *)
-           ret (fto (g^+ a), (fto (g^+ b), fto (g^+ c)))
+  Lemma fk_in_L__1: fk \in L__1.
+  Proof.
+    unfold L__1. unfold L__0.
+    rewrite in_fsetU.
+    apply /orP. right.
+    rewrite fset_cons.
+    rewrite in_fsetU.
+    apply /orP. left.
+    rewrite in_fset1.
+    apply /eqP.
+    reflexivity.
+  Qed.
+
+
+  Definition DH__ideal: package L__1 Game__Import Game__Export.
+    refine(
+        [package
+           #def #[ DDH ] (_ : 'unit) : 'group × 'group × 'group
+           {
+             a ← sample uniform p ;;
+             b ← sample uniform p ;;
+             c ← sample uniform p ;;
+
+             #put sk_A := a ;;
+             #put sk_B := b ;;
+             (* This was interesting:
+                When not putting [c] into the state, I received a cryptic error message.
+                It seems everything that was sampled needs to go into the state otherwise
+                the package is not valid.
+              *)
+             #put fk := c ;;
+
+             (* We are saying the an attacker would not be able to differentiate between
+                our computed result and a randomly chosen one. *)
+             ret (fto (g^+ a), (fto (g^+ b), fto (g^+ c)))
          }
-    ].
+      ]).
+     ssprove_valid.
+    - apply sk_A_in_L__1.
+    - apply sk_B_in_L__1.
+    - apply fk_in_L__1 .
+  Defined.
 
-  (* I could not get any better error messages with equations. *)
+  (* There is also a way to package a defined ValidCode into a ValidPackage.
+     This does not work in the above case because the return type differ.
+   *)
   Equations ddh_ideal : code L__1 [interface]
                      (prod_choiceType
                         (prod_choiceType
@@ -258,6 +321,16 @@ Module SigmaProtocol
 
            ret ((g^+ a), (g^+ b), (g^+ c))
       }.
+  Next Obligation.
+    ssprove_valid.
+    - apply sk_A_in_L__1.
+    - apply sk_B_in_L__1.
+    - apply fk_in_L__1 .
+  Defined.
+
+  (* It is also possible to extend the ssprove_valid db
+     with hints for the lemmas.
+   *)
 
   Check AdvantageE.
 
@@ -286,9 +359,19 @@ Module SigmaProtocol
      We need to prove a lemma of perfect indistinguishability of the two packages in the
      Game Pair.
    *)
-    eapply eq_rel_perf_ind_eq. (* Invariant: heaps are equal. *)
+    Check eq_rel_perf_ind_ignore.
+    Check fsubset.
+    eapply (eq_rel_perf_ind_ignore (fset [:: fk])). (* Invariant: heaps are subsets. *)
     - exact H.
     - exact H0.
+    - unfold fsubset. rewrite fset_cons. unfold L__1. rewrite <- fset0E. rewrite fsetUC.
+      rewrite fsetUA. rewrite fset_cons. rewrite <- fset0E. rewrite fsetU0.
+      rewrite fsetUA. rewrite fset1E. rewrite fsetUA. rewrite fsetU0.
+      rewrite fsetUid. rewrite fset_cons. rewrite <- fset0E. rewrite fsetUC. rewrite fsetUA.
+      rewrite fsetUC. rewrite fsetUA.
+      rewrite fsetUid. rewrite fsetUC.
+      apply /eqP.
+      reflexivity.
     - simplify_eq_rel x.  (* [x] becomes the argument to the procedure. *)
       (* Check this state out in the editor!
          The proof actually reasons about the state via pre and post conditions.
@@ -345,6 +428,7 @@ Module SigmaProtocol
           one of the state slots in one of the version. The problem that
           we are facing is that we cannot drop a lonely [put].
        *)
+     
       
 
 End SigmaProtocol.
