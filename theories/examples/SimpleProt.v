@@ -345,6 +345,18 @@ Module SigmaProtocol
    *)
   Check A_export.
 
+  Lemma ignored_is_subset : fsubset (fset [:: fk]) (L__0 :|: L__1).
+  Proof.
+    unfold fsubset. rewrite fset_cons. unfold L__1. rewrite <- fset0E. rewrite fsetUC.
+    rewrite fsetUA. rewrite fset_cons. rewrite <- fset0E. rewrite fsetU0.
+    rewrite fsetUA. rewrite fset1E. rewrite fsetUA. rewrite fsetU0.
+    rewrite fsetUid. rewrite fset_cons. rewrite <- fset0E. rewrite fsetUC. rewrite fsetUA.
+    rewrite fsetUC. rewrite fsetUA.
+    rewrite fsetUid. rewrite fsetUC.
+    apply /eqP.
+    reflexivity.
+  Qed.
+
   Theorem DDH__security : ∀ L__A A,
       ValidPackage L__0 Game__Import Game__Export DH__real → (* 1st game pair package is valid *)
       ValidPackage L__1 Game__Import Game__Export DH__ideal → (* 2nd game pair package is valid *)
@@ -364,14 +376,7 @@ Module SigmaProtocol
     eapply (eq_rel_perf_ind_ignore (fset [:: fk])). (* Invariant: heaps are subsets. *)
     - exact H.
     - exact H0.
-    - unfold fsubset. rewrite fset_cons. unfold L__1. rewrite <- fset0E. rewrite fsetUC.
-      rewrite fsetUA. rewrite fset_cons. rewrite <- fset0E. rewrite fsetU0.
-      rewrite fsetUA. rewrite fset1E. rewrite fsetUA. rewrite fsetU0.
-      rewrite fsetUid. rewrite fset_cons. rewrite <- fset0E. rewrite fsetUC. rewrite fsetUA.
-      rewrite fsetUC. rewrite fsetUA.
-      rewrite fsetUid. rewrite fsetUC.
-      apply /eqP.
-      reflexivity.
+    - apply ignored_is_subset.
     - simplify_eq_rel x.  (* [x] becomes the argument to the procedure. *)
       (* Check this state out in the editor!
          The proof actually reasons about the state via pre and post conditions.
@@ -380,17 +385,17 @@ Module SigmaProtocol
        *)
       ssprove_code_simpl_more.
       (* The first two code steps are equal: *)
-      ssprove_sync_eq.
+      ssprove_sync.
       intros.
-      ssprove_sync_eq.
+      ssprove_sync.
       intros.
       (* This one now is more tricky.
          My strategy: I'm just going to delay dealing with the last sampling until the very end.
        *)
       ssprove_swap_rhs 0%N.
-      ssprove_sync_eq.
+      ssprove_sync.
       ssprove_swap_rhs 0%N.
-      ssprove_sync_eq.
+      ssprove_sync.
       (* Now, we have the differences between the two programs. *)
       (* I would like to get rid of the [get]s now.
          My strategy: I need to teach SSProve that [a = x0] and [a0 = x1].
@@ -402,21 +407,22 @@ Module SigmaProtocol
       Restart.
 
     intros.
-    eapply eq_rel_perf_ind_eq. (* Invariant: heaps are equal. *)
+    eapply eq_rel_perf_ind_ignore.
     - exact H.
     - exact H0.
+    - apply ignored_is_subset.
     - simplify_eq_rel x.
       ssprove_code_simpl_more.
-      ssprove_sync_eq. intros.
-      ssprove_sync_eq. intros.
+      ssprove_sync. intros.
+      ssprove_sync. intros.
       (* Remove the [get]s on the left-hand side. *)
       ssprove_swap_lhs 1%N. (* Now we have the proper form for [get] removal. *)
       ssprove_contract_put_get_lhs.
       ssprove_swap_rhs 0%N. (* Go away [sample]! *)
-      ssprove_sync_eq. (* 1st [put] gone. *)
+      ssprove_sync. (* 1st [put] gone. *)
       ssprove_contract_put_get_lhs. (* 2nd [get] gone. *)
       ssprove_swap_rhs 0%N. (* Go away [sample]! *)
-      ssprove_sync_eq. (* 2nd [put] gone. *)
+      ssprove_sync. (* 2nd [put] gone. *)
       (* At this, we are left with the assertion (lhs) and the sampling (rhs). *)
       (*
         - There are rules still missing in SSProve. It would have helped to have
@@ -428,7 +434,17 @@ Module SigmaProtocol
           one of the state slots in one of the version. The problem that
           we are facing is that we cannot drop a lonely [put].
        *)
-     
+      eapply r_const_sample_R.
+      + (* Search "LosslessOp". *) apply LosslessOp_uniform.
+      + intros. eapply r_put_rhs.
+        (* At this point, I'm basically at the core of the proof.
+           I need the following rewrite:
+           [g ^+ a0 ^+ a = g ^+ x0]
+           or
+           [a0 ^+ a = x0]
+         *)
+        Search "^+".
+        eapply r_reflexivity_alt.
       
 
 End SigmaProtocol.
