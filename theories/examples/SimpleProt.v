@@ -110,6 +110,10 @@ Module Type SigmaProtocolAlgorithms (DDHP : DiffieHellmannProtocolParams) (GP : 
 
   (* [p] itself is derived from the DiffieHellmann Parameters. *)
   Definition p := #|Space|.
+  #[export] Instance p_pos : Positive p.
+  Proof.
+    unfold p. exact Space_pos.
+  Defined.
   Definition chPElem : choice_type := 'fin p.
 
   Parameter Protocol_locs : {fset Location}.    (* | Here I will note all the steps of the protocol *)
@@ -356,6 +360,62 @@ Module SigmaProtocol
     apply /eqP.
     reflexivity.
   Qed.
+(*
+  Lemma perf_ind_arit :
+    ∀ {A B: choiceType} c0 c1 (pre : precond) (post : postcond A A) (a a0 x0 : Arit (uniform p)),
+      ⊢ ⦃ pre ⦄ c0 (g ^+ x0) ≈ c1 (g ^+ x0) ⦃ post ⦄ →
+      ⊢ ⦃ pre ⦄ c0 (g ^+ a0 ^+ a) ≈ c1 (g ^+ x0) ⦃ post ⦄.
+ *)
+
+
+  Search "^+".
+  Search expgn_rec.
+
+  (*
+    fto : fin-to-option
+    otf : option-to-fin
+   *)
+
+  Check (Finite.sort DDHP.Space).
+
+  (* Understanding the types. *)
+  Definition g    (a : Arit (uniform p)) : DDHP.Space := otf a.
+  Definition g'   (a : DDHP.Space) : 'fin p := fto a.
+  Definition g''  (a : 'fin p) : nat := ('I_p a * 'I_p a)%nat.
+  Definition g''' (a : Arit (uniform p)) : nat := 'I_p (g' (g a)).
+  (* I need the inverse function of g⁗.
+     For that, I need to preserve [p].
+   *)
+  (*
+  Definition g'''' (a : Arit (uniform p)) : 'fin (p * p) := ('I_p a * 'I_p a)%nat.
+   *)
+  (*
+    I want to apply expgM!
+   *)
+  Definition f (a : Arit (uniform p)) : Arit (uniform (p * p)) → Arit (uniform p) * nat :=
+     fun x =>
+      let '(b,c) := ch2prod x in
+      let d := ((g''' a) * (g''' c))%nat in (* 'fin (a * c) *)
+      (b,d).
+
+  (* Search nat. Print divn. *)
+  (*
+  Definition h (a : Arit (uniform p)) : Arit (uniform p) * nat → Arit (uniform (p * p)) :=
+                  fun x =>
+                    let '(b,n) := x in
+                    chProd (b, divn n a).
+   *)
+  Lemma bijective_f : forall a, bijective (f a).
+  Proof.
+    intros.
+    (* Search bijective. *)
+    (* apply Bijective. *)
+    Check bijective.
+    Check Bijective.
+    Check cancel.
+    unfold f. simpl. unfold g'''. unfold g'. unfold g. simpl.
+    admit.
+    Admitted.
 
   Theorem DDH__security : ∀ L__A A,
       ValidPackage L__0 Game__Import Game__Export DH__real → (* 1st game pair package is valid *)
@@ -437,15 +497,98 @@ Module SigmaProtocol
       eapply r_const_sample_R.
       + (* Search "LosslessOp". *) apply LosslessOp_uniform.
       + intros. eapply r_put_rhs.
-        (* At this point, I'm basically at the core of the proof.
-           I need the following rewrite:
-           [g ^+ a0 ^+ a = g ^+ x0]
-           or
-           [a0 ^+ a = x0]
+
+        (* Careful here!
+           It seems like a good idea to remove the [ret].
+           But that also is the last command and will drop us
+           from [≈] (perfect indistinguishability) into [=] (equality).
+
+           Check out the steps below.
+           We end up having to prove [(a0 * a)%N = x0] which is
+           exactly the difference in the two programs.
+           But this lemma cannot be proven!
+           What we actually want to prove is [(a0 * a)%N ≈ x0].
+           We want to state that these two sides are indistinguishable!
+
+        eapply r_ret.
+        intros. split.
+        * apply f_equal. apply f_equal. apply f_equal.
+          (* At this point, I'm basically at the core of the proof.
+             I have to prove [g ^+ a0 ^+ a = g ^+ x0].
+           *)
+          (* Search "^+". *)
+          rewrite <- expgM. apply f_equal.
+          (* Reduced to a proof for [(a0 * a)%N = x0]. *)
+          destruct x0. destruct a0. destruct a. simpl.
+        * Search set_rhs. unfold set_rhs in H4. Search set_heap. inversion H4. destruct H5.
+        *)
+
+        (* Our goal is to finish off with [r_reflexivity], in fact
+           stating that the computations on both sides are indistinguishable
+           from each other for an attacker.
          *)
-        Search "^+".
-        eapply r_reflexivity_alt.
-      
+        eapply r_ret. intros. split.
+        * repeat f_equal. Search "^+". 1: { rewrite <- expg1. f_equal. destruct a0. cbn. inversion i. admit.  } admit.
+        * admit.
+    - ssprove_valid.
+    - auto.
+    - auto.
+
+      Restart.
+
+    intros.
+    eapply eq_rel_perf_ind_ignore.
+    - exact H.
+    - exact H0.
+    - apply ignored_is_subset.
+    - simplify_eq_rel x.
+      ssprove_code_simpl_more.
+      ssprove_sync. intros.
+
+      (* Take care of the put/get combos. *)
+      ssprove_swap_lhs 0%N.
+      ssprove_swap_lhs 2%N.
+      ssprove_swap_lhs 1%N.
+      ssprove_contract_put_get_lhs.
+      ssprove_swap_rhs 1%N.
+      ssprove_swap_rhs 0%N.
+      ssprove_sync.
+
+      eapply r_transR.
+      Check r_uniform_prod.
+      1: { eapply r_uniform_prod. intros. eapply rreflexivity_rule. }
+      simpl.
+      eapply @r_uniform_bij with (f := f a).
+      (*
+        I may be on the wrong track here because
+        Z_p * Z_p does not mean that I enter into Z_p again.
+        But that is not a problem in fact.
+        I can have :
+        [Definition f : Z_{p}_{} → Z_{p}_{}_{} → Z_{p*p}]
+        and the inverse operation:
+        [Definition g : Z____{}_{p*p} → Z_{p}×Z_{p}_{}_{}]
+        Or more general:
+        [Definition f : Z___{i} → Z_{j}_{} → Z_{i*j}]
+        and the inverse operation:
+        [Definition g : Z_{i*j} → Z_{i}×Z_{j}_{}_{}]
+       *)
+      Check expgM.
+      (*
+      f (x1, a) = y
+      g y = (x1, a)
+       *)
+
+      ssprove_sync. intros.
+      (* Remove the [get]s on the left-hand side. *)
+
+
+
+    - ssprove_valid.
+    - auto.
+    - auto.
+
+  Admitted.
+
 
 End SigmaProtocol.
 
