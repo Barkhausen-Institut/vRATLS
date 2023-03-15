@@ -379,10 +379,12 @@ Module SigmaProtocol
   Check (Finite.sort DDHP.Space).
 
   (* Understanding the types. *)
+  (*
   Definition g    (a : Arit (uniform p)) : DDHP.Space := otf a.
   Definition g'   (a : DDHP.Space) : 'fin p := fto a.
   Definition g''  (a : 'fin p) : nat := ('I_p a * 'I_p a)%nat.
   Definition g''' (a : Arit (uniform p)) : nat := 'I_p (g' (g a)).
+  *)
   (* I need the inverse function of g⁗.
      For that, I need to preserve [p].
    *)
@@ -392,12 +394,13 @@ Module SigmaProtocol
   (*
     I want to apply expgM!
    *)
-  Definition f (a : Arit (uniform p)) : Arit (uniform (p * p)) → Arit (uniform p) * nat :=
+  (*
+  Definition f' (a : Arit (uniform p)) : Arit (uniform (p * p)) → Arit (uniform p) * nat :=
      fun x =>
       let '(b,c) := ch2prod x in
       let d := ((g''' a) * (g''' c))%nat in (* 'fin (a * c) *)
       (b,d).
-
+   *)
   (* Search nat. Print divn. *)
   (*
   Definition h (a : Arit (uniform p)) : Arit (uniform p) * nat → Arit (uniform (p * p)) :=
@@ -405,6 +408,55 @@ Module SigmaProtocol
                     let '(b,n) := x in
                     chProd (b, divn n a).
    *)
+  Check Zp_mul.
+  Definition k (a b : nat) : 'I_(a * b)%nat.+1 :=
+    Zp_mul (inZp a) (inZp b).
+
+  Search "Zp".
+  Locate Zp_add.
+  Print mathcomp.algebra.zmodp.
+  Search "^+".
+  Locate "^-".
+  Check invg.
+  Search invg.
+  Locate "^+".
+  Check expgn.
+  Search (nat → baseFinGroupType).
+  (*
+    To exploit this, we need a baseFinGroupType!
+    Hence, we cannot work on the sampling space Z_p.
+   *)
+  Lemma inv : forall (x : gT) (y:nat), x = (x ^+ y) ^- y.
+  Admitted.
+
+  Search baseFinGroupType.
+
+  (*
+    The below lemma is what we would need to prove.
+   *)
+  Lemma inv' : forall (x y xy z: nat)
+                 (xy' y': 'I_(x*y).+1), (* The inverse operation of multiplication needs to be on a group. *)
+      xy = (x * y)%nat →  (* First direction: multiplication on natural numbers. *)
+      y' = inZp y →     (* Second direction: division on natural numbers requires a detour via a group. *)
+      xy' = inZp xy →
+      z = (Zp_mul xy' (y' ^- 1)) →
+      x = z.
+  Admitted.
+
+
+  Definition f (a : Arit (uniform p)) : Arit (uniform (p * p)) → Arit (uniform p) * 'I_(a * p)%nat.+1 :=
+     fun x =>
+      let '(b,c) := ch2prod x in
+      let d := (Zp_mul (inZp a) (inZp c)) in
+      (b,d).
+(*
+  Definition g (a : Arit (uniform p)) : Arit (uniform p) * 'I_(a * p)%nat.+1  → Arit (uniform (p * p)) :=
+     fun x =>
+      let '(b,d) := ch2prod x in
+      let c := (Zp_mul (inZp a) (inZp c)) in
+      fto (b,d).
+
+
   Lemma bijective_f : forall a, bijective (f a).
   Proof.
     intros.
@@ -416,6 +468,7 @@ Module SigmaProtocol
     unfold f. simpl. unfold g'''. unfold g'. unfold g. simpl.
     admit.
     Admitted.
+ *)
 
   Theorem DDH__security : ∀ L__A A,
       ValidPackage L__0 Game__Import Game__Export DH__real → (* 1st game pair package is valid *)
@@ -558,7 +611,12 @@ Module SigmaProtocol
       Check r_uniform_prod.
       1: { eapply r_uniform_prod. intros. eapply rreflexivity_rule. }
       simpl.
-      eapply @r_uniform_bij with (f := f a).
+      (* eapply rsymmetry.*)
+      eapply r_uniform_bij.
+
+      Definition f (a : Arit (uniform p)) : forall x:Arit (uniform p), (Arit (uniform p)) * 'I_(x ^+ a)
+      Definition f_inv (a : Arit (uniform p)) : (Arit (uniform p)) * nat → Arit (uniform p)
+
       (*
         I may be on the wrong track here because
         Z_p * Z_p does not mean that I enter into Z_p again.
