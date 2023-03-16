@@ -21,6 +21,7 @@ From Crypt Require Import Axioms ChoiceAsOrd SubDistr Couplings
 
 From Coq Require Import Utf8.
 From extructures Require Import ord fset fmap.
+Require Import Lia.
 
 From Equations Require Import Equations.
 Require Equations.Prop.DepElim.
@@ -431,18 +432,94 @@ Module SigmaProtocol
 
   Search baseFinGroupType.
 
+
+  Lemma my_mod : forall x y:nat, (x %% (x * y.+1).+1)%N = x.
+  Proof.
+    intros.
+    Search ((?X %% ?Y)%N = ?X).
+    rewrite modn_small.
+    1: {reflexivity.}
+      Search ((?X < ?Y.+1)%N).
+    Search ((_ < _.+1)%N). rewrite ltnS. Search ((?X <= (?X * _) )%N). apply leq_pmulr. Search ((0 < _.+1)%N). apply ltn0Sn.
+  Qed.
+
+  Lemma my_mod' : forall x y:nat, (y %% (x.+1 * y).+1)%N = y.
+  Proof.
+    intros.
+    rewrite mulnC.
+    apply my_mod.
+  Qed.
+
+  Lemma my_mod'' : forall x y:nat, (x %% (x.+1 * y.+1).+1)%N = x.
+  Proof.
+    intros.
+    Search ((?X %% ?Y)%N = ?X).
+    rewrite modn_small.
+    1: {reflexivity.}
+      Search ((?X < ?Y.+1)%N).
+    Search ((_ < _.+1)%N). rewrite ltnS.
+    Search ((?X <= (?X + _) )%N).
+    Search ((_.+1 * _ = _)%N). Search ((_ <= _ * _)%N).
+    rewrite <- muln1 at 1.
+    apply leq_mul.
+    - apply leqnSn.
+    - apply ltn0Sn.
+  Qed.
+
+  Lemma my_mul : forall (x y : nat)
+                   (x' y'  : 'I_(x.+1*y.+1).+1),
+      x' = inZp x →
+      y' = inZp y →
+      inZp (x * y) = x' *+ y'.
+  Proof.
+    intros.
+    rewrite Zp_mulrn.
+    f_equal.
+    Search (inZp _).
+    rewrite H H0.
+    simpl.
+    rewrite my_mod''. f_equal. rewrite mulnC. rewrite my_mod''. reflexivity.
+  Qed.
+
+
   (*
     The below lemma is what we would need to prove.
    *)
-  Lemma inv' : forall (x y xy z: nat)
-                 (xy' y': 'I_(x*y).+1), (* The inverse operation of multiplication needs to be on a group. *)
+  Lemma inv' : forall (x  y  xy  z: nat)
+                 (x' y' xy'  : 'I_(x*y).+1), (* The inverse operation of multiplication needs to be on a group. *)
       xy = (x * y)%nat →  (* First direction: multiplication on natural numbers. *)
+      x' = inZp x →
       y' = inZp y →     (* Second direction: division on natural numbers requires a detour via a group. *)
       xy' = inZp xy →
       z = (Zp_mul xy' (y' ^- 1)) →
       x = z.
-  Admitted.
+  Proof.
+    intros.
+    rewrite H3 H2 H1.
+    unfold Zp_mul.
+    (*
+      This feels to me like a very general lemma that should hold regardless
+      of our special case here.
+     *)
+    Search inZp.
+    rewrite <- Zp_mulrn.
+    rewrite <- Zp_mulrn.
+    rewrite Zp_expg.
+    Search inZp.
+    rewrite (valZpK (x*y)).
+    rewrite <- Zp_mulrn.
+    unfold "^-".
+    unfold FinGroup.inv.
+    simpl.
+    Search "inv".
+    Search "^+".
+    Print mathcomp.algebra.zmodp.
 
+
+    Lemma mul : forall (x y : nat) (x' y' xy'  : 'I_(x*y).+1),
+        x' = inZp x →
+        y' = inZp y →
+        inZp (x' * y') = x * y.
 
   Definition f (a : Arit (uniform p)) : Arit (uniform (p * p)) → Arit (uniform p) * 'I_(a * p)%nat.+1 :=
      fun x =>
