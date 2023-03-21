@@ -423,16 +423,67 @@ Module SigmaProtocol
   Locate "^+".
   Check expgn.
   Search (nat → baseFinGroupType).
+
+  Check cyclePmin.
+  Locate cyclePmin.
+  Check proj1_sig.
+  Check bijective.
+  Print bijective.
+  Locate "%:R".
+  Check in_setT.
+
+  (* ElGamal approach: *)
+  Definition q : nat := #[g]. (* Cardinality of group g. *)
+  Definition f''' (a : 'Z_q) : gT := g ^+ a.
+  Definition g''' : forall (y:gT), (y \in <[g]>) -> 'Z_q :=
+    fun y H =>
+      let a' := proj1_sig(@cyclePmin gT g y H) in
+      (a' %% q)%:R. (* We need the division [%%] in the the polynomial ring! *)
+
+  (*
+    Idea: Apply this [mulKn] or [mulnK].
+   *)
+
+  Definition coerc_arit_nat (a : Arit (uniform p)) : nat := a.
+
+  Inductive SNat : nat -> Type :=
+  | SNatc : forall n:nat, SNat n.
+
+  Definition my_f {a b : nat} (ab: ((SNat a) * (SNat b))%type) : SNat (a * b)%N.
+    destruct ab.
+    exact (SNatc (muln a b)).
+  Defined.
+
+  Definition my_g {a b : nat} (c : SNat (a * b)%N) : ((SNat a) * (SNat b))%type := (SNatc a, SNatc b).
+
+  Lemma bf : forall a b : nat, bijective (@my_f a b).
+  Proof.
+    intros.
+    Check Bijective.
+    Check my_f.
+    Check my_g.
+    apply (@Bijective (SNat (a * b)) (prod (SNat a) (SNat b)) my_f my_g).
+    - unfold cancel. unfold my_f. unfold my_g. intros. destruct x. destruct s. destruct s0. reflexivity.
+    - unfold cancel. unfold my_f. unfold my_g. intros. destruct x. reflexivity.
+  Qed.
+
+
+  (* Of course, this does not work. What are [a] and [b]?! *)
+  Fail Definition my_f' (ab : nat * nat) : SNat (a * b)%N :=
+    let '(a, b) := ab in
+    my_f (SNatc a, SNatc b).
+
+
+  (*
   (*
     To exploit this, we need a baseFinGroupType!
     Hence, we cannot work on the sampling space Z_p.
    *)
-  Lemma inv : forall (x : gT) (y:nat), x = (x ^+ y) ^- y.
+  Lemma inv : forall (x : gT) (y:nat), x = x ^+ y ^- y.
+  Proof.
   Admitted.
 
-  Search baseFinGroupType.
-
-
+*)
   Lemma my_mod : forall x y:nat, (x %% (x * y.+1).+1)%N = x.
   Proof.
     intros.
@@ -481,7 +532,97 @@ Module SigmaProtocol
     rewrite my_mod''. f_equal. rewrite mulnC. rewrite my_mod''. reflexivity.
   Qed.
 
+  Check expgM.
 
+  Search (_ ^+ ?X ^- ?X).
+
+  Lemma Zp_mul_inv : forall (a b : 'Z_p),
+      prime p ->
+      b != 0 ->
+      (Zp_mul (Zp_mul a b) (Zp_inv b)) = a.
+  Proof.
+    intros.
+    
+    rewrite Zp_mulC.
+    assert (Zp_mul a b = Zp_mul b a). 1: { rewrite Zp_mulC. reflexivity.} rewrite H1. clear H1.
+    rewrite Zp_mulA.
+    rewrite Zp_mulVz.
+    - rewrite Zp_mul1z. reflexivity.
+    - assert ((1 < p)%N).
+      1:{ apply prime_gt1. assumption. }.
+      simpl.
+      (*
+        [rewrite (@Zp_cast p H0)]
+        This fails with a cryptic type error because
+         the rewrite is to greedy:
+         https://stackoverflow.com/questions/43919377/coq-dependent-type-error-in-rewrite
+       *)
+      (*
+        [rewrite (@Zp_cast p H0) at 1.]
+        This fails because Coq requires a rewrite direction
+        when using an occurence clause.
+       *)
+      (*
+        [rewrite -> (@Zp_cast p H0) at 1.]
+        This worked but it turned out that it is better not to do
+        this rewrite because it allows me later on to apply [modZp].
+       *)
+      rewrite prime_coprime.
+      + unfold dvdn.
+        destruct p eqn:P.
+        * discriminate.
+        * simpl. rewrite modZp. assumption.
+      + rewrite -> (@Zp_cast p H1) at 1. assumption.
+  Qed.
+
+  Locate "%/".
+  Check divn.
+  Search divn.
+
+  (*
+    Different approach: save it in the context instead of in the type!
+   *)
+  Definition my_f' (a : nat) (H : (0 < a)%N) : nat -> nat :=
+    fun b => muln a b.
+
+  Definition my_g' (a : nat) (H : (0 < a)%N) : nat -> nat :=
+    fun c => divn c a.
+
+  (* [H] is also not derivable because [p] is positive but not necessarily the
+     number that was sampled from [p]. *)
+  Lemma bij' : forall (a : nat) (H:(0 < a)%N), bijective (my_f' a H).
+  Proof.
+    intros.
+    apply (@Bijective nat nat (my_f' a H) (my_g' a H)).
+    - unfold cancel. unfold my_f'. unfold my_g'. intros.
+      Search (((?X * ?Y) %/ ?X)%N). rewrite mulKn.
+      1: { reflexivity. }
+      assumption.
+    - unfold cancel. unfold my_f'. unfold my_g'. intros.
+      rewrite mulnC.
+      Check divnK.
+      Locate divn.
+      rewrite divnK.
+      1:{reflexivity.}
+      Search ((_ %| _)%N). Locate "%|". Search dvdn. Print dvdn. unfold dvdn.
+      Search ((_ %% _ = 0)%N).
+      (*
+        This does not work because the formula has the following form:
+        [(x %/ m) * m].
+        [%/] is the euclidean division.
+        That is, I have to provide evidence that [x %| m == 0] or phrased
+        differently: I have to show that there is no remainder in that division!
+        And that I can not do.
+       *)
+  Abort.
+
+(*
+  Definition f (ab : Arit (uniform p) * Arit (uniform p)) : Arit (uniform p) :=
+    let '(a, b) := ab in
+    my_f (SNatc a, SNatc b).
+ *)
+
+  (*
   (*
     The below lemma is what we would need to prove.
    *)
@@ -526,6 +667,7 @@ Module SigmaProtocol
       let '(b,c) := ch2prod x in
       let d := (Zp_mul (inZp a) (inZp c)) in
       (b,d).
+*)
 (*
   Definition g (a : Arit (uniform p)) : Arit (uniform p) * 'I_(a * p)%nat.+1  → Arit (uniform (p * p)) :=
      fun x =>
@@ -684,12 +826,39 @@ Module SigmaProtocol
       ssprove_swap_rhs 0%N.
       ssprove_sync.
 
+      (* This pattern is only here to turn two distinct samples
+         on the right-hand side into a single one.
+       *)
       eapply r_transR.
       Check r_uniform_prod.
       1: { eapply r_uniform_prod. intros. eapply rreflexivity_rule. }
+
       simpl.
-      (* eapply rsymmetry.*)
+
+      (* Now we need to define a function that says, how we get from one variable on the
+       left-hand side to a different (but by sampling connected) variable
+       on the right-hand side. *)
+      (* eapply rsymmetry. *)
+      Check r_uniform_bij.
+      Locate r_uniform_bij.
       eapply r_uniform_bij.
+      Search (_ ^+ _ ^+ _).
+      Search (_ ^- _).
+      (*
+        g ^+ n ^+ m = g ^+ (n * m)
+        x1 := x0
+        n := x1
+        m := a
+
+        y := x1 * a
+        y := (fun x0: x0 * a) x0
+
+        Zp :
+        f a := (fun x0 : x0 * a)
+        inv_f a := (fun y : y * a-1)
+
+        f a := (fun x0 : get_exp (g ^+ x0 ^+ a))
+        inv_f := (fun y: get_exp (g ^+ y ^- a) )
 
       Definition f (a : Arit (uniform p)) : forall x:Arit (uniform p), (Arit (uniform p)) * 'I_(x ^+ a)
       Definition f_inv (a : Arit (uniform p)) : (Arit (uniform p)) * nat → Arit (uniform p)
