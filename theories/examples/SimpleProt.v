@@ -31,6 +31,7 @@ Set Equations With UIP.
 Set Bullet Behavior "Strict Subproofs".
 Set Default Goal Selector "!".
 Set Primitive Projections.
+Set Printing Coercions.
 
 Import Num.Def.
 Import Num.Theory.
@@ -413,25 +414,6 @@ Module SigmaProtocol
   Definition k (a b : nat) : 'I_(a * b)%nat.+1 :=
     Zp_mul (inZp a) (inZp b).
 
-  Search "Zp".
-  Locate Zp_add.
-  Print mathcomp.algebra.zmodp.
-  Search "^+".
-  Locate "^-".
-  Check invg.
-  Search invg.
-  Locate "^+".
-  Check expgn.
-  Search (nat → baseFinGroupType).
-
-  Check cyclePmin.
-  Locate cyclePmin.
-  Check proj1_sig.
-  Check bijective.
-  Print bijective.
-  Locate "%:R".
-  Check in_setT.
-
   (* ElGamal approach: *)
   Definition q : nat := #[g]. (* Cardinality of group g. *)
   Definition f''' (a : 'Z_q) : gT := g ^+ a.
@@ -526,7 +508,7 @@ Module SigmaProtocol
     intros.
     rewrite Zp_mulrn.
     f_equal.
-    Search (inZp _).
+    (* Search (inZp _). *)
     rewrite H H0.
     simpl.
     rewrite my_mod''. f_equal. rewrite mulnC. rewrite my_mod''. reflexivity.
@@ -534,50 +516,98 @@ Module SigmaProtocol
 
   Check expgM.
 
-  Search (_ ^+ ?X ^- ?X).
+  Section Zp_bij.
 
-  Lemma Zp_mul_inv : forall (a b : 'Z_p),
-      prime p ->
+    Variable q:nat.
+
+    Lemma mul_inv : forall (a b : 'Z_q),
+      prime q ->
       b != 0 ->
       (Zp_mul (Zp_mul a b) (Zp_inv b)) = a.
-  Proof.
-    intros.
-    
-    rewrite Zp_mulC.
-    assert (Zp_mul a b = Zp_mul b a). 1: { rewrite Zp_mulC. reflexivity.} rewrite H1. clear H1.
-    rewrite Zp_mulA.
-    rewrite Zp_mulVz.
-    - rewrite Zp_mul1z. reflexivity.
-    - assert ((1 < p)%N).
-      1:{ apply prime_gt1. assumption. }.
-      simpl.
-      (*
+    Proof.
+      intros.
+
+      rewrite Zp_mulC.
+      assert (Zp_mul a b = Zp_mul b a). 1: { rewrite Zp_mulC. reflexivity.} rewrite H1. clear H1.
+      rewrite Zp_mulA.
+      rewrite Zp_mulVz.
+      - rewrite Zp_mul1z. reflexivity.
+      - assert ((1 < q)%N).
+        1:{ apply prime_gt1. assumption. }.
+        simpl.
+        (*
         [rewrite (@Zp_cast p H0)]
-        This fails with a cryptic type error because
-         the rewrite is to greedy:
+         This fails with a cryptic type error because
+         the rewrite is too greedy:
          https://stackoverflow.com/questions/43919377/coq-dependent-type-error-in-rewrite
-       *)
-      (*
+         *)
+        (*
         [rewrite (@Zp_cast p H0) at 1.]
         This fails because Coq requires a rewrite direction
         when using an occurence clause.
-       *)
-      (*
+        (In fact, the above rewrite is the one from SSReflect. Giving a a direction switches back to
+        the basic rewrite tactic.)
+         *)
+        (*
         [rewrite -> (@Zp_cast p H0) at 1.]
         This worked but it turned out that it is better not to do
         this rewrite because it allows me later on to apply [modZp].
-       *)
-      rewrite prime_coprime.
-      + unfold dvdn.
-        destruct p eqn:P.
-        * discriminate.
-        * simpl. rewrite modZp. assumption.
-      + rewrite -> (@Zp_cast p H1) at 1. assumption.
-  Qed.
+         *)
+        rewrite prime_coprime.
+        + unfold dvdn.
+          destruct q eqn:Q.
+          * discriminate.
+          * simpl. rewrite modZp. assumption.
+        + rewrite -> (@Zp_cast q H1) at 1. assumption.
+    Qed.
 
-  Locate "%/".
-  Check divn.
-  Search divn.
+    (*
+      TODO: Define the function [f] that pattern matches on
+      [a]. In case of [0] we just map to [0] otherwise we use
+      [Zp_mul] with the [Zp_inv] under the condition that [a > 0].
+     *)
+    Definition f (H : prime q) (a : 'Z_q) : 'Z_q -> 'Z_q :=
+      fun b =>
+        (*
+        match b with
+        | Ordinal 0 _ => Zp0
+        | Ordinal (S _) _ => Zp_mul a b
+        end. *)
+        if b == Zp0 then Zp0 else Zp_mul b a.
+
+    Definition f_inv (H : prime q) (a : 'Z_q) : 'Z_q -> 'Z_q :=
+      fun c =>
+        (* match c with
+        | Ordinal 0 _ => Zp0
+        | Ordinal (S _) _ => Zp_mul c (Zp_inv a)
+        end. *)
+        if c == Zp0  then Zp0 else Zp_mul c (Zp_inv a).
+
+    Lemma f_inj : forall (a : 'Z_q) (H : prime q),
+        cancel (f H a) (f_inv H a).
+    Proof.
+      move => a H.
+      rewrite /cancel/f/f_inv /=.
+      case => m. case En: m => [|n].
+      - clear. simpl.
+        (* The way via [nat] works too:
+           [move=> lt0; apply: val_inj => //=.]
+           as proposed in Zulip.
+         *)
+        rewrite /Zp0 /ord0 => i; f_equal => //=; apply/bool_irrelevance.
+      -  move => i //=.
+         have lt0 : forall x y :nat, x = y.+1 -> (0 < x)%N.
+         1:{  by [elim]. }
+         move: En; move/(lt0 m n) => O_lt_m //=.
+         (*
+           If [a=Zp0] then this is not the case.
+           I thought that I can map [a=0 /\ b=n -> Zp0].
+           But the truth is that [a=n.+1 /\ b=0 -> Zp0] too.
+           Hence, the function is not injective!
+          *)
+    Abort.
+
+  End Zp_bij.
 
   (*
     Different approach: save it in the context instead of in the type!
