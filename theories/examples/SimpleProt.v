@@ -420,7 +420,7 @@ Module SigmaProtocol
   Definition g''' : forall (y:gT), (y \in <[g]>) -> 'Z_q :=
     fun y H =>
       let a' := proj1_sig(@cyclePmin gT g y H) in
-      (a' %% q)%:R. (* We need the division [%%] in the the polynomial ring! *)
+      (a' %% q)%:R. (* We need the division [%%] in the polynomial ring! *)
 
   (*
     Idea: Apply this [mulKn] or [mulnK].
@@ -583,10 +583,10 @@ Module SigmaProtocol
         end. *)
         if c == Zp0  then Zp0 else Zp_mul c (Zp_inv a).
 
-    Lemma f_inj : forall (a : 'Z_q) (H : prime q),
+    Lemma f_inj : forall (H : prime q) (a : 'Z_q) (Ha : (0 <> a)%N),
         cancel (f H a) (f_inv H a).
     Proof.
-      move => a H.
+      move => H a Ha.
       rewrite /cancel/f/f_inv /=.
       case => m. case En: m => [|n].
       - clear. simpl.
@@ -605,9 +605,70 @@ Module SigmaProtocol
            But the truth is that [a=n.+1 /\ b=0 -> Zp0] too.
            Hence, the function is not injective!
           *)
+         rewrite {1}/Zp_mul //=.
+         case Ea: (nat_of_ord a) => [|mn].
+         + move: Ha; rewrite -Ea => Ha //=.
+         + have mulnSSgt0 : forall x y z: nat, (x.+1 * y.+1)%N = z -> (0 < z)%N.
+           1:{
+             move => x y z; case: x; case: y => //=.
+             - cbn. move => zeq1; rewrite -zeq1 => //=.
+             - move => n0 //=; rewrite mul1n => zeq2; rewrite -zeq2 //=.
+             - move => n0 //=; rewrite muln1 => zeq2; rewrite -zeq2 //=.
+             - move => n0 n1 zeq //=; rewrite -zeq //=.
+           }
+
+           (* The below does not hold unless I specify that p > 0 *)
+           have mulnSSgtZp0 : forall x y: nat, inZp (x.+1 * y.+1) != Zp0.
+            1:{
+             move => n0 x y; case: x; case: y => //=.
+             - rewrite mul1n -/Zp1 => //=.
+
+               rewrite /Zp0/ord0. (* Check this out. We are in n0 which can be any nat! If n0 = 1 then 1==0! *)
+               Check Zp0.
+               Check (inZp 0).
+               Check injective.
+               Check val.
+               Check inj_eq.
+               Check contra.
+               apply: contra (Zp_nontrivial n0). move/eqP => Zp1eqZp0 /=.
+               apply/eqP. inversion Zp1eqZp0.
+               case En0: n0 Zp1eqZp0.
+               + cbn.  rewrite /Zp1.
+
+
+               Check inj_eq.
+               rewrite inj_eq.
+               move /eqP/inj_eq.
+               Check contra.
+               rewrite /eqP. (inj_eq val_inj) /=.
+               Search (is_true _).
+               Check Zp_nontrivial.
+             - move => n0 //=; rewrite mul1n => zeq2; rewrite -zeq2 //=.
+             - move => n0 //=; rewrite muln1 => zeq2; rewrite -zeq2 //=.
+             - move => n0 n1 zeq //=; rewrite -zeq //=.
+           }
+
+           have bla : forall x:nat, inZp x.+1 != Zp0.
+           1:{
+             rewrite /Zp0/ord0/inZp => p x.
+             case: x => [|xn] //=.
+             - apply val_inj.
+           }
+           case Ci: (inZp (n.+1 * mn.+1) == Zp0).
+           * Search (inZp).
+             move: Ci; rewrite /Zp0/ord0 => //=. Search (_ = true).
     Abort.
 
   End Zp_bij.
+
+
+
+
+
+
+
+
+
 
   (*
     Different approach: save it in the context instead of in the type!
@@ -718,6 +779,15 @@ Module SigmaProtocol
     admit.
     Admitted.
  *)
+
+  Definition f_final     (a : Arit (uniform p)) : Arit (uniform p) -> Arit (uniform p) * 'Z_p :=
+    fun b =>
+      if (inZp a) == Zp0 then Zp0 else f a b.
+
+  Definition f_final_inv (a : Arit (uniform p)) : (Arit (uniform p)) * 'Z_p → Arit (uniform p) :=
+
+
+
 
   Theorem DDH__security : ∀ L__A A,
       ValidPackage L__0 Game__Import Game__Export DH__real → (* 1st game pair package is valid *)
@@ -890,8 +960,8 @@ Module SigmaProtocol
         f a := (fun x0 : get_exp (g ^+ x0 ^+ a))
         inv_f := (fun y: get_exp (g ^+ y ^- a) )
 
-      Definition f (a : Arit (uniform p)) : forall x:Arit (uniform p), (Arit (uniform p)) * 'I_(x ^+ a)
-      Definition f_inv (a : Arit (uniform p)) : (Arit (uniform p)) * nat → Arit (uniform p)
+      Definition f     (a : Arit (uniform p)) : forall b:Arit (uniform p), b * 'Z_p
+      Definition f_inv (a : Arit (uniform p)) : (Arit (uniform p)) * 'Z_p → Arit (uniform p)
 
       (*
         I may be on the wrong track here because
