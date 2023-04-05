@@ -701,14 +701,21 @@ Module DiffieHellman
       apply (mul_inv _ _ prime_q O_neq_na).
     Qed.
 
+    Lemma f_bij :
+      forall (a : 'Z_q),
+        prime q ->
+        (0 != a) ->
+        bijective (f' a).
+    Proof.
+      move => a prime_q O_neq_a.
+      Print bijective.
+      exact
+        (Bijective
+           (f_inj' a prime_q O_neq_a)
+           (f_inv_sur a prime_q O_neq_a)).
+    Qed.
+
   End Zp_bij.
-
-
-
-
-
-
-
 
 
 
