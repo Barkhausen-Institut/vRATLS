@@ -151,7 +151,9 @@ Module DiffieHellman
     {
       (* Initially the state locations are empty. Let's fill them: *)
       sk_alice ← sample uniform p ;;
+      assert (0 < sk_alice)%N ;; (* I do not know how to get this information from the sampling. *)
       sk_bob ← sample uniform p ;;
+      assert (0 < sk_bob)%N ;;
       #put sk_A := sk_alice ;;
       #put sk_B := sk_bob ;;
 
@@ -564,13 +566,13 @@ Module DiffieHellman
         end. *)
         if c == Zp0  then Zp0 else Zp_mul c (Zp_inv a).
 
-    Lemma f_inj : forall (H : prime q) (a : 'Z_q) (Ha : (0 <> a)%N),
+    Lemma f_inj : forall (H : prime q) (a : 'Z_q) (Ha : (0 < a)%N),
         cancel (f H a) (f_inv H a).
     Proof.
-      move => H a Ha.
+      move => prime_q a O_lt_a.
       rewrite /cancel/f/f_inv /=.
       case => m. case En: m => [|n].
-      - clear. simpl.
+      - move => /=.
         (* The way via [nat] works too:
            [move=> lt0; apply: val_inj => //=.]
            as proposed in Zulip.
@@ -588,8 +590,9 @@ Module DiffieHellman
           *)
          rewrite {1}/Zp_mul //=.
          case Ea: (nat_of_ord a) => [|mn].
-         + move: Ha; rewrite -Ea => Ha //=.
-         + have mulnSSgt0 : forall x y z: nat, (x.+1 * y.+1)%N = z -> (0 < z)%N.
+         + move: O_lt_a; rewrite Ea => O_lt_a //=.
+         +
+           have mulnSSgt0 : forall x y z: nat, (x.+1 * y.+1)%N = z -> (0 < z)%N.
            1:{
              move => x y z; case: x; case: y => //=.
              - cbn. move => zeq1; rewrite -zeq1 => //=.
@@ -599,43 +602,104 @@ Module DiffieHellman
            }
 
            have q_gt1 : (1 < q)%N.
-           1:{ apply (prime_gt1 H). }
+           1:{ apply (prime_gt1 prime_q). }
 
-           (* The below does not hold unless I specify that p > 0 *)
-           have mulnSSgtZp0 : forall x y: nat, inZp (x.+1 * y.+1) != Zp0.
-            1:{
-             move => n0 x y; case: x; case: y => //=.
-             - rewrite mul1n -/Zp1 => //=.
-
-               rewrite /Zp0/ord0. (* Check this out. We are in n0 which can be any nat! If n0 = 1 then 1==0! *)
-               apply: contra (Zp_nontrivial n0). move/eqP => Zp1eqZp0 /=.
-               apply/eqP. inversion Zp1eqZp0.
-               case En0: n0 Zp1eqZp0.
-               + cbn.  rewrite /Zp1.
-
-
-               Check inj_eq.
-               rewrite inj_eq.
-               move /eqP/inj_eq.
-               Check contra.
-               rewrite /eqP. (inj_eq val_inj) /=.
-               Search (is_true _).
-               Check Zp_nontrivial.
-             - move => n0 //=; rewrite mul1n => zeq2; rewrite -zeq2 //=.
-             - move => n0 //=; rewrite muln1 => zeq2; rewrite -zeq2 //=.
-             - move => n0 n1 zeq //=; rewrite -zeq //=.
-           }
-
-           have bla : forall x:nat, inZp x.+1 != Zp0.
+           have Zp1neqInZp0 : is_true (@Zp1 q != @inZp q 0).
            1:{
-             rewrite /Zp0/ord0/inZp => p x.
-             case: x => [|xn] //=.
-             - apply val_inj.
+             apply: contra (Zp_nontrivial q).
+             rewrite /Zp1. move/eqP. f_equal.
+             rewrite /inZp.
+             (* move/eqP => /=. *)
+             move/eqP.
+             Check (inj_eq val_inj). (* [val_inj] is an argument to [inj_eq]! *)
+             rewrite -(inj_eq val_inj) //=.
+             case Eq: q => [|nq] //-.
+             nat_reify.
+             move: q_gt1; rewrite Eq => one_lt0 //=. inversion one_lt0.
            }
-           case Ci: (inZp (n.+1 * mn.+1) == Zp0).
-           * Search (inZp).
-             move: Ci; rewrite /Zp0/ord0 => //=. Search (_ = true).
+
+           have Zp1neqInZp0' : forall p:nat, (1 < p)%N -> is_true (@Zp1 p != @inZp p 0).
+           1:{ clear. by case. }
+
+           have Zp1neqInZp0'' : forall p:nat, (1 < p)%N -> is_true (@Zp1 p != @inZp p 0).
+           1:{ clear. case => //=. }
+
+           have Zp1neqInZp0''' : forall p:nat, (1 < p)%N -> is_true (@Zp1 p != @inZp p 0).
+           1:{
+             clear. case.
+             - move => //=.
+             - move => //=.
+           }
+
+           have Zp1neqZp0 : is_true (@Zp1 q != @Zp0 q).
+           1:{
+             apply: contra (Zp_nontrivial q).
+             case Eq : q => TT //=. move:q_gt1; rewrite Eq => one_lt0 //=.
+           }
+
+           have mulnSSgtZp0 : forall x y: nat, @inZp q (x.+1 * y.+1)%N != @Zp0 q.
+           1:{
+             case => [|x0]; case => [|y0] //=.
+             - move => //=. rewrite mul1n -/Zp1 => //=.
+
+               (*
+                 Helper tactic in SSProve to convert boolean (in)equalities into propositional ones.
+                 Works on all hypotheses but not on the goal.
+                 Uses SSReflect view lemmas.
+                *)
+               (* nat_reify. *)
+               apply: contra (Zp_nontrivial q).
+               1:{ rewrite -(inj_eq val_inj) //=.
+                   nat_reify.
+                   move:q_gt1 => //=.
+                   elim: q => [|nq IHn] //=.
+                   - move => one_lt0 //=. inversion one_lt0.
+                   - move => SSeq0 //=. admit.
+                     (*
+                       This cannot be proven because the following may hold: [(x.+1 * y.+1)%N = q].
+                       This is despite the fact that [prime q] because it could be that [x=0, y=q-1].
+                      *)
+           }
+
+           - move => //=.
+
     Abort.
+
+    (* Restart: Include the preconditions. *)
+
+    Definition f' (a : 'Z_q) : 'Z_q -> 'Z_q :=
+      fun b => Zp_mul b a.
+
+    Definition f_inv' (a : 'Z_q) : 'Z_q -> 'Z_q :=
+      fun c => Zp_mul c (Zp_inv a).
+
+    (* Note that I cannot specify that [0 != b]. *)
+    Lemma f_inj' : forall (a : 'Z_q),
+        prime q ->
+        (0 != a) ->
+        cancel (f' a) (f_inv' a).
+    Proof.
+      case => na na_lt_q prime_q O_neq_na //=.
+      rewrite /cancel/f'/f_inv' => //=.
+      case => nb bb_lt_q //=.
+      Search (_ != _).
+      move: O_neq_na; rewrite eq_sym => O_neq_na.
+      apply (mul_inv _ _ prime_q O_neq_na).
+    Qed.
+
+    Lemma f_inv_sur : forall (a : 'Z_q),
+        prime q ->
+        (0 != a) ->
+        cancel (f_inv' a) (f' a).
+    Proof.
+      case => na na_lt_q prime_q //=.
+      rewrite eq_sym => O_neq_na //=.
+      rewrite /cancel/f_inv'/f'.
+      case => b0 b0_lt_q.
+      rewrite Zp_mulC Zp_mulA.
+      rewrite [X in Zp_mul X _]Zp_mulC. (* See Contextual Patterns for rewrite. *)
+      apply (mul_inv _ _ prime_q O_neq_na).
+    Qed.
 
   End Zp_bij.
 
