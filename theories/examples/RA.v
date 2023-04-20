@@ -101,7 +101,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
   Definition ch_sec_key := 'fin #|SecKey|.
   Definition ch_pub_key := 'fin #|PubKey|.
   Definition choice_Transcript :=
-    chProd (chProd ch_challenge ch_state) ch_attest.
+    chProd (chProd (chProd ch_pub_key ch_challenge) ch_state) ch_attest.
     
   Parameter Sign_locs : {fset Location}.     (* | Defining a finite set (fset) of elements of type Location*)
   Parameter Sign_Simul_locs : {fset Location}.
@@ -112,7 +112,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
   
   Parameter Sig_Verify :
   ∀ (pk : ch_pub_key) (c : ch_challenge) (s : ch_state) (a : ch_attest),
-    code Sign_locs [interface] ch_Bool.
+     ch_Bool.
 
   Parameter Sig_Simulate :
     ∀ (c : ch_challenge) (s : ch_state),
@@ -131,7 +131,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
   
       Definition TRANSCRIPT : nat := 0.
       Definition choice_Input :=  
-        chProd (chProd ch_challenge ch_state) ch_sec_key.
+        chProd ( chProd (chProd ch_pub_key ch_challenge ) ch_state ) ch_sec_key.
       Notation " 'chInput' " := 
         choice_Input (in custom pack_type at level 2).
       Notation " 'chTranscript' " :=
@@ -143,11 +143,11 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           [interface #val #[ TRANSCRIPT ] : chInput → chTranscript]
         :=
         [package
-          #def #[ TRANSCRIPT ] (cqsk : chInput) : chTranscript 
+          #def #[ TRANSCRIPT ] (input : chInput) : chTranscript 
           {
-            let '(c,q,sk) := cqsk in
+            let '(pk,c,q,sk) := input in
             m ← Sig_Sign sk c q ;;
-            @ret choice_Transcript (c,q,m) 
+            @ret choice_Transcript (pk,c,q,m) 
           }
         ].
       
@@ -157,9 +157,9 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           [interface #val #[ TRANSCRIPT ] : chInput → chTranscript]
         :=
         [package
-          #def #[ TRANSCRIPT ] (cqsk : chInput) : chTranscript 
+          #def #[ TRANSCRIPT ] (input : chInput) : chTranscript 
           {
-            let '(c,q,sk) := cqsk in
+            let '(pk,c,q,sk) := input in
             t ← Sig_Simulate c q ;;
             ret t
           }
@@ -176,16 +176,18 @@ Module Type SignatureAlgorithms (π : SignatureParams).
     Definition GET_sk : nat := 6.
     Definition GET_pk : nat := 7.
     Definition INIT : nat := 8.
+    Definition VER : nat := 9.
 
     Definition challenge_loc : Location := ('option ch_challenge; 7%N).
-    Definition response_loc : Location := ('option ch_attest; 8%N).
+    Definition attest_loc : Location := ('option ch_attest; 8%N).
 
     Definition Com_locs : {fset Location} := 
-      fset [:: challenge_loc ; response_loc ].
+      fset [:: challenge_loc ; attest_loc ].
 
     Definition setup_loc : Location := ('bool; 10%N).
     Definition sk_loc : Location := (ch_sec_key; 11%N).
     Definition pk_loc : Location := (ch_pub_key; 12%N).
+    (* Definition attest_loc : Location := (ch_pub_key; 13%N). *)
     Definition KEY_locs : {fset Location} := 
       fset [:: setup_loc; sk_loc ; pk_loc].
 
@@ -217,6 +219,8 @@ Module Type SignatureAlgorithms (π : SignatureParams).
         ch_pub_key (in custom pack_type at level 2).
     Notation " 'chAttest' " :=
         ch_attest (in custom pack_type at level 2).
+    Notation " 'chChallenge' " :=
+        ch_challenge (in custom pack_type at level 2).
 
     Definition KEY:
       package KEY_locs
@@ -263,57 +267,45 @@ Module Type SignatureAlgorithms (π : SignatureParams).
          }
       ].
 
-    Definition Sigma_to_Com_locs := (Com_locs :|: Sign_Simul_locs).
+    Definition RA_to_Sig_locs := (Com_locs :|: Sign_Simul_locs).
     
-    #[tactic=notac] Equations? Sigma_to_Com:
-    package Sigma_to_Com_locs
-      [interface
-        #val #[ INIT ] : 'unit → 'unit ;
-        #val #[ GET_sk ] : 'unit → chSecKey ;
-        #val #[ GET_pk ] : 'unit → chPubKey
-      ]
+    #[tactic=notac] Equations? RA_to_Sig:
+      package RA_to_Sig_locs
+        [interface
+          #val #[ INIT ] : 'unit → 'unit ;
+          #val #[ GET_sk ] : 'unit → chSecKey ;
+          #val #[ GET_pk ] : 'unit → chPubKey
+        ]
       [interface
         #val #[ ATTEST ] : 'unit → chAttest ;
         #val #[ VER ] : chTranscript → 'bool
       ]
-    := Sigma_to_Com :=
+    := RA_to_Sig :=
     [package
-      #def #[ ATTEST ] (_ : 'unit) : chAttest
+      #def #[ ATTEST ] (i : chInput) : chAttest
       {
+        let '(pk,c,s,a) := i in
         #import {sig #[ INIT ] : 'unit → 'unit } as key_gen_init ;;
-        #import {sig #[ GET_sk ] : 'unit → chStatement } as key_gen_get_sk ;;
-        #import {sig #[ GET_pk ] : 'unit → chStatement } as key_gen_get_pk ;;
+        #import {sig #[ GET_sk ] : 'unit → chSecKey } as key_gen_get_sk ;;
+        #import {sig #[ GET_pk ] : 'unit → chSecKey } as key_gen_get_pk ;;
         _ ← key_gen_init Datatypes.tt ;;
         sk ← key_gen_get_sk Datatypes.tt ;;
         pk ← key_gen_get_pk Datatypes.tt ;;
 
-        ∀ (c : ch_challenge) (s : ch_state),
-        code Sign_Simul_locs [interface] choice_Transcript.
-
-        '(c,s,a) ← Sig_Simulate c s ;;
-        #put challenge_loc := Some e ;;
-        #put response_loc := Some z ;;
+        '(pk,c,s,a) ← Sig_Simulate c s ;;
+        #put challenge_loc := Some c ;;
+        #put attest_loc := Some a ;;
         ret a
-      }
-     ;
-      #def #[ OPEN ] (_ : 'unit) : chOpen
-      {
-        o_e ← get challenge_loc ;;
-        o_z ← get response_loc ;;
-        match (o_e, o_z) with
-        | (Some e, Some z) => @ret choiceOpen (e, z)
-        | _ => fail
-        end
       }
       ;
       #def #[ VER ] (t : chTranscript) : 'bool
       {
-        let '(h,a,e,z) := t in
-        ret (otf (Verify h a e z))
+        let '(pk,c,s,a) := t in
+        ret (otf (Sig_Verify pk c s a))
       }
     ].
   Proof.
-    unfold Sigma_to_Com_locs.
+    unfold RA_to_Sig_locs.
     ssprove_valid.
     eapply valid_injectLocations.
     1: apply fsubsetUr.
