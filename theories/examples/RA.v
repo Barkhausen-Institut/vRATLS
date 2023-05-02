@@ -1,3 +1,5 @@
+
+
 (*
 Introduction:
 Here we will look at the remote attestation that is using a TPM for secure hardware 
@@ -37,7 +39,6 @@ Import Order.POrderTheory.
 Import PackageNotation.
 
 (** REMOTE ATTESTATION
-
     VERIFIER                             PROVER
 Generates a chal-
   lenge 'chal'
@@ -47,7 +48,6 @@ Generates a chal-
                    <-----res------
 Validity check
   of proof
-
 ** ATTESTATION
 Input: 'chal'
 --------------
@@ -55,7 +55,6 @@ TPM generates 'quoted' information
 sig = Sign(chal,key,quoted)
 --------------
 Output: '(sig,quoted)'
-
 **)
 
 
@@ -101,7 +100,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
   Definition ch_sec_key := 'fin #|SecKey|.
   Definition ch_pub_key := 'fin #|PubKey|.
   Definition choice_Transcript :=
-    chProd (chProd (chProd ch_pub_key ch_challenge) ch_state) ch_attest.
+    chProd (chProd ch_challenge ch_state) ch_attest.
     
   Parameter Sign_locs : {fset Location}.     (* | Defining a finite set (fset) of elements of type Location*)
   Parameter Sign_Simul_locs : {fset Location}.
@@ -115,7 +114,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
      ch_Bool.
 
   Parameter Sig_Simulate :
-    ∀ (c : ch_challenge) (s : ch_state),
+    ∀ (c : ch_challenge) (s : ch_state) (pk : ch_pub_key),
     code Sign_Simul_locs [interface] choice_Transcript.
 
   Parameter KeyGen : forall (sk : ch_sec_key), ch_pub_key.
@@ -147,7 +146,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           {
             let '(pk,c,q,sk) := input in
             m ← Sig_Sign sk c q ;;
-            @ret choice_Transcript (pk,c,q,m) 
+            @ret choice_Transcript (c,q,m) 
           }
         ].
       
@@ -160,7 +159,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           #def #[ TRANSCRIPT ] (input : chInput) : chTranscript 
           {
             let '(pk,c,q,sk) := input in
-            t ← Sig_Simulate c q ;;
+            t ← Sig_Simulate c q pk;;
             ret t
           }
           ].
@@ -177,6 +176,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
     Definition GET_pk : nat := 7.
     Definition INIT : nat := 8.
     Definition VER : nat := 9.
+    Definition ATTESTATION : nat :=   0.
 
     Definition challenge_loc : Location := ('option ch_challenge; 7%N).
     Definition attest_loc : Location := ('option ch_attest; 8%N).
@@ -277,22 +277,21 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           #val #[ GET_pk ] : 'unit → chPubKey
         ]
       [interface
-        #val #[ ATTEST ] : 'unit → chAttest ;
+        #val #[ ATTEST ] : chInput → chAttest ;
         #val #[ VER ] : chTranscript → 'bool
       ]
     := RA_to_Sig :=
     [package
       #def #[ ATTEST ] (i : chInput) : chAttest
       {
-        let '(pk,c,s,a) := i in
         #import {sig #[ INIT ] : 'unit → 'unit } as key_gen_init ;;
         #import {sig #[ GET_sk ] : 'unit → chSecKey } as key_gen_get_sk ;;
-        #import {sig #[ GET_pk ] : 'unit → chSecKey } as key_gen_get_pk ;;
+        #import {sig #[ GET_pk ] : 'unit → chPubKey } as key_gen_get_pk ;;
+        let '(pk,c,s,a) := i in
         _ ← key_gen_init Datatypes.tt ;;
         sk ← key_gen_get_sk Datatypes.tt ;;
         pk ← key_gen_get_pk Datatypes.tt ;;
-
-        '(pk,c,s,a) ← Sig_Simulate c s ;;
+        '(c,s,a) ← Sig_Simulate c s pk ;;
         #put challenge_loc := Some c ;;
         #put attest_loc := Some a ;;
         ret a
@@ -300,124 +299,108 @@ Module Type SignatureAlgorithms (π : SignatureParams).
       ;
       #def #[ VER ] (t : chTranscript) : 'bool
       {
-        let '(pk,c,s,a) := t in
+        let '(c,s,a) := t in
+        #import {sig #[ GET_pk ] : 'unit → chPubKey } as key_gen_get_pk ;;
+        pk ← key_gen_get_pk Datatypes.tt ;;
         ret (otf (Sig_Verify pk c s a))
       }
     ].
   Proof.
-    unfold RA_to_Sig_locs.
+    unfold RA_to_Sig_locs.    
     ssprove_valid.
     eapply valid_injectLocations.
     1: apply fsubsetUr.
     eapply valid_injectMap.
-    2: apply (Simulate x1 x).
+    2: apply (Sig_Simulate s2 s1 x1 ).
     rewrite -fset0E.
     apply fsub0set.
   Qed.
+
+  Definition choice_Attest_Input :=  
+    chProd  ch_challenge  ch_state.
+  
+  Notation " 'chAttIn' " := 
+      choice_Attest_Input (in custom pack_type at level 2).
+
+  Definition i_pubkey := #|PubKey|.
+  Definition i_challenge := #|Challenge|.
+  Definition i_state := #|State|.
+  Definition i_seckey := #|SecKey|.
+
+  Definition i_pubkey_pos : Positive i_pubkey.
+    Proof.
+      unfold i_pubkey.
+      apply PubKey_pos.
+    Qed.
+  
+  Definition i_challenge_pos : Positive i_challenge.
+    Proof.
+      unfold i_challenge.
+      apply Challenge_pos.
+    Qed.
+
+  Definition i_state_pos : Positive i_state.
+    Proof.
+      unfold i_state.
+      apply State_pos.
+    Qed.
+
+  Definition i_seckey_pos : Positive i_seckey.
+    Proof.
+      unfold i_seckey.
+      apply SecKey_pos.
+    Qed.
+
+  Definition RA_real:
+      package fset0
+        [interface
+          #val #[ INIT ] : 'unit → 'unit ;
+          #val #[ GET_sk ] : 'unit → chSecKey ;
+          #val #[ GET_pk ] : 'unit → chPubKey ;
+          #val #[ ATTEST ] : chInput → chAttest
+        ]
+        [interface #val #[ ATTESTATION ] : chAttIn → chAttest]
+      :=
+      [package
+        #def #[ ATTESTATION ] (cs : chAttIn) : chAttest
+        {
+          #import {sig #[ ATTEST ] : chInput → chAttest } as attest ;;
+          #import {sig #[ INIT ] : 'unit → 'unit } as key_gen_init ;;
+          #import {sig #[ GET_sk ] : 'unit → chSecKey } as key_gen_get_sk ;;
+          #import {sig #[ GET_pk ] : 'unit → chPubKey } as key_gen_get_pk ;;
+          let '(c,s) := cs in
+          _ ← key_gen_init Datatypes.tt ;;
+          sk ← key_gen_get_sk Datatypes.tt ;;
+          pk ← key_gen_get_pk Datatypes.tt ;;
+          a ← attest pk c s sk ;;
+          ret a          
+        }
+      ].
+
+  Definition RA_ideal:
+      package fset0
+        [interface
+          #val #[ INIT ] : 'unit → 'unit ;
+          #val #[ GET_sk ] : 'unit → chSecKey ;
+          #val #[ GET_pk ] : 'unit → chPubKey ;
+          #val #[ ATTEST ] : chInput → chAttest
+        ]
+        [interface #val #[ ATTESTATION ] : chAttIn → chAttest]
+      :=
+      [package
+        #def #[ ATTESTATION ] (_ : chAttIn) : chAttest
+        {
+          #import {sig #[ ATTEST ] : chInput → chAttest } as attest ;;
+          pk ← sample uniform i_pubkey ;;
+          c ← sample uniform i_challenge ;;
+          s ← sample uniform i_state ;;
+          sk ← sample uniform i_seckey ;;
+          a ← attest pk c s sk ;;
+          ret a          
+        }
+      ].
 
   End Signature.
 
 
 
-Module Type RemoteAttestationParams.
-
-  Parameter lt_key attest_token state_device output sec_param : finType.
-
-  Parameter lt_key_pos : Positive #|lt_key|.
-  Parameter attest_token_pos : Positive #|attest_token|.
-  Parameter state_device_pos : Positive #|state_device|.
-  Parameter output_pos : Positive #|output|.
-  Parameter sec_param_pos : Positive #|sec_param|.
-
-End RemoteAttestationParams.
-
-
-Module Type RemoteAttestationAlgorithms (π : RemoteAttestationParams).
-
-  Import π.
-
-  #[local] Open Scope package_scope.   (* sort of global definition (variables, func., ...), defined in the project*)
-
-  #[local] Existing Instance lt_key_pos.         (*| calling instances from the SigmaProtocolParams Module above*)
-  #[local] Existing Instance attest_token_pos.   (*| *)
-  #[local] Existing Instance state_device_pos.   (*| *)
-  #[local] Existing Instance output_pos.         (*| *) 
-  #[local] Existing Instance sec_param_pos.         (*| *) 
-  (*#[local] Existing Instance choice_challenge.*)
-
-
-  Definition choice_lt_key := 'fin #|lt_key|.      (* defining the instances again*)
-  Definition choice_attest_token := 'fin #|attest_token|.  (* using "choice" because of choice_type *)
-  Definition choice_state_device := 'fin #|state_device|.      (* "'fin" is their own finite set definition with n>0, not n >= 0 *)
-  Definition choice_output := 'fin #|output|.
-  Definition choice_sec_param := 'fin #|sec_param|.
-  Definition choiceTranscript :=
-      chProd choice_lt_key choice_attest_token.  
-
-  Parameter RA_locs : {fset Location}.     (* | Defining a finite set (fset) of elements of type Location*)
-  Parameter RA_Simul_locs : {fset Location}.
-
-  Parameter RA_Setup :
-  ∀ (i : choice_sec_param), 
-  code RA_locs [interface] choice_lt_key.
-
-  Parameter RA_Attest :
-  ∀ (k : choice_lt_key) (s : choice_state_device),
-    code RA_locs [interface] choice_attest_token.
-
-  Parameter RA_Verify :
-  ∀ (k : choice_lt_key) (s : choice_state_device)
-  (a : choice_attest_token),
-    code RA_locs [interface] choice_output.
-
-  Parameter RA_Simulate :
-  ∀ (i : choice_sec_param) (s : choice_state_device),
-    code RA_Simul_locs [interface] choiceTranscript.
-
-End RemoteAttestationAlgorithms.
-
-
-Module RemoteAttestation (π : RemoteAttestationParams)
-(Alg : RemoteAttestationAlgorithms π).
-
-    Import π.
-    Import Alg.
-
-    Definition TRANSCRIPT : nat := 0.
-    Definition choiceInput :=  (chProd choice_sec_param choice_state_device).
-    Notation " 'chInput' " := 
-      choiceInput (in custom pack_type at level 2).
-    Notation " 'chTranscript' " :=
-      choiceTranscript (in custom pack_type at level 2).
-   
-
-    Definition RA_real:
-      package RA_locs
-        [interface] (** No procedures from other packages are imported. *)
-        [interface #val #[ TRANSCRIPT ] : chInput → chTranscript]
-      :=
-      [package
-        #def #[ TRANSCRIPT ] (si : chInput) : chTranscript 
-        {
-          let '(i,s) := si in
-          k ← RA_Setup i ;;
-          a ← RA_Attest k s ;;
-          @ret choiceTranscript (k,a) 
-        }
-        ].
-    
-    Definition RA_ideal:
-      package RA_Simul_locs
-        [interface] (** No procedures from other packages are imported. *)
-        [interface #val #[ TRANSCRIPT ] : chInput → chTranscript]
-      :=
-      [package
-        #def #[ TRANSCRIPT ] (si : chInput) : chTranscript 
-        {
-          let '(i,s) := si in
-          t ← RA_Simulate i s ;;
-          ret t 
-        }
-      ].
-
-  Definition ɛ_RA A := AdvantageE RA_real RA_ideal A.
