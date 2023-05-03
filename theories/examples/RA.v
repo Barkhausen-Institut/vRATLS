@@ -100,7 +100,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
   Definition ch_sec_key := 'fin #|SecKey|.
   Definition ch_pub_key := 'fin #|PubKey|.
   Definition choice_Transcript :=
-    chProd (chProd ch_challenge ch_state) ch_attest.
+    chProd (chProd (chProd ch_challenge ch_state) ch_attest ) ch_pub_key.
     
   Parameter Sign_locs : {fset Location}.     (* | Defining a finite set (fset) of elements of type Location*)
   Parameter Sign_Simul_locs : {fset Location}.
@@ -146,7 +146,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           {
             let '(pk,c,q,sk) := input in
             m ← Sig_Sign sk c q ;;
-            @ret choice_Transcript (c,q,m) 
+            @ret choice_Transcript (c,q,m, pk) 
           }
         ].
       
@@ -181,7 +181,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
     Definition challenge_loc : Location := ('option ch_challenge; 7%N).
     Definition attest_loc : Location := ('option ch_attest; 8%N).
 
-    Definition Com_locs : {fset Location} := 
+    Definition Sig_locs : {fset Location} := 
       fset [:: challenge_loc ; attest_loc ].
 
     Definition setup_loc : Location := ('bool; 10%N).
@@ -267,7 +267,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
          }
       ].
 
-    Definition RA_to_Sig_locs := (Com_locs :|: Sign_Simul_locs).
+    Definition RA_to_Sig_locs := (Sig_locs :|: Sign_Simul_locs).
     
     #[tactic=notac] Equations? RA_to_Sig:
       package RA_to_Sig_locs
@@ -287,11 +287,11 @@ Module Type SignatureAlgorithms (π : SignatureParams).
         #import {sig #[ INIT ] : 'unit → 'unit } as key_gen_init ;;
         #import {sig #[ GET_sk ] : 'unit → chSecKey } as key_gen_get_sk ;;
         #import {sig #[ GET_pk ] : 'unit → chPubKey } as key_gen_get_pk ;;
-        let '(pk,c,s,a) := i in
+        let '(pk,c,s,_) := i in
         _ ← key_gen_init Datatypes.tt ;;
         sk ← key_gen_get_sk Datatypes.tt ;;
         pk ← key_gen_get_pk Datatypes.tt ;;
-        '(c,s,a) ← Sig_Simulate c s pk ;;
+        '(c,s,a,pk) ← Sig_Simulate c s pk ;;
         #put challenge_loc := Some c ;;
         #put attest_loc := Some a ;;
         ret a
@@ -299,9 +299,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
       ;
       #def #[ VER ] (t : chTranscript) : 'bool
       {
-        let '(c,s,a) := t in
-        #import {sig #[ GET_pk ] : 'unit → chPubKey } as key_gen_get_pk ;;
-        pk ← key_gen_get_pk Datatypes.tt ;;
+        let '(c,s,a,pk) := t in
         ret (otf (Sig_Verify pk c s a))
       }
     ].
@@ -315,6 +313,57 @@ Module Type SignatureAlgorithms (π : SignatureParams).
     rewrite -fset0E.
     apply fsub0set.
   Qed.
+
+  Definition choice_Keys :=  
+    chProd ch_pub_key ch_sec_key.
+  Notation " 'chKeys' " := 
+    choice_Keys (in custom pack_type at level 2).
+
+  #[tactic=notac] Equations? RA_to_Sign_Aux:
+      package (setup_loc |: RA_to_Sig_locs)
+        [interface
+          #val #[ TRANSCRIPT ] : chKeys → chTranscript
+        ]
+      [interface
+        #val #[ ATTEST ] : chInput → chAttest ;
+        #val #[ VER ] : chTranscript → 'bool
+      ]
+    := RA_to_Sign_Aux :=
+  [package
+    #def #[ ATTEST ] (i : chInput) : chAttest
+    {
+      let '(_,c,s,_) := i in
+      #import {sig #[ TRANSCRIPT ] : chKeys → chTranscript } as RUN ;;
+      b ← get setup_loc ;;
+      #assert (negb b) ;;
+      #put setup_loc := true ;;
+      sk ← sample uniform i_sk ;;
+      let pk := KeyGen sk in      
+      '(c,s,a,pk) ← RUN (pk, sk) ;;
+      #put challenge_loc := Some c ;;
+      #put attest_loc := Some a ;;
+      @ret ch_attest a
+    }
+    ;
+    #def #[ VER ] (t : chTranscript) : 'bool
+    {
+      let '(c,s,a,pk) := t in
+      ret (otf (Sig_Verify pk c s a))
+    }
+  
+  ].
+Proof.
+  unfold RA_to_Sig_locs, Sig_locs.
+  ssprove_valid.
+  all: rewrite in_fsetU ; apply /orP ; right.
+  all: rewrite in_fsetU ; apply /orP ; left.
+  all: rewrite !fset_cons.
+  1 : rewrite in_fsetU ; apply /orP ; left ; rewrite in_fset1 ; done.
+  1 : rewrite in_fsetU ; apply /orP ; right ;
+        rewrite in_fsetU ; apply /orP ; left ;
+        rewrite in_fset1 ; done.
+Qed.
+
 
   Definition choice_Attest_Input :=  
     chProd  ch_challenge  ch_state.
@@ -351,6 +400,15 @@ Module Type SignatureAlgorithms (π : SignatureParams).
       apply SecKey_pos.
     Qed.
 
+  (**
+  Definition choice_Input :=  
+    chProd ( chProd (chProd ch_pub_key ch_challenge ) ch_state ) ch_sec_key.
+  Notation " 'chInput' " := 
+    choice_Input (in custom pack_type at level 2).
+  **)
+
+  Definition RA_Interface := [interface #val #[ ATTESTATION ] : chAttIn → chAttest].
+
   Definition RA_real:
       package fset0
         [interface
@@ -359,7 +417,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           #val #[ GET_pk ] : 'unit → chPubKey ;
           #val #[ ATTEST ] : chInput → chAttest
         ]
-        [interface #val #[ ATTESTATION ] : chAttIn → chAttest]
+        RA_Interface
       :=
       [package
         #def #[ ATTESTATION ] (cs : chAttIn) : chAttest
@@ -372,7 +430,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           _ ← key_gen_init Datatypes.tt ;;
           sk ← key_gen_get_sk Datatypes.tt ;;
           pk ← key_gen_get_pk Datatypes.tt ;;
-          a ← attest pk c s sk ;;
+          a ← attest (pk, c, s, sk) ;;
           ret a          
         }
       ].
@@ -385,7 +443,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           #val #[ GET_pk ] : 'unit → chPubKey ;
           #val #[ ATTEST ] : chInput → chAttest
         ]
-        [interface #val #[ ATTESTATION ] : chAttIn → chAttest]
+        RA_Interface
       :=
       [package
         #def #[ ATTESTATION ] (_ : chAttIn) : chAttest
@@ -395,12 +453,66 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           c ← sample uniform i_challenge ;;
           s ← sample uniform i_state ;;
           sk ← sample uniform i_seckey ;;
-          a ← attest pk c s sk ;;
+          a ← attest (pk, c, s, sk) ;;
           ret a          
         }
       ].
 
-  End Signature.
+      Definition ɛ_hiding A :=
+        AdvantageE
+          (RA_real ∘ RA_to_Sig ∘ KEY)
+          (RA_ideal ∘ RA_to_Sig ∘ KEY) (A ∘ (par KEY (ID RA_Interface))).
+
+
+      Type ɛ_hiding. 
+  
+      Notation inv := (
+        heap_ignore (fset [:: pk_loc ; sk_loc])
+      ).
+  
+      Instance Invariant_inv : Invariant (RA_to_Sig_locs :|: KEY_locs) (setup_loc |: RA_to_Sig_locs) inv.
+      Proof.
+        ssprove_invariant.
+        unfold KEY_locs.
+        apply fsubsetU ; apply /orP ; left.
+        apply fsubsetU ; apply /orP ; right.
+        rewrite !fset_cons.
+        apply fsubsetU ; apply /orP ; right.
+        rewrite fsubUset ; apply /andP ; split.
+        - apply fsubsetU ; apply /orP ; right.
+          apply fsubsetU ; apply /orP ; left.
+          apply fsubsetxx.
+        - apply fsubsetU ; apply /orP ; left.
+          rewrite fsubUset ; apply /andP ; split.
+          + apply fsubsetxx.
+          + rewrite -fset0E. apply fsub0set.
+      Qed.
+  
+      Hint Extern 50 (_ = code_link _ _) =>
+        rewrite code_link_scheme
+        : ssprove_code_simpl.
+  
+      Theorem commitment_hiding :
+        ∀ LA A,
+          ValidPackage LA [interface
+            #val #[ ATTEST ] : chInput → chAttest
+          ] A_export (A ∘ (par KEY (ID RA_Interface))) →
+          fdisjoint LA KEY_locs ->
+          fdisjoint LA RA_to_Sig_locs ->
+          fdisjoint LA (fset [:: setup_loc]) ->
+          fdisjoint LA Sign_locs ->
+          fdisjoint LA Sign_Simul_locs ->
+          fdisjoint Sign_Simul_locs (fset [:: pk_loc ; sk_loc]) ->
+          fdisjoint Sign_locs (fset [:: pk_loc ; sk_loc]) ->
+            (ɛ_hiding A) <= 0 +
+             AdvantageE Sign_ideal Sign_real (((A ∘ par KEY (ID RA_Interface)) ∘ RA_real) ∘ RA_to_Sign_Aux) +
+             AdvantageE (RA_real ∘ RA_to_Sign_Aux ∘ Sign_real) 
+               (RA_ideal ∘ RA_to_Sign_Aux ∘ Sign_real) (A ∘ par KEY (ID RA_Interface)) +
+             AdvantageE Sign_real Sign_ideal (((A ∘ par KEY (ID RA_Interface)) ∘ RA_ideal) ∘ RA_to_Sign_Aux) +
+             0.
+      Proof.
+
+  End RemoteAttestation.
 
 
 
