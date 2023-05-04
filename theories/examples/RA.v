@@ -21,7 +21,6 @@ From Crypt Require Import Axioms ChoiceAsOrd SubDistr Couplings
 
 From Coq Require Import Utf8.
 From extructures Require Import ord fset fmap.
-Require Import Lia.
 
 From Equations Require Import Equations.
 Require Equations.Prop.DepElim.
@@ -135,7 +134,9 @@ Module Type SignatureAlgorithms (π : SignatureParams).
         choice_Input (in custom pack_type at level 2).
       Notation " 'chTranscript' " :=
         choice_Transcript (in custom pack_type at level 2).     
-  
+
+      #[local] Open Scope package_scope.
+
       Definition Sign_real:
         package Sign_locs
           [interface] (** No procedures from other packages are imported. *)
@@ -464,7 +465,15 @@ Qed.
           (RA_ideal ∘ RA_to_Sig ∘ KEY) (A ∘ (par KEY (ID RA_Interface))).
 
 
-      Type ɛ_hiding. 
+      Type ɛ_hiding.
+      Check R.
+      Check Axioms.R.
+      Check ɛ_hiding.
+      Check 0.
+      #[local] Open Scope ring_scope.
+      (* Under this scope [0] has a differred type of class [zmodType]*)
+      Check 0.
+      #[local] Close Scope ring_scope.
   
       Notation inv := (
         heap_ignore (fset [:: pk_loc ; sk_loc])
@@ -491,7 +500,7 @@ Qed.
       Hint Extern 50 (_ = code_link _ _) =>
         rewrite code_link_scheme
         : ssprove_code_simpl.
-  
+
       Theorem commitment_hiding :
         ∀ LA A,
           ValidPackage LA [interface
@@ -504,12 +513,12 @@ Qed.
           fdisjoint LA Sign_Simul_locs ->
           fdisjoint Sign_Simul_locs (fset [:: pk_loc ; sk_loc]) ->
           fdisjoint Sign_locs (fset [:: pk_loc ; sk_loc]) ->
-            (ɛ_hiding A) <= 0 +
+            ((ɛ_hiding A) <= 0 +
              AdvantageE Sign_ideal Sign_real (((A ∘ par KEY (ID RA_Interface)) ∘ RA_real) ∘ RA_to_Sign_Aux) +
              AdvantageE (RA_real ∘ RA_to_Sign_Aux ∘ Sign_real) 
                (RA_ideal ∘ RA_to_Sign_Aux ∘ Sign_real) (A ∘ par KEY (ID RA_Interface)) +
              AdvantageE Sign_real Sign_ideal (((A ∘ par KEY (ID RA_Interface)) ∘ RA_ideal) ∘ RA_to_Sign_Aux) +
-             0.
+             0)%R. (* You can tell Coq to interpret this term at the level of [R]. *)
       Proof.
 
   End RemoteAttestation.
