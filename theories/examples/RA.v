@@ -101,12 +101,12 @@ Module Type SignatureAlgorithms (π : SignatureParams).
   Definition choice_Transcript :=
     chProd (chProd (chProd ch_challenge ch_state) ch_attest ) ch_pub_key.
     
-  Parameter Sign_locs : {fset Location}.     (* | Defining a finite set (fset) of elements of type Location*)
-  Parameter Sign_Simul_locs : {fset Location}.
+  Parameter Sig_locs : {fset Location}.     (* | Defining a finite set (fset) of elements of type Location*)
+  Parameter Sig_Simul_locs : {fset Location}.
   
   Parameter Sig_Sign :
     ∀ (sk : ch_sec_key) (c : ch_challenge) (s : ch_state),
-    code Sign_locs [interface] ch_attest.
+    code Sig_locs [interface] ch_attest.
   
   Parameter Sig_Verify :
   ∀ (pk : ch_pub_key) (c : ch_challenge) (s : ch_state) (a : ch_attest),
@@ -114,7 +114,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
 
   Parameter Sig_Simulate :
     ∀ (c : ch_challenge) (s : ch_state) (pk : ch_pub_key),
-    code Sign_Simul_locs [interface] choice_Transcript.
+    code Sig_Simul_locs [interface] choice_Transcript.
 
   Parameter KeyGen : forall (sk : ch_sec_key), ch_pub_key.
   
@@ -137,8 +137,8 @@ Module Type SignatureAlgorithms (π : SignatureParams).
 
       #[local] Open Scope package_scope.
 
-      Definition Sign_real:
-        package Sign_locs
+      Definition Sig_real:
+        package Sig_locs
           [interface] (** No procedures from other packages are imported. *)
           [interface #val #[ TRANSCRIPT ] : chInput → chTranscript]
         :=
@@ -151,8 +151,8 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           }
         ].
       
-      Definition Sign_ideal:
-      package Sign_Simul_locs
+      Definition Sig_ideal:
+      package Sig_Simul_locs
           [interface] (** No procedures from other packages are imported. *)
           [interface #val #[ TRANSCRIPT ] : chInput → chTranscript]
         :=
@@ -165,7 +165,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
           }
           ].
 
-      Definition ɛ_sign A := AdvantageE Sign_real Sign_ideal A.  
+      Definition ɛ_sig A := AdvantageE Sig_real Sig_ideal A.  
 
 (** |    REMOTE   |
     | ATTESTATION | **)
@@ -268,7 +268,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
          }
       ].
 
-    Definition RA_to_Sig_locs := (Sig_locs :|: Sign_Simul_locs).
+    Definition RA_to_Sig_locs := (Sig_locs :|: Sig_Simul_locs).
     
     #[tactic=notac] Equations? RA_to_Sig:
       package RA_to_Sig_locs
@@ -320,7 +320,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
   Notation " 'chKeys' " := 
     choice_Keys (in custom pack_type at level 2).
 
-  #[tactic=notac] Equations? RA_to_Sign_Aux:
+  #[tactic=notac] Equations? RA_to_Sig_Aux:
       package (setup_loc |: RA_to_Sig_locs)
         [interface
           #val #[ TRANSCRIPT ] : chKeys → chTranscript
@@ -329,7 +329,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
         #val #[ ATTEST ] : chInput → chAttest ;
         #val #[ VER ] : chTranscript → 'bool
       ]
-    := RA_to_Sign_Aux :=
+    := RA_to_Sig_Aux :=
   [package
     #def #[ ATTEST ] (i : chInput) : chAttest
     {
@@ -459,21 +459,13 @@ Qed.
         }
       ].
 
-      Definition ɛ_hiding A :=
+      Definition ɛ_RA A :=
         AdvantageE
           (RA_real ∘ RA_to_Sig ∘ KEY)
           (RA_ideal ∘ RA_to_Sig ∘ KEY) (A ∘ (par KEY (ID RA_Interface))).
 
 
-      Type ɛ_hiding.
-      Check R.
-      Check Axioms.R.
-      Check ɛ_hiding.
-      Check 0.
-      #[local] Open Scope ring_scope.
-      (* Under this scope [0] has a differred type of class [zmodType]*)
-      Check 0.
-      #[local] Close Scope ring_scope.
+     
   
       Notation inv := (
         heap_ignore (fset [:: pk_loc ; sk_loc])
@@ -500,8 +492,12 @@ Qed.
       Hint Extern 50 (_ = code_link _ _) =>
         rewrite code_link_scheme
         : ssprove_code_simpl.
+(* SHVZK = Sign
+   Hiding = RA
+   Sigma-to-Com = RA-to-Sig *)
 
-      Theorem commitment_hiding :
+
+      Theorem RA_hiding :
         ∀ LA A,
           ValidPackage LA [interface
             #val #[ ATTEST ] : chInput → chAttest
@@ -509,17 +505,270 @@ Qed.
           fdisjoint LA KEY_locs ->
           fdisjoint LA RA_to_Sig_locs ->
           fdisjoint LA (fset [:: setup_loc]) ->
-          fdisjoint LA Sign_locs ->
-          fdisjoint LA Sign_Simul_locs ->
-          fdisjoint Sign_Simul_locs (fset [:: pk_loc ; sk_loc]) ->
-          fdisjoint Sign_locs (fset [:: pk_loc ; sk_loc]) ->
-            ((ɛ_hiding A) <= 0 +
-             AdvantageE Sign_ideal Sign_real (((A ∘ par KEY (ID RA_Interface)) ∘ RA_real) ∘ RA_to_Sign_Aux) +
-             AdvantageE (RA_real ∘ RA_to_Sign_Aux ∘ Sign_real) 
-               (RA_ideal ∘ RA_to_Sign_Aux ∘ Sign_real) (A ∘ par KEY (ID RA_Interface)) +
-             AdvantageE Sign_real Sign_ideal (((A ∘ par KEY (ID RA_Interface)) ∘ RA_ideal) ∘ RA_to_Sign_Aux) +
+          fdisjoint LA Sig_locs ->
+          fdisjoint LA Sig_Simul_locs ->
+          fdisjoint Sig_Simul_locs (fset [:: pk_loc ; sk_loc]) ->
+          fdisjoint Sig_locs (fset [:: pk_loc ; sk_loc]) ->
+            ((ɛ_RA A) <= 0 +
+             AdvantageE Sig_ideal Sig_real (((A ∘ par KEY (ID RA_Interface)) ∘ RA_real) ∘ RA_to_Sig_Aux) +
+             AdvantageE (RA_real ∘ RA_to_Sig_Aux ∘ Sig_real) 
+               (RA_ideal ∘ RA_to_Sig_Aux ∘ Sig_real) (A ∘ par KEY (ID RA_Interface)) +
+             AdvantageE Sig_real Sig_ideal (((A ∘ par KEY (ID RA_Interface)) ∘ RA_ideal) ∘ RA_to_Sig_Aux) +
              0)%R. (* You can tell Coq to interpret this term at the level of [R]. *)
       Proof.
+      unfold ɛ_RA, ɛ_sig.
+      intros LA A VA Hd1 Hd2 Hd3 HdSigma HdSimulator Hd4 Hd5.
+      ssprove triangle (RA_real ∘ RA_to_Sig ∘ KEY) [::
+        (RA_real ∘ RA_to_Sig_Aux ∘ Sig_ideal) ;
+        (RA_real ∘ RA_to_Sig_Aux ∘ Sig_real) ;
+        (RA_ideal ∘RA_to_Sig_Aux ∘ Sig_real) ;
+        (RA_ideal ∘ RA_to_Sig_Aux ∘ Sig_ideal)
+      ] (RA_ideal ∘ RA_to_Sig ∘ KEY) (A ∘ (par KEY (ID RA_Interface)))
+      as ineq.
+      eapply le_trans. 1: exact ineq.
+      clear ineq.
+      repeat eapply ler_add.
+      - apply eq_ler.
+        eapply eq_rel_perf_ind with (inv := inv).
+        5: apply VA.
+        1:{
+          ssprove_valid.
+          4: apply fsubsetxx.
+          4: apply fsubsetxx.
+          2: instantiate (1 := (RA_to_Sig_locs :|: KEY_locs)).
+          2: apply fsubsetUl.
+          2: apply fsubsetUr.
+          (* valid package stays -> don't know why and
+          don't know what to do with it*)
+          admit.
+        }
+        1:{
+          ssprove_valid.
+          3: apply fsubsetxx.
+          4: apply fsub0set.
+          4: apply fsubsetxx.
+          3: unfold RA_to_Sig_locs.
+          3: apply fsubsetU ; apply /orP ; right.
+          3: apply fsubsetUr.
+        (* same as above, but two of them*)
+          1: admit.
+          1: admit.
+        }
+        3,4: rewrite fdisjointUr ; apply /andP ; split.
+        3-4,6: assumption.
+        3: rewrite fset1E ; assumption.
+        1: exact _.
+        rewrite RA_to_Sig_equation_1.
+        rewrite RA_to_Sig_Aux_equation_1.
+        (* next step breaks down the entire statement*)
+        simplify_eq_rel h.
+        all: ssprove_code_simpl.
+        destruct h.
+        1: ssprove_sync.
+        ssprove_code_simpl.
+        ssprove_code_simpl_more.
+        ssprove_sync=>b.
+        case (Nat.even b) eqn:Hb ; rewrite Hb.
+        + ssprove_sync=> setup.
+          ssprove_code_simpl.
+          ssprove_code_simpl_more.
+          apply r_assertD.
+          1: done.
+          intros _ _.
+          ssprove_sync=> w.
+          apply r_assertD.
+          1: done.
+          intros _ Rel.
+          ssprove_swap_seq_lhs [:: 2 ; 1]%N.
+          ssprove_contract_put_get_lhs.
+          rewrite !cast_fun_K.
+          rewrite Rel.
+          ssprove_code_simpl.
+          ssprove_code_simpl_more.
+          ssprove_sync.
+          ssprove_swap_lhs 1%N.
+          ssprove_contract_put_get_lhs.
+          ssprove_swap_seq_lhs [:: 0 ; 1]%N.
+          ssprove_contract_put_get_lhs.
+          apply r_put_lhs.
+          apply r_put_lhs.
+          ssprove_restore_pre.
+          1: ssprove_invariant.
+          eapply rsame_head_alt.
+          1: exact _.
+          {
+            unfold inv.
+            intros l lin h1 s' h2.
+            apply h2.
+            move: Hd4 => /fdisjointP Hd4.
+            apply Hd4.
+            apply lin.
+          }
+          {
+            unfold inv.
+            intros l v lin.
+            apply put_pre_cond_heap_ignore.
+          }
+          intros t.
+          destruct t.
+          destruct s1.
+          destruct s1.
+          ssprove_sync.
+          ssprove_sync.
+          apply r_ret.
+          done.
+        + ssprove_sync=>setup.
+          ssprove_code_simpl.
+          ssprove_code_simpl_more.
+          apply r_assertD.
+          1: done.
+          intros _ _.
+          ssprove_sync=>w.
+          apply r_assertD.
+          1: done.
+          intros _ Rel.
+          ssprove_swap_seq_lhs [:: 2 ; 1]%N.
+          ssprove_contract_put_get_lhs.
+          rewrite !cast_fun_K.
+          rewrite Rel.
+          ssprove_code_simpl.
+          ssprove_code_simpl_more.
+          ssprove_sync.
+          ssprove_swap_lhs 1%N.
+          ssprove_contract_put_get_lhs.
+          ssprove_swap_seq_lhs [:: 0 ; 1]%N.
+          ssprove_contract_put_get_lhs.
+          apply r_put_lhs.
+          apply r_put_lhs.
+          ssprove_restore_pre.
+          1: ssprove_invariant.
+          eapply rsame_head_alt.
+          1: exact _.
+          {
+            unfold inv.
+            intros l lin h1 s' h2.
+            apply h2.
+            move: Hd4 => /fdisjointP Hd4.
+            apply Hd4.
+            apply lin.
+          }
+          {
+            unfold inv.
+            intros l v lin.
+            apply put_pre_cond_heap_ignore.
+          }
+          intros t.
+          destruct t.
+          destruct s1.
+          destruct s1.
+          ssprove_sync.
+          ssprove_sync.
+          apply r_ret.
+          done.
+      - rewrite -!Advantage_link.
+        1: apply eq_ler ; done.
+      - done.
+      - rewrite -!Advantage_link.
+        1: apply eq_ler ; done.
+      - apply eq_ler.
+        eapply eq_rel_perf_ind with (inv := inv).
+        5: apply VA.
+        1:{
+          ssprove_valid.
+          4: apply fsubsetxx.
+          3: apply fsub0set.
+          2: instantiate (1 := (Simulator_locs :|: (setup_loc |: Sigma_to_Com_locs))).
+          - apply fsubsetUr.
+          - apply fsubsetUl.
+        }
+        1:{
+          ssprove_valid.
+          3: apply fsub0set.
+          3: apply fsubsetxx.
+          1: instantiate (1 := (Sigma_to_Com_locs :|: KEY_locs)).
+          - apply fsubsetUl.
+          - apply fsubsetUr.
+        }
+        3,4: rewrite fdisjointUr ; apply /andP ; split.
+        4: rewrite fdisjointUr ; apply /andP ; split.
+        3,5-7: assumption.
+        3: rewrite fset1E ; assumption.
+        {
+          ssprove_invariant.
+          unfold KEY_locs.
+          apply fsubsetU ; apply /orP ; right.
+          apply fsubsetU ; apply /orP ; right.
+          rewrite !fset_cons.
+          apply fsubsetU ; apply /orP ; right.
+          rewrite fsubUset ; apply /andP ; split.
+          - apply fsubsetU ; apply /orP ; right.
+            apply fsubsetU ; apply /orP ; left.
+            apply fsubsetxx.
+          - apply fsubsetU ; apply /orP ; left.
+            rewrite fsubUset ; apply /andP ; split.
+            + apply fsubsetxx.
+            + rewrite -fset0E. apply fsub0set.
+        }
+        rewrite Sigma_to_Com_equation_1.
+        rewrite Sigma_to_Com_Aux_equation_1.
+        simplify_eq_rel h.
+        ssprove_code_simpl.
+        destruct h.
+        ssprove_code_simpl.
+        ssprove_code_simpl_more.
+        ssprove_sync=>e.
+        ssprove_sync=> setup.
+        ssprove_code_simpl.
+        ssprove_code_simpl_more.
+        apply r_assertD.
+        1: done.
+        intros _ _.
+        ssprove_sync=> w.
+        apply r_assertD.
+        1: done.
+        intros _ Rel.
+        ssprove_swap_seq_rhs [:: 2 ; 1]%N.
+        ssprove_contract_put_get_rhs.
+        rewrite !cast_fun_K.
+        rewrite Rel.
+        ssprove_code_simpl.
+        ssprove_code_simpl_more.
+        ssprove_sync.
+        ssprove_swap_rhs 1%N.
+        ssprove_contract_put_get_rhs.
+        ssprove_swap_seq_rhs [:: 0 ; 1]%N.
+        ssprove_contract_put_get_rhs.
+        apply r_put_rhs.
+        apply r_put_rhs.
+        ssprove_restore_pre.
+        1: ssprove_invariant.
+        eapply rsame_head_alt.
+        1: exact _.
+        {
+          unfold inv.
+          intros l lin h1 s' h2.
+          apply h2.
+          move: Hd4 => /fdisjointP Hd4.
+          apply Hd4.
+          apply lin.
+        }
+        {
+          unfold inv.
+          intros l v lin.
+          apply put_pre_cond_heap_ignore.
+        }
+        intros t.
+        destruct t.
+        destruct s1.
+        destruct s1.
+        ssprove_sync.
+        ssprove_sync.
+        apply r_ret.
+        done.
+    Qed.
+
+
+
 
   End RemoteAttestation.
 
