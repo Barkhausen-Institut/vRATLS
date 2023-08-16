@@ -135,7 +135,7 @@ Module Type SigmaProtocolAlgorithms (π : SigmaProtocolParams).
       (*|>> "Validity of code c with respect to set of locations L and import interface I is denoted by the 
       class ValidCode L I c. We derive from it the type code L I A of valid code."*)
     (* defining Commit - which is the touple (h,w) - as code [locations] [interface] [name] *)
-    (* Wie legen wir den aktuellen Zustand in unseren Locations ab um ihn im nächsten Schritt "lesen" und bearbeiten zu können*)
+    (* Wir legen den aktuellen Zustand in unseren Locations ab um ihn im nächsten Schritt "lesen" und bearbeiten zu können*)
 
   Parameter Response :
     ∀ (h : choiceStatement) (w : choiceWitness)
