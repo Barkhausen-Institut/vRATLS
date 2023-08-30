@@ -1,11 +1,3 @@
-
-
-(*
-Introduction:
-Here we will look at the remote attestation that is using a TPM for secure hardware 
-cryptography. It is like the version used on the RATLS paper.
-*)
-
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
@@ -39,123 +31,39 @@ Import Order.POrderTheory.
 
 Import PackageNotation.
 
-(** REMOTE ATTESTATION
-    VERIFIER                             PROVER
-Generates a chal-
-  lenge 'chal'
-                   -----chal----->    
-                                       Attestation
-                                       (using TPM) 
-                   <-----res------
-Validity check
-  of proof
-** ATTESTATION
-Input: 'chal'
---------------
-TPM generates 'quoted' information
-sig = Sign(chal,key,quoted)
---------------
-Output: '(sig,quoted)'
-**)
-
-(*
-Introduction:
-Here we will look at the remote attestation that is using a TPM for secure hardware 
-cryptography. It is like the version used on the RATLS paper.
-*)
-
-Module Type SignatureParams.
+Module Type SignatureDefs.
 
     Variable (n: nat). 
     Definition pos_n: nat := 2^n.
+    Definition Seed : choice_type := chFin(mkpos pos_n).
     Definition SecKey : choice_type := chFin(mkpos pos_n).
     Definition PubKey : choice_type := chFin(mkpos pos_n).
-    Definition State : choice_type := chFin(mkpos pos_n).
-    Definition Challenge : choice_type := chFin(mkpos pos_n).
-    Definition Attestation : choice_type := chFin(mkpos pos_n).
-    Definition Message : choice_type := chFin(mkpos pos_n).
-    Definition Signature : choice_type := chFin(mkpos pos_n).
-    Definition Seed : choice_type := chFin(mkpos pos_n).
 
-    Parameter Challenge_pos : Positive #|Challenge|.
+End SignatureDefs.
 
-End SignatureParams.
+Module Type SignatureAlgorithms (π : SignatureDefs).
   
-(** |  SIGNATURE  |
-    |   SCHEME    | **)
-
-Module Type SignatureAlgorithms (π : SignatureParams).
-  
-  Import π.
-  
+  Import π.  
   #[local] Open Scope package_scope.
 
-(* Key Generation *)
-  Parameter KeyGen :
-  ∀ {L : {fset Location}} (sd : Seed),
-    code L [interface] (SecKey × PubKey).
-
-  Parameter KeyGen2 : ∀ (sd : Seed), (SecKey × PubKey).
-
-  (* Siganture algorithm *)
-  Parameter Sign :
-  ∀ {L : {fset Location}} (sk : SecKey) (m : Message),
-    code L [interface] Signature.
-
-  (* Verification algorithm *)
-  Parameter Ver_sig :
-  ∀ {L : {fset Location}} (pk : PubKey) (sig : Signature) (m : Message),
-    code L [interface] 'bool.
-
-    Parameter Attest :
-    ∀ {L : {fset Location}} (sk : SecKey) ( c : Challenge ) (s : State),
-       code L [interface] Signature.
-     
-  (* Decryption algorithm *)
-  Parameter Ver_att :
-    ∀ {L : {fset Location}} (pk : PubKey) (att : Attestation)
-                   ( c : Challenge) ( s : State),
-       code L [interface] 'bool.
-
-  Parameter Hash :
-    	State -> Challenge ->
-      Message.
-
-  Parameter Hash_refl : 
-    forall s1 c1 , Hash s1 c1 = Hash s1 c1.
-
-  Parameter Hash_bij :
-    forall s1 c1 s2 c2, s1 != s2 \/ c1 != c2  -> Hash s1 c1 != Hash s2 c2.
+  Parameter KeyGen : ∀ (sd : Seed), (SecKey × PubKey).
     
 End SignatureAlgorithms.
 
-Module RemoteAttestation (π : SignatureParams)
+Module RemoteAttestation (π : SignatureDefs)
   (Alg : SignatureAlgorithms π).
 
   Import π.
   Import Alg.
-
   #[local] Open Scope package_scope.
 
   Notation " 'pubkey "    := PubKey      (in custom pack_type at level 2).
   Notation " 'pubkey "    := PubKey      (at level 2): package_scope.
-  Notation " 'signature " := Signature   (in custom pack_type at level 2).
-  Notation " 'signature " := Signature   (at level 2): package_scope.
-  Notation " 'state "     := State       (in custom pack_type at level 2).
-  Notation " 'state "     := State       (at level 2): package_scope.
-  Notation " 'challenge " := Challenge   (in custom pack_type at level 2).
-  Notation " 'challenge " := Challenge   (at level 2): package_scope.
-  Notation " 'message "   := Message     (in custom pack_type at level 2).
-  Notation " 'message "   := Message     (at level 2): package_scope.  
+  Notation " 'seckey "    := SecKey      (in custom pack_type at level 2).
+  Notation " 'seckey "    := SecKey      (at level 2): package_scope.  
   Notation " 'seed "      := Seed        (in custom pack_type at level 2).
   Notation " 'seed "      := Seed        (at level 2): package_scope.
-  Notation " 'att "       := Attestation (in custom pack_type at level 2).
-  Notation " 'att "       := Attestation (at level 2): package_scope.
 
-  (**
-  We can't use sets directly in [choice_type] so instead we use a map to units.
-  We can then use [domm] to get the domain, which is a set.
-  *)
   Definition chSet t := chMap t 'unit.
   Notation " 'set t " := (chSet t) (in custom pack_type at level 2).
   Notation " 'set t " := (chSet t) (at level 2): package_scope.
@@ -164,64 +72,27 @@ Module RemoteAttestation (π : SignatureParams)
 
   Definition pk_loc      : Location := (PubKey    ; 0%N).
   Definition sk_loc      : Location := (SecKey    ; 1%N).
-  Definition message_loc : Location := (Message   ; 2%N).   
-  Definition sign_loc    : Location := ('set ('signature × 'message); 3%N).
-  Definition state_loc   : Location := (State    ; 4%N).
-  Definition chal_loc    : Location := (Challenge ; 5%N).
-  Definition attest_loc  : Location := ('set ('challenge × 'state × 'att ) ; 6%N).
 
-  Definition get_pk    : nat := 42. (* routine to get the public key *)
-  Definition get_state : nat := 43. (* routine to get the state to be attested *)
-  Definition sign      : nat := 44. (* routine to sign a message *)
-  Definition verify_sig: nat := 45. (* routine to verify the signature *)
-  Definition verify_att: nat := 46.
+  Definition key_gen   : nat := 42. (* routine to get the public key *)
 
-  Definition Signature_locs := fset [:: pk_loc ; sk_loc ; sign_loc ].
+  Definition KeyGen_locs := fset [:: pk_loc ; sk_loc ]. 
 
-  Notation " 'attest "    := Attestation    (in custom pack_type at level 2).  
-  Definition attest    : nat := 47. (* routine to attest *)  
-
-  Definition Attestation_locs := fset [:: pk_loc ; sk_loc; attest_loc ].
-  
-  Definition Sign_interface := [interface
-    #val #[get_pk] : 'unit → 'pubkey ;
-    #val #[sign] : ('message × 'seed) → 'signature ;
-    #val #[verify_sig] : ('signature × 'message) → 'bool
+  Definition Ideal_interface := [interface
+  #val #[key_gen] : 'unit → 'pubkey 
   ].
 
-  Definition Att_interface := [interface
-  #val #[get_pk] : 'unit → 'pubkey ;
-  #val #[attest] : ('challenge × ('state × 'seed)) → 'signature ;
-  #val #[verify_att] : ( ('challenge × 'state) × 'signature) → 'bool
-  ].
-
-  Definition Sig_real :
-  package Signature_locs
+  Definition Key_Gen_real :
+  package KeyGen_locs
     [interface]
-    Sign_interface
+    [interface #val #[key_gen] : 'unit → 'pubkey ].
   :=
   [package
-    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    #def  #[key_gen] (_ : 'unit) : 'pubkey
     {
-      pk ← get pk_loc  ;;
-      ret pk
-    } ;
-
-    #def #[sign] ( '(msg,sd) : 'message × 'seed) : 'signature
-    {
-      (*'(sk, pk) ← KeyGen2 sd ;;*)
-      let (sk,pk) := KeyGen2 sd in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      sig ← Sign sk msg ;;
-      (*#put sign_loc := ( sig , msg ) ;; *)
-      ret sig 
-    };
-    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
-    {
-      pk ← get pk_loc  ;;
-      bool ← Ver_sig pk sig msg ;;
-      ret bool
+    let (sk,pk) := KeyGen2 sd in
+    #put pk_loc := pk ;;
+    #put sk_loc := sk ;;
+    ret pk
     }
   ].
 
