@@ -60,6 +60,7 @@
 
           shellHook = ''
                     alias ll="ls -lasi"
+                    alias spacemacs="HOME=. emacs" 
                     cd ssprove && make
                     cd ..
                     '';
