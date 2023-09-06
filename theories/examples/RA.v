@@ -352,8 +352,8 @@ Module RemoteAttestation (π : SignatureParams)
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let msg := Hash state chal in
-      att ← sign (msg, sk) ;;      
-      #put attest_loc := setm A ( chal, state, att ) tt ;; 
+      att ← sign (msg, sk) ;;
+      #put attest_loc := setm A ( chal, state, att ) tt ;;
       ret att
     };
     #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'attest) : 'bool
@@ -364,17 +364,27 @@ Module RemoteAttestation (π : SignatureParams)
   ].
 
   Definition mkpair {Lt Lf E}
-  (t: package Lt [interface] E) (f: package Lf [interface] E):
-  loc_GamePair E := fun b => if b then {locpackage t} else {locpackage f}.  
+    (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
+    fun b => if b then {locpackage t} else {locpackage f}.
 
-  Definition Sig_unforg := @mkpair Signature_locs Signature_locs Sign_interface  Sig_real Sig_ideal.
+  Equations mkpair' {Lt Lf E} (t: package Lt Sign_interface E) (f: package Lf Sign_interface E) (b:bool): loc_package Sign_interface E :=
+    mkpair' t _ true  := {locpackage t};
+    mkpair' _ f false := {locpackage f}.
+
+  (*
+  Definition mkpair' {Lt Lf E}
+    (t: package Lt Sign_interface E) (f: package Lf Sign_interface E): loc_GamePair E :=
+    fun b => if b then {locpackage t} else {locpackage f}.
+   *)
+
+  Definition Sig_unforg := @mkpair Signature_locs Signature_locs Sign_interface Sig_real Sig_ideal.
 
   Definition ɛ_att A := AdvantageE Att_real Att_ideal A.
 
-  Definition Att_unforg := @mkpair Attestation_locs Attestation_locs Att_interface Att_real Att_ideal.
+  Definition Att_unforg := @mkpair' Attestation_locs Attestation_locs Att_interface Att_real Att_ideal.
 
   Lemma sig_real_vs_att_real_true :
-  Att_unforg true ≈₀ Aux ∘ Sig_unforg true.
+    Att_unforg true ≈₀ Aux ∘ Sig_unforg true.
   Proof.
     eapply eq_rel_perf_ind_eq.
     simplify_eq_rel x.
