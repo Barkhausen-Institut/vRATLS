@@ -256,12 +256,6 @@ Module RemoteAttestation (π : SignatureParams)
 
   Definition ɛ_sig A := AdvantageE Sig_real Sig_ideal A. 
 
-  Definition mkpair {Lt Lf E}
-  (t: package Lt [interface] E) (f: package Lf [interface] E):
-  loc_GamePair E := fun b => if b then {locpackage t} else {locpackage f}.  
-
-  Definition Sig_unforg := @mkpair Signature_locs Signature_locs Sign_interface Sig_real Sig_ideal.
-
   Definition i_challenge := #|Challenge|.
   Definition i_challenge_pos : Positive i_challenge.
   Proof.
@@ -306,10 +300,9 @@ Module RemoteAttestation (π : SignatureParams)
   ].
 
 (* Encryption algorithm *)
- 
   Definition Att_real :
   package Attestation_locs
-    [interface]
+    Sign_interface
     Att_interface
   :=
   [package
@@ -320,24 +313,28 @@ Module RemoteAttestation (π : SignatureParams)
     } ;
     #def #[attest] ( '(chal,(state,sd)) : 'challenge × ('state × 'seed)) : 'signature
     {
+      #import {sig #[sign] : ('message  × 'seed) → 'signature } as sign ;;
       (*'(sk, pk) ← KeyGen2 sd ;;*)
       let (sk,pk) := KeyGen2 sd in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
-      att ← Attest sk chal state ;;
+      let msg := Hash state chal in
+      att ← sign (msg, sd) ;;
       ret att
-    };
+    } ;
     #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'signature) : 'bool
     {
+      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
       pk ← get pk_loc  ;;
-      bool ← Ver_att pk att chal state ;;
+      let msg := Hash state chal in
+      bool ← verify (att, msg) ;;
       ret bool
     }
   ].
 
   Definition Att_ideal :
   package Attestation_locs
-    [interface]
+    Sign_interface
     Att_interface
   :=
   [package
@@ -348,12 +345,14 @@ Module RemoteAttestation (π : SignatureParams)
     } ;
     #def #[attest] ( '(chal,(state,sd)) : 'challenge × ('state × 'seed)) : 'attest
     {
+    #import {sig #[sign] : ('message  × 'seed) → 'signature } as sign ;;
       A ← get attest_loc ;;
       (*'(sk, pk) ← KeyGen2 sd ;;*)
       let (sk,pk) := KeyGen2 sd in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
-      att ← Attest sk chal state ;;      
+      let msg := Hash state chal in
+      att ← sign (msg, sk) ;;      
       #put attest_loc := setm A ( chal, state, att ) tt ;; 
       ret att
     };
@@ -364,9 +363,15 @@ Module RemoteAttestation (π : SignatureParams)
     }
   ].
 
+  Definition mkpair {Lt Lf E}
+  (t: package Lt [interface] E) (f: package Lf [interface] E):
+  loc_GamePair E := fun b => if b then {locpackage t} else {locpackage f}.  
+
+  Definition Sig_unforg := @mkpair Signature_locs Signature_locs Sign_interface  Sig_real Sig_ideal.
+
   Definition ɛ_att A := AdvantageE Att_real Att_ideal A.
 
-  Definition Att_unforg := mkpair Att_real Att_ideal.
+  Definition Att_unforg := @mkpair Attestation_locs Attestation_locs Att_interface Att_real Att_ideal.
 
   Lemma sig_real_vs_att_real_true :
   Att_unforg true ≈₀ Aux ∘ Sig_unforg true.
@@ -384,9 +389,11 @@ Module RemoteAttestation (π : SignatureParams)
       ssprove_sync_eq.
       ssprove_sync_eq.
       ssprove_code_simpl_more.
-      eapply rsame_head_alt. 
-      simpl.
-      eapply rreflexivity_rule.
+      eapply rpost_weaken_rule.
+      1:{  
+         
+        }
+      2:{ intros. }
 
 
 
