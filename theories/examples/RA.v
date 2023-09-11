@@ -39,6 +39,8 @@ Import Order.POrderTheory.
 
 Import PackageNotation.
 
+Obligation Tactic := idtac.
+
 (** REMOTE ATTESTATION
     VERIFIER                             PROVER
 Generates a chal-
@@ -254,17 +256,130 @@ Module RemoteAttestation (π : SignatureParams)
     }
   ].
 
-  Definition ɛ_sig A := AdvantageE Sig_real Sig_ideal A. 
+  Definition Att_real_new :
+  package Attestation_locs
+    [interface]
+    Att_interface
+  :=
+  [package
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    {
+      pk ← get pk_loc  ;;
+      ret pk
+    } ;
+    #def #[attest] ( '(chal,(state,sd)) : 'challenge × ('state × 'seed)) : 'signature
+    {
+      (*'(sk, pk) ← KeyGen2 sd ;;*)
+      let (sk,pk) := KeyGen2 sd in
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+      let msg := Hash state chal in
+      att ← Sign sk msg ;;
+      ret att
+    } ;
+    #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'signature) : 'bool
+    {
+      pk ← get pk_loc  ;;
+      let msg := Hash state chal in
+      bool ← Ver_sig pk att msg ;;
+      ret bool
+    }
+  ].
 
-  Definition i_challenge := #|Challenge|.
-  Definition i_challenge_pos : Positive i_challenge.
+  Definition Att_ideal_new :
+  package Attestation_locs
+    [interface]
+    Att_interface
+  :=
+  [package
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    {
+      pk ← get pk_loc ;;
+      ret pk
+    } ;
+    #def #[attest] ( '(chal,(state,sd)) : 'challenge × ('state × 'seed)) : 'attest
+    {
+      A ← get attest_loc ;;
+      (*'(sk, pk) ← KeyGen2 sd ;;*)
+      let (sk,pk) := KeyGen2 sd in
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+      let msg := Hash state chal in
+      att ← Sign sk msg ;;
+      #put attest_loc := setm A ( chal, state, att ) tt ;;
+      ret att
+    };
+    #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'attest) : 'bool
+    {
+      A ← get attest_loc ;;
+      ret ( (chal, state, att) \in domm A )
+    }
+  ].
+
+  Definition Aux_locs := fset [:: sign_loc ; pk_loc ; attest_loc ].
+
+  Definition Aux_new :
+  package Aux_locs
+  Sign_interface
+  Att_interface
+  :=
+  [package
+    #def #[get_pk] (_ : 'unit) : 'pubkey
+    {
+      pk ← get pk_loc ;;
+      ret pk
+    } ;
+    #def #[attest] ( '(chal,(state,sd)) : ('challenge × ('state × 'seed))) : 'signature
+    {
+      #import {sig #[sign] : ('message  × 'seed) → 'signature } as sign ;;
+      let msg := Hash state chal in
+      att ← sign (msg,sd) ;;
+      (*#put attest_loc := att ;;*)
+      ret att
+    } ;
+    #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'signature) : 'bool
+    {
+      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
+      let msg := Hash state chal in
+      pk ← get pk_loc ;;
+      verify (att,msg) 
+    }
+  ].
+
+  Definition mkpair {Lt Lf E}
+    (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
+    fun b => if b then {locpackage t} else {locpackage f}.
+
+  Definition Sig_unforg := @mkpair Signature_locs Signature_locs Sign_interface Sig_real Sig_ideal.
+  Definition Att_unforg := @mkpair Attestation_locs Attestation_locs Att_interface Att_real_new Att_ideal_new.
+
+  Lemma sig_real_vs_att_real_true:
+    Att_unforg true ≈₀  Aux_new ∘ Sig_unforg true.
   Proof.
-    unfold i_challenge.
-    apply Challenge_pos.
-  Qed.
+    eapply eq_rel_perf_ind_eq.
+    simplify_eq_rel x.
+    all: ssprove_code_simpl. 
+    - eapply rpost_weaken_rule.
+      1: eapply rreflexivity_rule.
+      move => [a1 h1] [a2 h2] [Heqa Heqh]. 
+      intuition auto.
+    - (*rewrite !cast_fun_K.*)
+      destruct x.
+      destruct s0.
+      ssprove_sync_eq.
+      ssprove_sync_eq.
+      ssprove_code_simpl_more. (*doesn't do anything*)
+      eapply rpost_weaken_rule. (*doesn't help*)
+      (*eapply rsame_head_alt.*)
+      1:{  
+         
+        }
+      2:{ intros. }
+
 
   Definition Aux :
-  package (fset [:: sign_loc ; pk_loc ; attest_loc ])
+  package 
+  Aux_locs
   [interface
   #val #[get_pk] : 'unit → 'pubkey ;
   #val #[sign] : ('message × 'seed)  → 'signature ;
@@ -367,9 +482,15 @@ Module RemoteAttestation (π : SignatureParams)
     (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
     fun b => if b then {locpackage t} else {locpackage f}.
 
-  Equations mkpair' {Lt Lf E} (t: package Lt Sign_interface E) (f: package Lf Sign_interface E) (b:bool): loc_package Sign_interface E :=
+  Equations mkpair' {Lt Lf E} (t: package Lt Sign_interface E) 
+  (f: package Lf Sign_interface E) (b:bool): loc_package Sign_interface E :=
     mkpair' t _ true  := {locpackage t};
     mkpair' _ f false := {locpackage f}.
+
+  Check loc_GamePair.
+  Print loc_GamePair.
+  Check Game_Type.
+  Print Game_Type.
 
   (*
   Definition mkpair' {Lt Lf E}
@@ -383,8 +504,31 @@ Module RemoteAttestation (π : SignatureParams)
 
   Definition Att_unforg := @mkpair' Attestation_locs Attestation_locs Att_interface Att_real Att_ideal.
 
-  Lemma sig_real_vs_att_real_true :
-    Att_unforg true ≈₀ Aux ∘ Sig_unforg true.
+  
+  #[tactic=notac] Equations Sig_pkg : package Signature_locs [interface] Sign_interface :=
+    Sig_pkg := {package Sig_unforg true }.
+
+ 
+ #[tactic=notac] Equations? Aux_pkg : package Signature_locs [interface] Att_interface :=
+    Aux_pkg := {package Aux }.
+  Proof.
+   unfold Aux. ssprove_valid.
+
+  Equations? Aux_comp_pkg : package Aux_locs Sign_interface Att_interface :=
+    Aux_comp_pkg := {package Aux ∘ Sig_pkg }.
+  Proof.
+  ssprove_valid.
+  2,3: apply fsubsetxx.
+   
+  Admitted.
+
+  Equations? Att_pkg : package Attestation_locs [interface] Att_interface :=
+    Att_pkg := {package Sig_unforg true ∘ Att_unforg true }.
+  Proof.
+  ssprove_valid.
+
+  Lemma sig_real_vs_att_real_true:
+    Att_pkg ≈₀ Aux_pkg.
   Proof.
     eapply eq_rel_perf_ind_eq.
     simplify_eq_rel x.
