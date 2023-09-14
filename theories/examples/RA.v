@@ -77,7 +77,6 @@ Module Type SignatureParams.
     Definition Attestation : choice_type := chFin(mkpos pos_n).
     Definition Message : choice_type := chFin(mkpos pos_n).
     Definition Signature : choice_type := chFin(mkpos pos_n).
-    Definition Seed : choice_type := chFin(mkpos pos_n).
 
     Parameter Challenge_pos : Positive #|Challenge|.
 
@@ -94,15 +93,20 @@ Module Type SignatureAlgorithms (π : SignatureParams).
 
 (* Key Generation *)
   Parameter KeyGen :
-  ∀ {L : {fset Location}} (sd : Seed),
+  ∀ {L : {fset Location}},
     code L [interface] (SecKey × PubKey).
 
-  Parameter KeyGen2 : ∀ (sd : Seed), (SecKey × PubKey).
+  Parameter KeyGen2 : (SecKey × PubKey).
 
   (* Siganture algorithm *)
   Parameter Sign :
   ∀ {L : {fset Location}} (sk : SecKey) (m : Message),
     code L [interface] Signature.
+
+  Parameter Sign2 : ∀ (sk : SecKey) (m : Message), Signature.
+
+  Parameter Ver_sig2 : ∀ (pk : PubKey) (sig : Signature) (m : Message), 'bool.
+
 
   (* Verification algorithm *)
   Parameter Ver_sig :
@@ -148,9 +152,7 @@ Module RemoteAttestation (π : SignatureParams)
   Notation " 'challenge " := Challenge   (in custom pack_type at level 2).
   Notation " 'challenge " := Challenge   (at level 2): package_scope.
   Notation " 'message "   := Message     (in custom pack_type at level 2).
-  Notation " 'message "   := Message     (at level 2): package_scope.  
-  Notation " 'seed "      := Seed        (in custom pack_type at level 2).
-  Notation " 'seed "      := Seed        (at level 2): package_scope.
+  Notation " 'message "   := Message     (at level 2): package_scope.
   Notation " 'att "       := Attestation (in custom pack_type at level 2).
   Notation " 'att "       := Attestation (at level 2): package_scope.
 
@@ -176,24 +178,26 @@ Module RemoteAttestation (π : SignatureParams)
   Definition get_state : nat := 43. (* routine to get the state to be attested *)
   Definition sign      : nat := 44. (* routine to sign a message *)
   Definition verify_sig: nat := 45. (* routine to verify the signature *)
-  Definition verify_att: nat := 46.
-
-  Definition Signature_locs := fset [:: pk_loc ; sk_loc ; sign_loc ].
+  Definition verify_att: nat := 46.  
 
   Notation " 'attest "    := Attestation    (in custom pack_type at level 2).  
   Definition attest    : nat := 47. (* routine to attest *)  
 
+  Definition Signature_locs := fset [:: pk_loc ; sk_loc ; sign_loc ].
+
   Definition Attestation_locs := fset [:: pk_loc ; sk_loc; attest_loc ].
+
+  Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ].
   
   Definition Sign_interface := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
-    #val #[sign] : ('message × 'seed) → 'signature ;
+    #val #[sign] : 'message → 'signature ;
     #val #[verify_sig] : ('signature × 'message) → 'bool
   ].
 
   Definition Att_interface := [interface
   #val #[get_pk] : 'unit → 'pubkey ;
-  #val #[attest] : ('challenge × ('state × 'seed)) → 'signature ;
+  #val #[attest] : ('challenge × 'state) → 'signature ;
   #val #[verify_att] : ( ('challenge × 'state) × 'signature) → 'bool
   ].
 
@@ -209,20 +213,22 @@ Module RemoteAttestation (π : SignatureParams)
       ret pk
     } ;
 
-    #def #[sign] ( '(msg,sd) : 'message × 'seed) : 'signature
+    #def #[sign] ( 'msg : 'message ) : 'signature
     {
       (*'(sk, pk) ← KeyGen2 sd ;;*)
-      let (sk,pk) := KeyGen2 sd in
+      let (sk,pk) := KeyGen2 in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
-      sig ← Sign sk msg ;;
+      let sig := Sign2 sk msg in
+      (*sig ← Sign sk msg ;;*)
       (*#put sign_loc := ( sig , msg ) ;; *)
       ret sig 
     };
     #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
     {
       pk ← get pk_loc  ;;
-      bool ← Ver_sig pk sig msg ;;
+      let bool := Ver_sig2 pk sig msg in
+      (*bool ← Ver_sig pk sig msg ;;*)
       ret bool
     }
   ].
@@ -238,13 +244,14 @@ Module RemoteAttestation (π : SignatureParams)
       pk ← get pk_loc ;;
       ret pk
     } ;
-    #def #[sign] ( '(msg,sd) : 'message × 'seed) : 'signature
+    #def #[sign] ( 'msg : 'message ) : 'signature
     {
       (*'(sk, pk) ← KeyGen2 sd ;;*)
-      let (sk,pk) := KeyGen2 sd in
+      let (sk,pk) := KeyGen2 in
       #put pk_loc := pk ;;
-      #put sk_loc := sk ;;      
-      sig ← Sign sk msg ;; 
+      #put sk_loc := sk ;;
+      let sig := Sign2 sk msg in
+      (*sig ← Sign sk msg ;;*) 
       S ← get sign_loc ;; 
       #put sign_loc := setm S (sig, msg) tt ;;
       ret sig
@@ -267,21 +274,23 @@ Module RemoteAttestation (π : SignatureParams)
       pk ← get pk_loc  ;;
       ret pk
     } ;
-    #def #[attest] ( '(chal,(state,sd)) : 'challenge × ('state × 'seed)) : 'signature
+    #def #[attest] ( '(chal,state) : 'challenge × 'state ) : 'signature
     {
       (*'(sk, pk) ← KeyGen2 sd ;;*)
-      let (sk,pk) := KeyGen2 sd in
+      let (sk,pk) := KeyGen2 in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let msg := Hash state chal in
-      att ← Sign sk msg ;;
+      let att := Sign2 sk msg in
+      (*att ← Sign sk msg ;;*)
       ret att
     } ;
     #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'signature) : 'bool
     {
       pk ← get pk_loc  ;;
       let msg := Hash state chal in
-      bool ← Ver_sig pk att msg ;;
+      let bool := Ver_sig2 pk att msg in
+      (*bool ← Ver_sig pk att msg ;;*)
       ret bool
     }
   ].
@@ -297,15 +306,16 @@ Module RemoteAttestation (π : SignatureParams)
       pk ← get pk_loc ;;
       ret pk
     } ;
-    #def #[attest] ( '(chal,(state,sd)) : 'challenge × ('state × 'seed)) : 'attest
+    #def #[attest] ( '(chal,state) : 'challenge × 'state) : 'attest
     {
       A ← get attest_loc ;;
       (*'(sk, pk) ← KeyGen2 sd ;;*)
-      let (sk,pk) := KeyGen2 sd in
+      let (sk,pk) := KeyGen2 in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let msg := Hash state chal in
-      att ← Sign sk msg ;;
+      let att := Sign2 sk msg in
+      (*att ← Sign sk msg ;;*)
       #put attest_loc := setm A ( chal, state, att ) tt ;;
       ret att
     };
@@ -329,11 +339,11 @@ Module RemoteAttestation (π : SignatureParams)
       pk ← get pk_loc ;;
       ret pk
     } ;
-    #def #[attest] ( '(chal,(state,sd)) : ('challenge × ('state × 'seed))) : 'signature
+    #def #[attest] ( '(chal,state) : ('challenge × 'state )) : 'signature
     {
-      #import {sig #[sign] : ('message  × 'seed) → 'signature } as sign ;;
+      #import {sig #[sign] : 'message  → 'signature } as sign ;;
       let msg := Hash state chal in
-      att ← sign (msg,sd) ;;
+      att ← sign msg ;;
       (*#put attest_loc := att ;;*)
       ret att
     } ;
@@ -357,6 +367,7 @@ Module RemoteAttestation (π : SignatureParams)
     Att_unforg true ≈₀  Aux_new ∘ Sig_unforg true.
   Proof.
     eapply eq_rel_perf_ind_eq.
+    ssprove_invariant.
     simplify_eq_rel x.
     all: ssprove_code_simpl. 
     - eapply rpost_weaken_rule.
@@ -365,10 +376,16 @@ Module RemoteAttestation (π : SignatureParams)
       intuition auto.
     - (*rewrite !cast_fun_K.*)
       destruct x.
-      destruct s0.
       ssprove_sync_eq.
       ssprove_sync_eq.
-      ssprove_code_simpl_more. (*doesn't do anything*)
+      ssprove_code_simpl_more. (*doesn't do anything*)  
+      Check rsame_head.
+      Check r_reflexivity_alt.
+      (* eapply rsame_head. *)
+      (*eapply r_reflexivity_alt. *)
+      eapply rpost_weaken_rule.
+      Check rpost_weaken_rule.
+      2:{ }
       eapply rpost_weaken_rule. (*doesn't help*)
       (*eapply rsame_head_alt.*)
       1:{  
