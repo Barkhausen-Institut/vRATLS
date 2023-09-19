@@ -185,7 +185,7 @@ Module RemoteAttestation (π : SignatureParams)
 
   Definition Signature_locs := fset [:: pk_loc ; sk_loc ; sign_loc ].
 
-  Definition Attestation_locs := fset [:: pk_loc ; sk_loc; attest_loc ].
+  Definition Attestation_locs := fset [:: pk_loc ; sk_loc; attest_loc ; sign_loc ].
 
   Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ].
   
@@ -363,6 +363,12 @@ Module RemoteAttestation (π : SignatureParams)
   Definition Sig_unforg := @mkpair Signature_locs Signature_locs Sign_interface Sig_real Sig_ideal.
   Definition Att_unforg := @mkpair Attestation_locs Attestation_locs Att_interface Att_real_new Att_ideal_new.
 
+(* Attestation_locs =o Aux_locs o Sig_locs
+Definition Attestation_locs := fset [:: pk_loc ; sk_loc; attest_loc ].
+
+Definition Signature_locs := fset [:: pk_loc ; sk_loc ; sign_loc ].
+Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ]. *)
+
   Lemma sig_real_vs_att_real_true:
     Att_unforg true ≈₀  Aux_new ∘ Sig_unforg true.
   Proof.
@@ -380,11 +386,12 @@ Module RemoteAttestation (π : SignatureParams)
       ssprove_sync_eq.
       ssprove_code_simpl_more. (*doesn't do anything*)  
       Check rsame_head.
-      Check r_reflexivity_alt.
-      (* eapply rsame_head. *)
+      Check r_reflexivity_alt. 
+      (*eapply rsame_head.*)
       (*eapply r_reflexivity_alt. *)
       eapply rpost_weaken_rule.
       Check rpost_weaken_rule.
+
       2:{ }
       eapply rpost_weaken_rule. (*doesn't help*)
       (*eapply rsame_head_alt.*)
