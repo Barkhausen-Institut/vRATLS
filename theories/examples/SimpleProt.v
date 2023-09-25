@@ -364,9 +364,9 @@ Module DiffieHellman
     {
       (* Initially the state locations are empty. Let's fill them: *)
       sk_alice ← sample uniform p ;;
-      assert (0 != Aritp_Zp sk_alice) ;; (* I do not know how to get this information from the sampling. *)
+      #assert (0 != Aritp_Zp sk_alice) ;; (* I do not know how to get this information from the sampling. *)
       sk_bob ← sample uniform p ;;
-      assert (0 != Aritp_Zp sk_bob) ;;
+      #assert (0 != Aritp_Zp sk_bob) ;;
       #put sk_A := sk_alice ;;
       #put sk_B := sk_bob ;;
 
@@ -479,9 +479,9 @@ Module DiffieHellman
            #def #[ DDH ] (_ : 'unit) : 'group × 'group × 'group
            {
              a ← sample uniform p ;;
-             assert (0 != Aritp_Zp a) ;;
+             #assert (0 != Aritp_Zp a) ;;
              b ← sample uniform p ;;
-             assert (0 != Aritp_Zp b) ;;
+             #assert (0 != Aritp_Zp b) ;;
              c ← sample uniform p ;;
 
              #put sk_A := a ;;
@@ -1046,12 +1046,35 @@ Module DiffieHellman
         let c := f' p (Aritp_Zp a) (Aritp_Zp b) in
         prod2ch (b, Zp_Aritp c).
 
-  Definition f_final_inv (a : Arit (uniform p)) : (Arit (uniform p)) * 'Z_p → Arit (uniform (p * p)) :=
+  Definition f_final_inv (a : Arit (uniform p)) : Arit (uniform (p * p)) → Arit (uniform p) :=
     fun x =>
-      let '(b,d) := x in
-      let c := f_inv' p (Aritp_Zp a) d in
-      prod2ch (b, Zp_Aritp c).
+      let '(_,c) := ch2prod x in  (* I cannot just use the [b] that comes with the tuple because then I cannot prove bijectivity. *)
+      Zp_Aritp (f_inv' p (Aritp_Zp a) (Aritp_Zp c)).
 
+  Lemma f_final_f_final_inv (a : Arit (uniform p)) (uneq_0 : 0 != Aritp_Zp a) :
+    forall x, f_final_inv a (f_final a x) = x.
+  Proof.
+    rewrite /f_final_inv/f_final => x //=.
+    rewrite ch2prod_prod2ch //=.
+    rewrite /Aritp_Zp/Zp_Aritp/Arit_Zp'/Zp_Arit' => //=.
+    rewrite fromZp_intoZp.
+    rewrite f_inj'.
+    - by rewrite intoZp_fromZp.
+    - exact prime_order.
+    - exact uneq_0.
+  Qed.
+
+  Lemma f_final_inv_f_final (a : Arit (uniform p)) :
+    forall x, f_final a (f_final_inv a x) = x.
+  Proof.
+    rewrite /f_final/f_final_inv => x //=.
+    rewrite /Aritp_Zp/Zp_Aritp/Arit_Zp'/Zp_Arit' => //=.
+  Abort.
+
+  Lemma f_final_bij (a : Arit (uniform p)):
+    bijective (f_final a).
+  Proof.
+  Admitted.
 
   Theorem DDH__security : ∀ L__A A,
       ValidPackage L__0 Game__Import Game__Export DH__real → (* 1st game pair package is valid *)
@@ -1083,6 +1106,7 @@ Module DiffieHellman
       (* The first two code steps are equal: *)
       ssprove_sync.
       intros.
+      eapply r_assert.
       ssprove_sync.
       intros.
       (* This one now is more tricky.
