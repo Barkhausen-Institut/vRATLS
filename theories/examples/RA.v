@@ -68,8 +68,14 @@ cryptography. It is like the version used on the RATLS paper.
 
 Module Type SignatureParams.
 
-    Variable (n: nat). 
+    Variable (n: nat).
     Definition pos_n: nat := 2^n.
+
+    (*
+      FIXME This does not make much sense, does it?
+      Keys should be of type [uniform p].
+     *)
+
     Definition SecKey : choice_type := chFin(mkpos pos_n).
     Definition PubKey : choice_type := chFin(mkpos pos_n).
     Definition State : choice_type := chFin(mkpos pos_n).
@@ -81,15 +87,24 @@ Module Type SignatureParams.
     Parameter Challenge_pos : Positive #|Challenge|.
 
 End SignatureParams.
-  
+
 (** |  SIGNATURE  |
     |   SCHEME    | **)
 
 Module Type SignatureAlgorithms (π : SignatureParams).
-  
+
   Import π.
-  
+
   #[local] Open Scope package_scope.
+
+  (*
+    FIXME
+    This also looks strange to me:
+    It seems like the whole scheme builds upon an
+    asymmetric encryption scheme.
+    If so, then we should definitely show that this
+    is indeed the case!
+   *)
 
 (* Key Generation *)
   Parameter KeyGen :
@@ -116,7 +131,7 @@ Module Type SignatureAlgorithms (π : SignatureParams).
     Parameter Attest :
     ∀ {L : {fset Location}} (sk : SecKey) ( c : Challenge ) (s : State),
        code L [interface] Signature.
-     
+
   (* Decryption algorithm *)
   Parameter Ver_att :
     ∀ {L : {fset Location}} (pk : PubKey) (att : Attestation)
@@ -127,12 +142,12 @@ Module Type SignatureAlgorithms (π : SignatureParams).
     	State -> Challenge ->
       Message.
 
-  Parameter Hash_refl : 
+  Parameter Hash_refl :
     forall s1 c1 , Hash s1 c1 = Hash s1 c1.
 
   Parameter Hash_bij :
     forall s1 c1 s2 c2, s1 != s2 \/ c1 != c2  -> Hash s1 c1 != Hash s2 c2.
-    
+
 End SignatureAlgorithms.
 
 Module RemoteAttestation (π : SignatureParams)
@@ -168,7 +183,7 @@ Module RemoteAttestation (π : SignatureParams)
 
   Definition pk_loc      : Location := (PubKey    ; 0%N).
   Definition sk_loc      : Location := (SecKey    ; 1%N).
-  Definition message_loc : Location := (Message   ; 2%N).   
+  Definition message_loc : Location := (Message   ; 2%N).
   Definition sign_loc    : Location := ('set ('signature × 'message); 3%N).
   Definition state_loc   : Location := (State    ; 4%N).
   Definition chal_loc    : Location := (Challenge ; 5%N).
@@ -178,17 +193,17 @@ Module RemoteAttestation (π : SignatureParams)
   Definition get_state : nat := 43. (* routine to get the state to be attested *)
   Definition sign      : nat := 44. (* routine to sign a message *)
   Definition verify_sig: nat := 45. (* routine to verify the signature *)
-  Definition verify_att: nat := 46.  
+  Definition verify_att: nat := 46.
 
-  Notation " 'attest "    := Attestation    (in custom pack_type at level 2).  
-  Definition attest    : nat := 47. (* routine to attest *)  
+  Notation " 'attest "    := Attestation    (in custom pack_type at level 2).
+  Definition attest    : nat := 47. (* routine to attest *)
 
   Definition Signature_locs := fset [:: pk_loc ; sk_loc ; sign_loc ].
 
   Definition Attestation_locs := fset [:: pk_loc ; sk_loc; attest_loc ; sign_loc ].
 
   Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ].
-  
+
   Definition Sign_interface := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
     #val #[sign] : 'message → 'signature ;
@@ -222,7 +237,7 @@ Module RemoteAttestation (π : SignatureParams)
       let sig := Sign2 sk msg in
       (*sig ← Sign sk msg ;;*)
       (*#put sign_loc := ( sig , msg ) ;; *)
-      ret sig 
+      ret sig
     };
     #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
     {
@@ -251,15 +266,15 @@ Module RemoteAttestation (π : SignatureParams)
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let sig := Sign2 sk msg in
-      (*sig ← Sign sk msg ;;*) 
-      S ← get sign_loc ;; 
+      (*sig ← Sign sk msg ;;*)
+      S ← get sign_loc ;;
       #put sign_loc := setm S (sig, msg) tt ;;
       ret sig
     };
     #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
     {
       S ← get sign_loc ;;
-      ret ( (sig,msg) \in domm S)      
+      ret ( (sig,msg) \in domm S)
     }
   ].
 
@@ -331,8 +346,7 @@ Module RemoteAttestation (π : SignatureParams)
   Definition Aux_new :
   package Aux_locs
   Sign_interface
-  Att_interface
-  :=
+  Att_interface :=
   [package
     #def #[get_pk] (_ : 'unit) : 'pubkey
     {
@@ -351,8 +365,13 @@ Module RemoteAttestation (π : SignatureParams)
     {
       #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
       let msg := Hash state chal in
-      pk ← get pk_loc ;;
-      verify (att,msg) 
+      (* pk ← get pk_loc ;; *)
+      b  ← verify (att,msg) ;;
+      ret b
+      (* When I just write:
+         [verify (att,msg)]
+         Then SSProve errors out and cannot validate the package. Why?
+       *)
     }
   ].
 
@@ -373,32 +392,22 @@ Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ]. *)
     Att_unforg true ≈₀  Aux_new ∘ Sig_unforg true.
   Proof.
     eapply eq_rel_perf_ind_eq.
-    ssprove_invariant.
     simplify_eq_rel x.
-    all: ssprove_code_simpl. 
+    all: ssprove_code_simpl.
     - eapply rpost_weaken_rule.
       1: eapply rreflexivity_rule.
-      move => [a1 h1] [a2 h2] [Heqa Heqh]. 
+      move => [a1 h1] [a2 h2] [Heqa Heqh].
       intuition auto.
-    - (*rewrite !cast_fun_K.*)
-      destruct x.
+    - destruct x.
       ssprove_sync_eq.
       ssprove_sync_eq.
-      ssprove_code_simpl_more. (*doesn't do anything*)  
-      Check rsame_head.
-      Check r_reflexivity_alt. 
-      (*eapply rsame_head.*)
-      (*eapply r_reflexivity_alt. *)
-      eapply rpost_weaken_rule.
-      Check rpost_weaken_rule.
-
-      2:{ }
-      eapply rpost_weaken_rule. (*doesn't help*)
-      (*eapply rsame_head_alt.*)
-      1:{  
-         
-        }
-      2:{ intros. }
+      by [apply r_ret].
+    - case x => s s0.
+      case s => s1 s2.
+      ssprove_sync_eq.
+      move => a.
+      by [apply r_ret].
+  Qed.
 
 
   Definition Aux :
