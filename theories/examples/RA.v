@@ -74,6 +74,16 @@ Module Type SignatureParams.
     (*
       FIXME This does not make much sense, does it?
       Keys should be of type [uniform p].
+
+      J: I made this because the signature ideal-game requires us 
+      to create and add to a set and ask if something is an element of 
+      that set. This construction is from MACCCA.v
+      (See joy of crypto, p. 194)
+      Furthermore, this entire file works without a single 
+      'sampling' call. I guess the "randomness / samlpling" is an 
+      important part of ssprove. But the core is that it is able to show
+      that two packages are the same. They may or may not use a sampling.
+      But, it indeed might be necessary/ helpful to add it at some point. 
      *)
 
     Definition SecKey : choice_type := chFin(mkpos pos_n).
@@ -104,6 +114,10 @@ Module Type SignatureAlgorithms (π : SignatureParams).
     asymmetric encryption scheme.
     If so, then we should definitely show that this
     is indeed the case!
+
+    J: I don't understand the question. I've never defined an
+    encryption nor an decryption functionality. Where do you 
+    get the impression that we use an asymmetric enc. scheme?
    *)
 
 (* Key Generation *)
