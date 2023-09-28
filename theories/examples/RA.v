@@ -122,33 +122,31 @@ Module Type SignatureAlgorithms (π : SignatureParams).
     S: From the presence of a public-secret key pair.
    *)
 
-(* Key Generation *)
-  Parameter KeyGen :
+  Parameter KeyGen : (SecKey × PubKey).
+
+  (* currently not used *)
+  Parameter KeyGen_alt : 
   ∀ {L : {fset Location}},
     code L [interface] (SecKey × PubKey).
 
-  Parameter KeyGen2 : (SecKey × PubKey).
+  Parameter Sign : ∀ (sk : SecKey) (m : Message), Signature.
 
-  (* Siganture algorithm *)
-  Parameter Sign :
+  (* currently not used *)  
+  Parameter Sign_alt :
   ∀ {L : {fset Location}} (sk : SecKey) (m : Message),
     code L [interface] Signature.
 
-  Parameter Sign2 : ∀ (sk : SecKey) (m : Message), Signature.
-
-  Parameter Ver_sig2 : ∀ (pk : PubKey) (sig : Signature) (m : Message), 'bool.
-
-
-  (* Verification algorithm *)
-  Parameter Ver_sig :
+  Parameter Ver_sig : ∀ (pk : PubKey) (sig : Signature) (m : Message), 'bool.
+   
+  (* currently not used *)
+  Parameter Ver_sig_alt :
   ∀ {L : {fset Location}} (pk : PubKey) (sig : Signature) (m : Message),
     code L [interface] 'bool.
 
-    Parameter Attest :
+  Parameter Attest :
     ∀ {L : {fset Location}} (sk : SecKey) ( c : Challenge ) (s : State),
        code L [interface] Signature.
 
-  (* Decryption algorithm *)
   Parameter Ver_att :
     ∀ {L : {fset Location}} (pk : PubKey) (att : Attestation)
                    ( c : Challenge) ( s : State),
@@ -247,10 +245,10 @@ Module RemoteAttestation (π : SignatureParams)
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
       (*'(sk, pk) ← KeyGen2 sd ;;*)
-      let (sk,pk) := KeyGen2 in
+      let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
-      let sig := Sign2 sk msg in
+      let sig := Sign sk msg in
       (*sig ← Sign sk msg ;;*)
       (*#put sign_loc := ( sig , msg ) ;; *)
       ret sig
@@ -258,7 +256,7 @@ Module RemoteAttestation (π : SignatureParams)
     #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
     {
       pk ← get pk_loc  ;;
-      let bool := Ver_sig2 pk sig msg in
+      let bool := Ver_sig pk sig msg in
       (*bool ← Ver_sig pk sig msg ;;*)
       ret bool
     }
@@ -278,10 +276,10 @@ Module RemoteAttestation (π : SignatureParams)
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
       (*'(sk, pk) ← KeyGen2 sd ;;*)
-      let (sk,pk) := KeyGen2 in
+      let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
-      let sig := Sign2 sk msg in
+      let sig := Sign sk msg in
       (*sig ← Sign sk msg ;;*)
       S ← get sign_loc ;;
       #put sign_loc := setm S (sig, msg) tt ;;
@@ -308,11 +306,11 @@ Module RemoteAttestation (π : SignatureParams)
     #def #[attest] ( '(chal,state) : 'challenge × 'state ) : 'signature
     {
       (*'(sk, pk) ← KeyGen2 sd ;;*)
-      let (sk,pk) := KeyGen2 in
+      let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let msg := Hash state chal in
-      let att := Sign2 sk msg in
+      let att := Sign sk msg in
       (*att ← Sign sk msg ;;*)
       ret att
     } ;
@@ -320,7 +318,7 @@ Module RemoteAttestation (π : SignatureParams)
     {
       pk ← get pk_loc  ;;
       let msg := Hash state chal in
-      let bool := Ver_sig2 pk att msg in
+      let bool := Ver_sig pk att msg in
       (*bool ← Ver_sig pk att msg ;;*)
       ret bool
     }
@@ -341,11 +339,11 @@ Module RemoteAttestation (π : SignatureParams)
     {
       A ← get attest_loc ;;
       (*'(sk, pk) ← KeyGen2 sd ;;*)
-      let (sk,pk) := KeyGen2 in
+      let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let msg := Hash state chal in
-      let att := Sign2 sk msg in
+      let att := Sign sk msg in
       (*att ← Sign sk msg ;;*)
       #put attest_loc := setm A ( chal, state, att ) tt ;;
       ret att
@@ -359,7 +357,7 @@ Module RemoteAttestation (π : SignatureParams)
 
   Definition Aux_locs := fset [:: sign_loc ; pk_loc ; attest_loc ].
 
-  Definition Aux_new :
+  Definition Aux :
   package Aux_locs
   Sign_interface
   Att_interface :=
@@ -405,7 +403,7 @@ Definition Signature_locs := fset [:: pk_loc ; sk_loc ; sign_loc ].
 Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ]. *)
 
   Lemma sig_real_vs_att_real_true:
-    Att_unforg true ≈₀  Aux_new ∘ Sig_unforg true.
+    Att_unforg true ≈₀  Aux ∘ Sig_unforg true.
   Proof.
     eapply eq_rel_perf_ind_eq.
     simplify_eq_rel x.
@@ -425,194 +423,8 @@ Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ]. *)
       by [apply r_ret].
   Qed.
 
-
-  Definition Aux :
-  package
-  Aux_locs
-  [interface
-  #val #[get_pk] : 'unit → 'pubkey ;
-  #val #[sign] : ('message × 'seed)  → 'signature ;
-  #val #[verify_sig] : ('signature × 'message) → 'bool
-  ]
-  [interface
-  #val #[get_pk] : 'unit → 'pubkey ;
-  #val #[attest] : ('challenge × ('state × 'seed)) → 'signature ;
-  #val #[verify_att] : ( ('challenge × 'state) × 'signature) → 'bool
-  ]
-  :=
-  [package
-    #def #[get_pk] (_ : 'unit) : 'pubkey
-    {
-      pk ← get pk_loc ;;
-      ret pk
-    } ;
-    #def #[attest] ( '(chal,(state,sd)) : ('challenge × ('state × 'seed))) : 'signature
-    {
-      #import {sig #[sign] : ('message  × 'seed) → 'signature } as sign ;;
-      let msg := Hash state chal in
-      att ← sign (msg,sd) ;;
-      (*#put attest_loc := att ;;*)
-      ret att
-    } ;
-    #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'signature) : 'bool
-    {
-      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
-      let msg := Hash state chal in
-      pk ← get pk_loc ;;
-      verify (att,msg)
-    }
-  ].
-
-(* Encryption algorithm *)
-  Definition Att_real :
-  package Attestation_locs
-    Sign_interface
-    Att_interface
-  :=
-  [package
-    #def  #[get_pk] (_ : 'unit) : 'pubkey
-    {
-      pk ← get pk_loc  ;;
-      ret pk
-    } ;
-    #def #[attest] ( '(chal,(state,sd)) : 'challenge × ('state × 'seed)) : 'signature
-    {
-      #import {sig #[sign] : ('message  × 'seed) → 'signature } as sign ;;
-      (*'(sk, pk) ← KeyGen2 sd ;;*)
-      let (sk,pk) := KeyGen2 sd in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      let msg := Hash state chal in
-      att ← sign (msg, sd) ;;
-      ret att
-    } ;
-    #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'signature) : 'bool
-    {
-      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
-      pk ← get pk_loc  ;;
-      let msg := Hash state chal in
-      bool ← verify (att, msg) ;;
-      ret bool
-    }
-  ].
-
-  Definition Att_ideal :
-  package Attestation_locs
-    Sign_interface
-    Att_interface
-  :=
-  [package
-    #def  #[get_pk] (_ : 'unit) : 'pubkey
-    {
-      pk ← get pk_loc ;;
-      ret pk
-    } ;
-    #def #[attest] ( '(chal,(state,sd)) : 'challenge × ('state × 'seed)) : 'attest
-    {
-    #import {sig #[sign] : ('message  × 'seed) → 'signature } as sign ;;
-      A ← get attest_loc ;;
-      (*'(sk, pk) ← KeyGen2 sd ;;*)
-      let (sk,pk) := KeyGen2 sd in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      let msg := Hash state chal in
-      att ← sign (msg, sk) ;;
-      #put attest_loc := setm A ( chal, state, att ) tt ;;
-      ret att
-    };
-    #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'attest) : 'bool
-    {
-      A ← get attest_loc ;;
-      ret ( (chal, state, att) \in domm A )
-    }
-  ].
-
-  Definition mkpair {Lt Lf E}
-    (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
-    fun b => if b then {locpackage t} else {locpackage f}.
-
-  Equations mkpair' {Lt Lf E} (t: package Lt Sign_interface E) 
-  (f: package Lf Sign_interface E) (b:bool): loc_package Sign_interface E :=
-    mkpair' t _ true  := {locpackage t};
-    mkpair' _ f false := {locpackage f}.
-
-  Check loc_GamePair.
-  Print loc_GamePair.
-  Check Game_Type.
-  Print Game_Type.
-
-  (*
-  Definition mkpair' {Lt Lf E}
-    (t: package Lt Sign_interface E) (f: package Lf Sign_interface E): loc_GamePair E :=
-    fun b => if b then {locpackage t} else {locpackage f}.
-   *)
-
-  Definition Sig_unforg := @mkpair Signature_locs Signature_locs Sign_interface Sig_real Sig_ideal.
-
-  Definition ɛ_att A := AdvantageE Att_real Att_ideal A.
-
-  Definition Att_unforg := @mkpair' Attestation_locs Attestation_locs Att_interface Att_real Att_ideal.
-
-  
-  #[tactic=notac] Equations Sig_pkg : package Signature_locs [interface] Sign_interface :=
-    Sig_pkg := {package Sig_unforg true }.
-
- 
- #[tactic=notac] Equations? Aux_pkg : package Signature_locs [interface] Att_interface :=
-    Aux_pkg := {package Aux }.
-  Proof.
-   unfold Aux. ssprove_valid.
-
-  Equations? Aux_comp_pkg : package Aux_locs Sign_interface Att_interface :=
-    Aux_comp_pkg := {package Aux ∘ Sig_pkg }.
-  Proof.
-  ssprove_valid.
-  2,3: apply fsubsetxx.
-   
-  Admitted.
-
-  Equations? Att_pkg : package Attestation_locs [interface] Att_interface :=
-    Att_pkg := {package Sig_unforg true ∘ Att_unforg true }.
-  Proof.
-  ssprove_valid.
-
-  Lemma sig_real_vs_att_real_true:
-    Att_pkg ≈₀ Aux_pkg.
-  Proof.
-    eapply eq_rel_perf_ind_eq.
-    simplify_eq_rel x.
-    all: ssprove_code_simpl. 
-    - eapply rpost_weaken_rule.
-      1: eapply rreflexivity_rule.
-      move => [a1 h1] [a2 h2] [Heqa Heqh]. 
-      intuition auto.
-    - (*rewrite !cast_fun_K.*)
-      destruct x.
-      destruct s0.
-      ssprove_sync_eq.
-      ssprove_sync_eq.
-      ssprove_code_simpl_more.
-      eapply rpost_weaken_rule.
-      1:{  
-         
-        }
-      2:{ intros. }
-
-
-
-      eapply rreflexivity_rule.
-      ssprove_sync_eq.
-      ssprove_code_simpl_more.
-      eapply rsame_head_alt.          
-      ssprove_sync.  
-      ssprove_sync_eq. 
-      
-    ssprove_swap_lhs 0%N. 
-    Admitted.
-  (*Qed.*)
-
   Lemma sig_ideal_vs_att_ideal_true :
-  Att_ideal ≈₀ Aux ∘ Sig_ideal.
+  Att_unforg false ≈₀ Aux ∘ Sig_unforg false.
   Proof.
     eapply eq_rel_perf_ind_eq.
     simplify_eq_rel m.
@@ -620,6 +432,7 @@ Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ]. *)
     Admitted.
   (*Qed.*)
 
+  (* This is what the theorem is supposed to look like, but it doesn't compile! -> to be changed*)
   Theorem RA_unforg LA A :
   ∀ LA A,
     ValidPackage LA [interface
