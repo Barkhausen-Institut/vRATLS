@@ -152,6 +152,10 @@ Module Type SignatureAlgorithms (π : SignatureParams).
                    ( c : Challenge) ( s : State),
        code L [interface] 'bool.
 
+  (*
+TODO remove below
+   *)
+
   Parameter Hash :
     	State -> Challenge ->
       Message.
@@ -214,7 +218,15 @@ Module RemoteAttestation (π : SignatureParams)
 
   Definition Signature_locs := fset [:: pk_loc ; sk_loc ; sign_loc ].
 
-  Definition Attestation_locs := fset [:: pk_loc ; sk_loc; attest_loc ; sign_loc ].
+  Definition Attestation_locs := fset [:: pk_loc ; sk_loc; attest_loc; sign_loc ].
+  (*
+TODO:
+    Definition Attestation_locs := fset [:: pk_loc ; sk_loc; sign_loc ].
+
+TODO:
+    Definition hash ((chal,st):'set ('challenge × 'state )) : 'set ('message) :=
+      (chal,st).
+   *)
 
   Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ].
 
@@ -423,12 +435,20 @@ Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ]. *)
       by [apply r_ret].
   Qed.
 
-  Lemma sig_ideal_vs_att_ideal_true :
+  Lemma sig_ideal_vs_att_ideal_false :
   Att_unforg false ≈₀ Aux ∘ Sig_unforg false.
   Proof.
     eapply eq_rel_perf_ind_eq.
-    simplify_eq_rel m.
+    simplify_eq_rel x.
     all: ssprove_code_simpl.
+    - ssprove_sync_eq => pk_loc.
+      by [apply r_ret].
+    - case x => challenge state.
+      ssprove_swap_lhs 0.
+      ssprove_sync_eq.
+      ssprove_swap_lhs 0.
+      ssprove_sync_eq.
+      rewrite /attest_loc /sign_loc.
     Admitted.
   (*Qed.*)
 
