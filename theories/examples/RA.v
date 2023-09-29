@@ -152,20 +152,6 @@ Module Type SignatureAlgorithms (π : SignatureParams).
                    ( c : Challenge) ( s : State),
        code L [interface] 'bool.
 
-  (*
-TODO remove below
-   *)
-
-  Parameter Hash :
-    	State -> Challenge ->
-      Message.
-
-  Parameter Hash_refl :
-    forall s1 c1 , Hash s1 c1 = Hash s1 c1.
-
-  Parameter Hash_bij :
-    forall s1 c1 s2 c2, s1 != s2 \/ c1 != c2  -> Hash s1 c1 != Hash s2 c2.
-
 End SignatureAlgorithms.
 
 Module RemoteAttestation (π : SignatureParams)
@@ -186,8 +172,8 @@ Module RemoteAttestation (π : SignatureParams)
   Notation " 'challenge " := Challenge   (at level 2): package_scope.
   Notation " 'message "   := Message     (in custom pack_type at level 2).
   Notation " 'message "   := Message     (at level 2): package_scope.
-  Notation " 'att "       := Attestation (in custom pack_type at level 2).
-  Notation " 'att "       := Attestation (at level 2): package_scope.
+  Notation " 'att "       := Signature (in custom pack_type at level 2).
+  Notation " 'att "       := Signature (at level 2): package_scope.
 
   (**
   We can't use sets directly in [choice_type] so instead we use a map to units.
@@ -205,7 +191,7 @@ Module RemoteAttestation (π : SignatureParams)
   Definition sign_loc    : Location := ('set ('signature × 'message); 3%N).
   Definition state_loc   : Location := (State    ; 4%N).
   Definition chal_loc    : Location := (Challenge ; 5%N).
-  Definition attest_loc  : Location := ('set ('challenge × 'state × 'att ) ; 6%N).
+  Definition attest_loc  : Location := ('set ('att × 'challenge × 'state ) ; 6%N).
 
   Definition get_pk    : nat := 42. (* routine to get the public key *)
   Definition get_state : nat := 43. (* routine to get the state to be attested *)
@@ -218,15 +204,28 @@ Module RemoteAttestation (π : SignatureParams)
 
   Definition Signature_locs := fset [:: pk_loc ; sk_loc ; sign_loc ].
 
-  Definition Attestation_locs := fset [:: pk_loc ; sk_loc; attest_loc; sign_loc ].
+  Definition Attestation_locs := fset [:: pk_loc ; sk_loc; sign_loc ].
   (*
 TODO:
     Definition Attestation_locs := fset [:: pk_loc ; sk_loc; sign_loc ].
 
-TODO:
+
     Definition hash ((chal,st):'set ('challenge × 'state )) : 'set ('message) :=
       (chal,st).
-   *)
+  *)
+(*
+TODO remove below
+*)
+
+  Parameter Hash :
+    	State -> Challenge ->
+      Message.
+(*
+  Parameter Hash_refl :
+    forall s1 c1 , Hash s1 c1 = Hash s1 c1.
+
+  Parameter Hash_bij :
+    forall s1 c1 s2 c2, s1 != s2 \/ c1 != c2  -> Hash s1 c1 != Hash s2 c2. *)
 
   Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ].
 
@@ -304,7 +303,7 @@ TODO:
     }
   ].
 
-  Definition Att_real_new :
+  Definition Att_real :
   package Attestation_locs
     [interface]
     Att_interface
@@ -336,7 +335,7 @@ TODO:
     }
   ].
 
-  Definition Att_ideal_new :
+  Definition Att_ideal :
   package Attestation_locs
     [interface]
     Att_interface
@@ -349,7 +348,7 @@ TODO:
     } ;
     #def #[attest] ( '(chal,state) : 'challenge × 'state) : 'attest
     {
-      A ← get attest_loc ;;
+      A ← get sign_loc ;;
       (*'(sk, pk) ← KeyGen2 sd ;;*)
       let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
@@ -357,17 +356,18 @@ TODO:
       let msg := Hash state chal in
       let att := Sign sk msg in
       (*att ← Sign sk msg ;;*)
-      #put attest_loc := setm A ( chal, state, att ) tt ;;
+      #put sign_loc := setm A ( att, msg ) tt ;;
       ret att
     };
     #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'attest) : 'bool
     {
-      A ← get attest_loc ;;
-      ret ( (chal, state, att) \in domm A )
+      A ← get sign_loc ;;
+      let msg := Hash state chal in
+      ret ( ( att, msg ) \in domm A )
     }
   ].
 
-  Definition Aux_locs := fset [:: sign_loc ; pk_loc ; attest_loc ].
+  Definition Aux_locs := fset [:: sign_loc ; pk_loc ; sign_loc ].
 
   Definition Aux :
   package Aux_locs
@@ -384,14 +384,12 @@ TODO:
       #import {sig #[sign] : 'message  → 'signature } as sign ;;
       let msg := Hash state chal in
       att ← sign msg ;;
-      (*#put attest_loc := att ;;*)
       ret att
     } ;
     #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'signature) : 'bool
     {
       #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
       let msg := Hash state chal in
-      (* pk ← get pk_loc ;; *)
       b  ← verify (att,msg) ;;
       ret b
       (* When I just write:
@@ -406,7 +404,7 @@ TODO:
     fun b => if b then {locpackage t} else {locpackage f}.
 
   Definition Sig_unforg := @mkpair Signature_locs Signature_locs Sign_interface Sig_real Sig_ideal.
-  Definition Att_unforg := @mkpair Attestation_locs Attestation_locs Att_interface Att_real_new Att_ideal_new.
+  Definition Att_unforg := @mkpair Attestation_locs Attestation_locs Att_interface Att_real Att_ideal.
 
 (* Attestation_locs =o Aux_locs o Sig_locs
 Definition Attestation_locs := fset [:: pk_loc ; sk_loc; attest_loc ].
