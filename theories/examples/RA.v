@@ -94,8 +94,6 @@ Module Type SignatureParams.
     Definition Message : choice_type := chFin(mkpos pos_n).
     Definition Signature : choice_type := chFin(mkpos pos_n).
 
-    Parameter Challenge_pos : Positive #|Challenge|.
-
 End SignatureParams.
 
 (** |  SIGNATURE  |
@@ -215,7 +213,81 @@ TODO:
   *)
 (*
 TODO remove below
-*)
+ *)
+
+  Equations hash {c s} (x: choice_type) (H: x = chMap (chProd (chFin c) (chFin s)) 'unit) : choice_type :=
+    hash (chMap (chProd (chFin cPos) (chFin sPos)) _) eq_refl :=
+      chMap
+        (chFin
+           (mkpos
+              (pos cPos * pos sPos)
+              (* (Positive_prod (cond_pos cPos) (cond_pos sPos)) *)
+        ))
+        'unit.
+
+  Check hash_equation_1.
+  Check FunctionalElimination_hash.
+
+Fail  Equations hash' (x: choice_type) {H: x = 'set ('challenge × 'state)} : choice_type :=
+    hash' (chMap (chProd (chFin cPos) (chFin sPos)) _) eq_refl :=
+      chMap
+        (chFin
+           (mkpos
+              (pos cPos * pos sPos)
+              (* (Positive_prod (cond_pos cPos) (cond_pos sPos)) *)
+        ))
+        'unit.
+
+  Lemma hash_spec: hash ('set ('challenge × 'state)) eq_refl = 'set ('message).
+  Proof.
+    rewrite /chSet/Challenge/State/Message.
+    set x := chMap 'fin pos_n 'unit.
+    elim/FunctionalElimination_hash: (hash (chMap ('fin pos_n × 'fin pos_n) 'unit) erefl) (* (hash _ _) *).
+    move => c s.
+    rewrite /x.
+    f_equal.
+    f_equal.
+    (*
+      This spec is just not true.
+      I believe that the problem is in the data definition.
+      It defines values instead of mathematical structure.
+     *)
+    Print Location.
+    (*
+      Note that the need for specifying a [choice_type]
+      comes from the need to store it into a heap location.
+      But the better way to achieve this, is to use a mathematical
+      structure and then create the heap locations out of this.
+      In the code, it is possible to just use the conversion
+      functions [fto] and [otf] from SSProve.
+
+      For example, in DDH we define
+      [Definition chGroup : choice_type := 'fin #|GroupSpace|.]
+      which comes directly from a mathematical structure:
+      [Definition GroupSpace : finType := FinGroup.arg_finType gT.]
+      and:
+      [Parameter gT : finGroupType.]
+
+      In RA, we do not have such a construction.
+      We essentially define:
+      [Definition Challenge : choice_type := chFin(mkpos pos_n).]
+      with:
+      [Definition pos_n: nat := 2^n.]
+      That is: there is no mathematical structure.
+
+      Maybe here a small explanation, why locations want to
+      be of type [choice_type]:
+      because they define default values, i.e., the initial
+      value of the heap location.
+      See [choice_type.chCannonical].
+      [choice_type] coerces to mathcomps [choiceType]
+      https://math-comp.github.io/htmldoc/mathcomp.ssreflect.choice.html
+
+      To cut a long story short:
+      A message should not be of type [choice_type] but of the
+      type of the mathematical structure, probably [I_n]
+     *)
+  Abort.
 
   Parameter Hash :
     	State -> Challenge ->
