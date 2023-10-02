@@ -120,26 +120,12 @@ Module Type SignatureAlgorithms (π : SignatureParams).
     S: From the presence of a public-secret key pair.
    *)
 
+  (*TODO Use the [kgen] function from MACCA. *)
   Parameter KeyGen : (SecKey × PubKey).
 
-  (* currently not used *)
-  Parameter KeyGen_alt : 
-  ∀ {L : {fset Location}},
-    code L [interface] (SecKey × PubKey).
-
-  Parameter Sign : ∀ (sk : SecKey) (m : Message), Signature.
-
-  (* currently not used *)  
-  Parameter Sign_alt :
-  ∀ {L : {fset Location}} (sk : SecKey) (m : Message),
-    code L [interface] Signature.
+  Parameter Sign : ∀ {M:Type} (sk : SecKey) (m : M), Signature.
 
   Parameter Ver_sig : ∀ (pk : PubKey) (sig : Signature) (m : Message), 'bool.
-   
-  (* currently not used *)
-  Parameter Ver_sig_alt :
-  ∀ {L : {fset Location}} (pk : PubKey) (sig : Signature) (m : Message),
-    code L [interface] 'bool.
 
   Parameter Attest :
     ∀ {L : {fset Location}} (sk : SecKey) ( c : Challenge ) (s : State),
@@ -200,9 +186,6 @@ Module RemoteAttestation (π : SignatureParams)
   Notation " 'attest "    := Attestation    (in custom pack_type at level 2).
   Definition attest    : nat := 47. (* routine to attest *)
 
-  Definition Signature_locs := fset [:: pk_loc ; sk_loc ; sign_loc ].
-
-  Definition Attestation_locs := fset [:: pk_loc ; sk_loc; sign_loc ].
   (*
 TODO:
     Definition Attestation_locs := fset [:: pk_loc ; sk_loc; sign_loc ].
@@ -274,6 +257,7 @@ Fail  Equations hash' (x: choice_type) {H: x = 'set ('challenge × 'state)} : ch
       with:
       [Definition pos_n: nat := 2^n.]
       That is: there is no mathematical structure.
+      It is actually just a concrete value [2^n].
 
       Maybe here a small explanation, why locations want to
       be of type [choice_type]:
@@ -289,6 +273,53 @@ Fail  Equations hash' (x: choice_type) {H: x = 'set ('challenge × 'state)} : ch
      *)
   Abort.
 
+  (* MACCA approach. *)
+  Context (mk_hash : 'state -> 'challenge -> 'message).
+  (* But I cannot see how the result is possible when the space is not a group.
+     That is because the heap locations in MACCA all have the same type or are subsets.
+     They never have to convert one into the other.
+   *)
+
+  (* Check this out: *)
+  Fail Definition f: 'set ('message) := chMap (chFin (mkpos 1)) chUnit.
+  Check Choice.sort 'set ('message).
+  (* So what are the inhabitants of this type?! *)
+  Fail Definition f: 'set ('message) := chMap (chFin (mkpos pos_n)) chUnit.
+  (* Nope. Check out the error message:
+     [
+Error:
+The term "chMap 'fin pos_n 'unit" has type "choice_type" while it is expected to have type
+ "Choice.sort 'set ('message)".
+     ]
+     That is, it cannot reduce [Choice.sort 'set ('message)] in the type!
+     Remember [rew]?!
+     Let's check out what [Choice.sort 'set ('message)] actually should reduce to:
+   *)
+  Print Choice.sort.
+  Eval hnf in Choice.sort 'set ('message).
+  Locate FMap.
+  Check FMap.fmap_type.
+  Eval hnf in (chElement_ordType 'message).
+  Check Ordinal.
+  Check is_true.
+  Lemma two_lt_three : 2 < 3. by []. Defined.
+  Compute Ordinal two_lt_three.
+  Locate "<".
+  Definition f: 'I_3 := Ordinal two_lt_three.
+
+  Definition X: choice_type := (chFin (mkpos 3)).
+  Definition g: X := Ordinal two_lt_three.
+
+  Locate "\in".
+  Check in_mem.
+  Locate in_mem.
+  Print Coq.ssr.ssrbool.
+
+  (* We still need a group in order to perform any
+     operation on two elements.
+   *)
+  
+
   Parameter Hash :
     	State -> Challenge ->
       Message.
@@ -299,7 +330,17 @@ Fail  Equations hash' (x: choice_type) {H: x = 'set ('challenge × 'state)} : ch
   Parameter Hash_bij :
     forall s1 c1 s2 c2, s1 != s2 \/ c1 != c2  -> Hash s1 c1 != Hash s2 c2. *)
 
-  Definition Aux_locs' := fset [:: sign_loc ; pk_loc ; attest_loc ].
+  (* The signature scheme requires a heap location to store the seen signatures. *)
+  Definition Signature_locs_real := fset [:: pk_loc ; sk_loc].
+  Definition Signature_locs_fake := Signature_locs_real :|: fset [:: sign_loc ].
+
+  (* The remote attestation protocol does the same. *)
+  Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
+  Definition Attestation_locs_fake := Attestation_locs_real :|: fset [:: attest_loc ].
+
+  (*
+    The key challenge: relate [sign_loc] and [attest_loc].
+   *)
 
   Definition Sign_interface := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
@@ -309,16 +350,12 @@ Fail  Equations hash' (x: choice_type) {H: x = 'set ('challenge × 'state)} : ch
 
   Definition Att_interface := [interface
   #val #[get_pk] : 'unit → 'pubkey ;
-  #val #[attest] : ('challenge × 'state) → 'signature ;
-  #val #[verify_att] : ( ('challenge × 'state) × 'signature) → 'bool
+  #val #[attest] : 'challenge → 'signature ;
+  #val #[verify_att] : ('challenge × 'signature) → 'bool
   ].
 
-  Definition Sig_real :
-  package Signature_locs
-    [interface]
-    Sign_interface
-  :=
-  [package
+  Definition Sig_real : package Signature_locs_real [interface] Sign_interface
+  := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     {
       pk ← get pk_loc  ;;
@@ -327,119 +364,116 @@ Fail  Equations hash' (x: choice_type) {H: x = 'set ('challenge × 'state)} : ch
 
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
-      (*'(sk, pk) ← KeyGen2 sd ;;*)
       let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let sig := Sign sk msg in
-      (*sig ← Sign sk msg ;;*)
-      (*#put sign_loc := ( sig , msg ) ;; *)
       ret sig
     };
+
     #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
     {
       pk ← get pk_loc  ;;
       let bool := Ver_sig pk sig msg in
-      (*bool ← Ver_sig pk sig msg ;;*)
       ret bool
     }
   ].
 
-  Definition Sig_ideal :
-  package Signature_locs
-    [interface]
-    Sign_interface
-  :=
-  [package
+  Equations Sig_ideal : package Signature_locs_fake [interface] Sign_interface :=
+  Sig_ideal := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     {
       pk ← get pk_loc ;;
       ret pk
-    } ;
+    };
+
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
-      (*'(sk, pk) ← KeyGen2 sd ;;*)
       let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let sig := Sign sk msg in
-      (*sig ← Sign sk msg ;;*)
       S ← get sign_loc ;;
       #put sign_loc := setm S (sig, msg) tt ;;
       ret sig
     };
+
     #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
     {
       S ← get sign_loc ;;
       ret ( (sig,msg) \in domm S)
     }
   ].
+  Next Obligation.
+    ssprove_valid; rewrite /Signature_locs_fake/Signature_locs_real in_fsetU; apply /orP.
+    2,3,6: left;auto_in_fset.
+    all: right; auto_in_fset.
+  Defined.
 
-  Definition Att_real :
-  package Attestation_locs
-    [interface]
-    Att_interface
-  :=
-  [package
+  Definition Att_real : package Attestation_locs_real [interface] Att_interface
+  := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     {
       pk ← get pk_loc  ;;
       ret pk
-    } ;
-    #def #[attest] ( '(chal,state) : 'challenge × 'state ) : 'signature
+    };
+
+    #def #[attest] (chal : 'challenge) : 'signature
     {
-      (*'(sk, pk) ← KeyGen2 sd ;;*)
+      state ← get state_loc ;;
       let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let msg := Hash state chal in
       let att := Sign sk msg in
-      (*att ← Sign sk msg ;;*)
       ret att
-    } ;
-    #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'signature) : 'bool
+    };
+
+    #def #[verify_att] ('(chal, att) : ('challenge × 'signature)) : 'bool
     {
-      pk ← get pk_loc  ;;
+      pk ← get pk_loc ;;
+      state ← get state_loc ;;
       let msg := Hash state chal in
       let bool := Ver_sig pk att msg in
-      (*bool ← Ver_sig pk att msg ;;*)
       ret bool
     }
   ].
 
-  Definition Att_ideal :
-  package Attestation_locs
-    [interface]
-    Att_interface
-  :=
-  [package
+  Equations Att_ideal : package Attestation_locs_fake [interface] Att_interface :=
+  Att_ideal := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     {
       pk ← get pk_loc ;;
       ret pk
-    } ;
-    #def #[attest] ( '(chal,state) : 'challenge × 'state) : 'attest
+    };
+
+    #def #[attest] (chal : 'challenge) : 'attest
     {
-      A ← get sign_loc ;;
-      (*'(sk, pk) ← KeyGen2 sd ;;*)
+      A ← get attest_loc ;;
+      state ← get state_loc ;;
       let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
-      let msg := Hash state chal in
-      let att := Sign sk msg in
-      (*att ← Sign sk msg ;;*)
-      #put sign_loc := setm A ( att, msg ) tt ;;
+      let att := Sign sk (chal, state) in
+      #put attest_loc := setm A ( att, chal, state ) tt ;;
       ret att
     };
-    #def #[verify_att] ('(chal, state, att) : ('challenge × 'state) × 'attest) : 'bool
+
+    #def #[verify_att] ('(chal, att) : ('challenge × 'attest)) : 'bool
     {
-      A ← get sign_loc ;;
-      let msg := Hash state chal in
-      ret ( ( att, msg ) \in domm A )
+      A ← get attest_loc ;;
+      state ← get state_loc ;;
+      let b :=  (att, chal, state) \in domm A in
+      ret b
     }
   ].
+  Next Obligation.
+    ssprove_valid; rewrite /Attestation_locs_fake/Attestation_locs_real in_fsetU; apply /orP.
+    1,3,7: right;auto_in_fset.
+    all: left; auto_in_fset.
+  Defined.
 
-  Definition Aux_locs := fset [:: sign_loc ; pk_loc ; sign_loc ].
+  Definition Aux_locs := fset [:: sign_loc ; pk_loc ].
 
   Definition Aux :
   package Aux_locs
