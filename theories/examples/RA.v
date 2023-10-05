@@ -521,20 +521,44 @@ Module RemoteAttestationHeapSig
       by [apply r_ret].
   Qed.
 
-  (* This is what the theorem is supposed to look like, but it doesn't compile! -> to be changed*)
   Theorem RA_unforg LA A :
-      ValidPackage LA [interface
-                       #val #[get_pk] : 'unit → 'pubkey ;
-                       #val #[sign] : ('challenge × 'state) → 'attest ;
-                       #val #[verify_sig] : ( ('challenge × 'state) × 'attest) → 'bool
-        ] A_export A →
+      ValidPackage LA Att_interface A_export A →
       fdisjoint LA (Sig_unforg true).(locs) →
       fdisjoint LA (Sig_unforg false).(locs) →
       fdisjoint LA Aux_locs →
       fdisjoint LA (Att_unforg true).(locs) →
       fdisjoint LA (Att_unforg false).(locs) →
-      (Advantage Att_unforg A <= AdvantageE Sig_real Sig_ideal (A ∘ Aux))%R.
+      (Advantage Att_unforg A <= AdvantageE Sig_ideal Sig_real (A ∘ Aux))%R.
   Proof.
+    move => va H1 H2 H3 H4 H5.
+    rewrite Advantage_E Advantage_sym.
+    simpl in H1.
+    simpl in H2.
+    simpl in H3.
+    simpl in H4.
+    simpl in H5.
+    ssprove triangle (Att_unforg true) [::
+      Aux ∘ Sig_unforg true ;
+      Aux ∘ Sig_unforg false
+      ] (Att_unforg false) A as ineq.
+    eapply le_trans.
+    1: { exact: ineq. }
+    clear ineq.
+    rewrite sig_real_vs_att_real_true.
+    2: simpl; exact: H4.
+    2: {
+      simpl.
+      rewrite fdisjointUr.
+      apply/andP; split; assumption.
+    }
+    rewrite GRing.add0r.
+    rewrite [X in (_ + X <= _)%R]Advantage_sym.
+    rewrite sig_ideal_vs_att_ideal_false.
+    2: { simpl; exact: H5. }
+    2: { rewrite fdisjointUr; apply/andP; split; assumption. }
+    rewrite GRing.addr0.
+    by [rewrite -Advantage_link Advantage_sym].
+  Qed.
 
 End RemoteAttestationAlgorithmsHeapSig.
 
