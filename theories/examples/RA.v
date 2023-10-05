@@ -523,7 +523,6 @@ Module RemoteAttestationHeapSig
 
   (* This is what the theorem is supposed to look like, but it doesn't compile! -> to be changed*)
   Theorem RA_unforg LA A :
-    ∀ LA A,
       ValidPackage LA [interface
                        #val #[get_pk] : 'unit → 'pubkey ;
                        #val #[sign] : ('challenge × 'state) → 'attest ;
@@ -534,7 +533,7 @@ Module RemoteAttestationHeapSig
       fdisjoint LA Aux_locs →
       fdisjoint LA (Att_unforg true).(locs) →
       fdisjoint LA (Att_unforg false).(locs) →
-      Advantage Att_unforg A <= AdvantageE Sig_real Sig_ideal (A ∘ Aux).
+      (Advantage Att_unforg A <= AdvantageE Sig_real Sig_ideal (A ∘ Aux))%R.
   Proof.
 
 End RemoteAttestationAlgorithmsHeapSig.
