@@ -607,11 +607,38 @@ Module NoHeapHash.
       forall s1 c1 s2 c2, s1 != s2 \/ c1 != c2  -> Hash s1 c1 != Hash s2 c2. *)
 
     Parameter Hash_spec:
-      forall state challenge sk msg sig (A: (Signature × ('challenge × 'state))) (B: (Signature × chMessage)),
+      forall state challenge sk msg sig (A: 'set (Signature × ('challenge × 'state))) (B: 'set (Signature × chMessage)),
         msg = Hash state challenge ->
         sig = Sign sk msg ->
-        ((sig, challenge,state) \in domm A) = ((sig, msg) \in domm B).
-    
+        ((sig,(challenge,state)) \in domm A) = ((sig, msg) \in domm B).
+
+    (*
+      I cannot define such an equality for writing to a heap location.
+      I need an invariant on these two dedicated heap locations that allows
+      them to be unequal.
+      Or even better that establishes an invariant that is based on
+      the above spec!
+
+      For that I need to generalize the spec a bit such that I do not need
+      the secret key [sk]:
+     *)
+
+    Parameter Hash_spec':
+      forall state challenge msg sig (A: 'set (Signature × ('challenge × 'state))) (B: 'set (Signature × chMessage)),
+        msg = Hash state challenge ->
+        ((sig,(challenge,state)) \in domm A) = ((sig, msg) \in domm B).
+
+    (* Note that I could actually get the [sk] from the heap locations
+       as well but that makes the invariant more evolved.
+     *)
+
+    (*
+      Check out what actually happened now:
+      In order to prove this property, I will have to prove that
+      the [Hash] function is bijective!
+      That is exactly what we assumed. The above lemmas just show how to use
+      this property in the proof.
+     *)
 
   End RemoteAttestationAlgorithmsNoHeapSig.
 
