@@ -763,7 +763,9 @@ Module HeapHashAltAlgo.
         ssprove_swap_lhs 0.
         ssprove_sync_eq => state.
         ssprove_sync_eq => pk.
-        by [apply r_ret].
+        case: (Ver_sig pk s0 (Hash state (Ordinal (n:={| pos := {| pos := pos_n; cond_pos := PositiveExp2 n |}; cond_pos := PositiveExp2 n |}) (m:=s1) s2))).
+        2: by [apply r_ret].
+        (* here I need a property that connects Hash and UnHash. *)
     Qed.
 
     (* TODO If we define the spec right then this proof needs fixing! *)
