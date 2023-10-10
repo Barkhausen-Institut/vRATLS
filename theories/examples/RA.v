@@ -611,6 +611,7 @@ Module HeapHashAltAlgo.
     Definition attest    : nat := 47. (* routine to attest *)
 
     Parameter Hash : chState -> chChallenge -> chMessage.
+    Parameter UnHash : chChallenge -> chMessage -> chState.
 
   End RemoteAttestationAlgorithms.
 
@@ -688,15 +689,10 @@ Module HeapHashAltAlgo.
 
       #def #[verify_att] ('(chal, att) : ('challenge × 'attest)) : 'bool
       {
-        (* TODO the believe is insufficient!
-           Is there a version of the code below that would require
-           an [UnHash] function, i.e., the bijective property of [Hash]?
-         *)
         A ← get attest_loc ;;
         state ← get state_loc ;;
         let msg := Hash state chal in
-        let b :=  (att, msg) \in domm A in
-        ret b
+        if (att, msg) \in domm A then ret (state == UnHash att chal) else ret false
       }
     ].
     Next Obligation.
@@ -733,7 +729,7 @@ Module HeapHashAltAlgo.
         state ← get state_loc ;;
         let msg := Hash state chal in
         b  ← verify (att,msg) ;;
-        ret b
+        if b then ret (state == UnHash att chal) else ret false
         (* When I just write:
            [verify (att,msg)]
            Then SSProve errors out and cannot validate the package. Why?
