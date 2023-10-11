@@ -471,6 +471,30 @@ Module HeapHash.
       }
     ].
 
+    (* Explicit definition of an attacker/distinguisher
+
+    Definition Dist :
+      package
+        Dist_locs Att_interface
+        [interface
+           #val #[RUN] : 'unit → 'bool ]
+    :=
+    [package
+      #def #[RUN] (_ : 'unit) : 'bool
+      {
+        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk
+        #import {sig #[attest] : 'challenge → 'signature } as attest
+        #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att
+
+        (* distinguisher code -- attack *)
+        let pk := get_pk () in
+        ...
+      };
+
+    ].
+
+    *)
+
     Definition mkpair {Lt Lf E}
       (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
       fun b => if b then {locpackage t} else {locpackage f}.
