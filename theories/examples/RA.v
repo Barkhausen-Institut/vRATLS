@@ -59,7 +59,7 @@ Obligation Tactic := idtac.
 
 #[local] Open Scope package_scope.
 
-Require Import Signature. 
+From examples Require Import Signature.
 
 (* Sadly, this approach being polymorphic about the heap location
    did not work out.
