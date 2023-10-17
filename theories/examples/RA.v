@@ -59,7 +59,163 @@ Obligation Tactic := idtac.
 
 #[local] Open Scope package_scope.
 
-From examples Require Import Signature.
+(*From examples Require Import Signature.*)
+
+Variable (n: nat).
+Definition pos_n: nat := 2^n.
+
+(**
+  We can't use sets directly in [choice_type] so instead we use a map to units.
+  We can then use [domm] to get the domain, which is a set.
+ *)
+Definition chSet t := chMap t 'unit.
+Notation " 'set t " := (chSet t) (in custom pack_type at level 2).
+Notation " 'set t " := (chSet t) (at level 2): package_scope.
+
+Definition tt := Datatypes.tt.
+
+Module Type SignatureParams.
+
+    Definition SecKey : choice_type := chFin(mkpos pos_n).
+    Definition PubKey : choice_type := chFin(mkpos pos_n).
+    Definition Signature : choice_type := chFin(mkpos pos_n).
+
+End SignatureParams.
+
+Module Type SignatureConstraints.
+  Definition chMessage : choice_type := 'fin (mkpos pos_n).
+End SignatureConstraints.
+
+Module Type SignatureConstraintsFail.
+  Parameter Message : finType.
+
+  (* FIXME THis is broken.
+     It creates the space [I_(pos_n)].
+     But that might be because I chose the wrong message type!
+     Maybe give it another try.
+   *)
+  Parameter Message_pos : Positive #|Message|.
+  #[local] Existing Instance Message_pos.
+  Definition chMessage := 'fin #|Message|.
+
+  Notation " 'chal " := ('fin (2^n)%N) (in custom pack_type at level 2).
+  Definition i_chal : nat := 2^n.
+
+End SignatureConstraintsFail.
+
+(** |  SIGNATURE  |
+    |   SCHEME    | **)
+
+Module Type SignatureAlgorithms (π1 : SignatureParams) (π2 : SignatureConstraints).
+
+  Import π1.
+  Import π2.
+
+  (*TODO Use the [kgen] function from MACCA.
+    Also check out AsymmScheme on how to define it in a module type.
+   *)
+  Parameter KeyGen : (SecKey × PubKey).
+
+  Parameter Sign : ∀ (sk : SecKey) (m : chMessage), Signature.
+
+  Parameter Ver_sig : ∀ (pk : PubKey) (sig : Signature) (m : chMessage), 'bool.
+
+End SignatureAlgorithms.
+
+Module Type SignatureScheme
+  (π1 : SignatureParams)
+  (π2 : SignatureConstraints)
+  (Alg : SignatureAlgorithms π1 π2).
+
+  Import π1.
+  Import π2.
+  Import Alg.
+
+  (* #[local] Open Scope package_scope. *)
+
+  Notation " 'pubkey "    := PubKey      (in custom pack_type at level 2).
+  Notation " 'pubkey "    := PubKey      (at level 2): package_scope.
+  Notation " 'signature " := Signature   (in custom pack_type at level 2).
+  Notation " 'signature " := Signature   (at level 2): package_scope.
+  Notation " 'message "   := chMessage     (in custom pack_type at level 2).
+  Notation " 'message "   := chMessage     (at level 2): package_scope.
+
+  Definition pk_loc      : Location := (PubKey    ; 0%N).
+  Definition sk_loc      : Location := (SecKey    ; 1%N).
+  Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
+
+  Definition get_pk    : nat := 42. (* routine to get the public key *)
+  Definition sign      : nat := 44. (* routine to sign a message *)
+  Definition verify_sig: nat := 45. (* routine to verify the signature *)
+
+  (* The signature scheme requires a heap location to store the seen signatures. *)
+  Definition Signature_locs_real := fset [:: pk_loc ; sk_loc].
+  Definition Signature_locs_fake := Signature_locs_real :|: fset [:: sign_loc ].
+
+  Definition Sign_interface := [interface
+    #val #[get_pk] : 'unit → 'pubkey ;
+    #val #[sign] : 'message → 'signature ;
+    #val #[verify_sig] : ('signature × 'message) → 'bool
+  ].
+
+  Definition Sig_real : package Signature_locs_real [interface] Sign_interface
+  := [package
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    {
+      pk ← get pk_loc  ;;
+      ret pk
+    } ;
+
+    #def #[sign] ( 'msg : 'message ) : 'signature
+    {
+      let (sk,pk) := KeyGen in
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+      let sig := Sign sk msg in
+      ret sig
+    };
+
+    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
+    {
+      pk ← get pk_loc  ;;
+      let bool := Ver_sig pk sig msg in
+      ret bool
+    }
+  ].
+
+  Equations Sig_ideal : package Signature_locs_fake [interface] Sign_interface :=
+  Sig_ideal := [package
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    {
+      pk ← get pk_loc ;;
+      ret pk
+    };
+
+    #def #[sign] ( 'msg : 'message ) : 'signature
+    {
+      let (sk,pk) := KeyGen in
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+      let sig := Sign sk msg in
+      S ← get sign_loc ;;
+      let S' := setm S (sig, msg) tt in
+      #put sign_loc := S' ;;
+      ret sig
+    };
+
+    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
+    {
+      S ← get sign_loc ;;
+      ret ( (sig,msg) \in domm S)
+    }
+  ].
+  Next Obligation.
+    ssprove_valid; rewrite /Signature_locs_fake/Signature_locs_real in_fsetU; apply /orP.
+    2,3,6: left;auto_in_fset.
+    all: right; auto_in_fset.
+  Defined.
+
+End SignatureScheme.
 
 (* Sadly, this approach being polymorphic about the heap location
    did not work out.
@@ -246,99 +402,7 @@ Module HeapHash.
       all: left; auto_in_fset.
     Defined.
 
- (* THIS IS THE NEW VERSION (with sampling the challenge) 
-    incl. defining all sorts of stuff *)
-
-    Definition chChal : choice_type := 'fin ((2^n)%N).
-    Notation " 'chal "     := chChal       (in custom pack_type at level 2).
-    Notation " 'chal "     := chChal       (at level 2): package_scope.
-    Definition i_chal : nat := 2^n.
-
-    Parameter Hash' : chState -> chChal -> chMessage.
-
-    Definition chal_loc    : Location := ('chal ; 5%N).
-
-    Definition Attestation_locs_real_new := fset [:: pk_loc ; sk_loc; state_loc ; chal_loc ].
-    Definition Attestation_locs_fake_new := Attestation_locs_real_new :|: fset [:: attest_loc ].
-   
-    Definition Att_interface_new := [interface
-    #val #[get_pk] : 'unit → 'pubkey ;
-    #val #[attest] : 'unit → 'signature ;
-    #val #[verify_att] : 'signature → 'bool
-    ].
-
-    Definition Att_real_sample_chal : package Attestation_locs_real_new 
-              [interface] Att_interface_new
-    := [package
-      #def  #[get_pk] (_ : 'unit) : 'pubkey
-      {
-        pk ← get pk_loc  ;;
-        ret pk
-      };
-
-      #def #[attest] (_ : 'unit) : 'signature
-      {
-        chal ←  sample uniform i_chal ;;
-        #put chal_loc := chal ;;
-        state ← get state_loc ;;
-        let (sk,pk) := KeyGen in
-        #put pk_loc := pk ;;
-        #put sk_loc := sk ;;
-        let msg := Hash' state chal in
-        let att := Sign sk msg in
-        ret att
-      };
-
-      #def #[verify_att] ( att : 'signature) : 'bool
-      {
-        pk ← get pk_loc ;;
-        chal ← get chal_loc ;;
-        state ← get state_loc ;;
-        let msg := Hash' state chal in
-        let bool := Ver_sig pk att msg in
-        ret bool
-      }
-    ].
-
-    Equations Att_ideal : package Attestation_locs_fake_new 
-         [interface] Att_interface_new :=
-    Att_ideal := [package
-      #def  #[get_pk] (_ : 'unit) : 'pubkey
-      {
-        pk ← get pk_loc ;;
-        ret pk
-      };
-
-      #def #[attest] (_ : 'unit) : 'attest
-      {
-        chal ←  sample uniform i_chal ;;
-        #put chal_loc := chal ;;
-        A ← get attest_loc ;;
-        s ← get state_loc ;;
-        let (sk,pk) := KeyGen in
-        #put pk_loc := pk ;;
-        #put sk_loc := sk ;;
-        let msg := Hash' s chal in
-        let att := Sign sk msg in
-        #put attest_loc := setm A ( att, msg ) tt ;;
-        ret att
-      };
-
-      #def #[verify_att] ('(chal, att) : ('challenge × 'attest)) : 'bool
-      {
-        A ← get attest_loc ;;
-        chal ← get chal_loc ;;
-        state ← get state_loc ;;
-        let msg := Hash' state chal in
-        let b :=  (att, msg) \in domm A in
-        ret b
-      }
-    ].
-    Next Obligation.
-      ssprove_valid; rewrite /Attestation_locs_fake_new/Attestation_locs_real_new in_fsetU; apply /orP.
-      1,3,7: right;auto_in_fset.
-      all: left; auto_in_fset.
-    Defined.
+ 
 
 
     (*
@@ -497,7 +561,7 @@ Module HeapHash.
     Qed.
 
   End RemoteAttestation.
-End HeapHash.
+
 
 (** We need a specification for remote attestation that
     carves out the properties of the [Hash] function.
@@ -513,4 +577,108 @@ End HeapHash.
  *)
 
 
+(* THIS IS THE NEW VERSION (with sampling the challenge) 
+    incl. defining all sorts of stuff *)
 
+
+  Module RemoteAttestation_Protocol
+      (π1 : SignatureParams)
+      (π2 : RemoteAttestationParams)
+      (π3 : SignatureAlgorithms π1 π2)
+      (π4 : RemoteAttestationAlgorithms π1 π2 π3)
+      (π5 : SignatureScheme π1 π2 π3).
+
+      Import π1 π2 π3 π4 π5.
+
+    Definition chChal : choice_type := 'fin ((2^n)%N).
+    Notation " 'chal "     := chChal       (in custom pack_type at level 2).
+    Notation " 'chal "     := chChal       (at level 2): package_scope.
+    Definition i_chal : nat := 2^n.
+
+    Parameter Hash' : chState -> chChal -> chMessage.
+
+    Definition chal_loc    : Location := ('chal ; 5%N).
+
+    Definition Attestation_locs_real_new := fset [:: pk_loc ; sk_loc; state_loc ; chal_loc ].
+    Definition Attestation_locs_fake_new := Attestation_locs_real_new :|: fset [:: attest_loc ].
+   
+    Definition Att_interface_new := [interface
+    #val #[get_pk] : 'unit → 'pubkey ;
+    #val #[attest] : 'unit → 'signature ;
+    #val #[verify_att] : 'signature → 'bool
+    ].
+
+    Definition Att_real_sample_chal : package Attestation_locs_real_new 
+              [interface] Att_interface_new
+    := [package
+      #def  #[get_pk] (_ : 'unit) : 'pubkey
+      {
+        pk ← get pk_loc  ;;
+        ret pk
+      };
+
+      #def #[attest] (_ : 'unit) : 'signature
+      {
+        chal ←  sample uniform i_chal ;;
+        #put chal_loc := chal ;;
+        state ← get state_loc ;;
+        let (sk,pk) := KeyGen in
+        #put pk_loc := pk ;;
+        #put sk_loc := sk ;;
+        let msg := Hash' state chal in
+        let att := Sign sk msg in
+        ret att
+      };
+
+      #def #[verify_att] ( att : 'signature) : 'bool
+      {
+        pk ← get pk_loc ;;
+        chal ← get chal_loc ;;
+        state ← get state_loc ;;
+        let msg := Hash' state chal in
+        let bool := Ver_sig pk att msg in
+        ret bool
+      }
+    ].
+
+    Equations Att_ideal : package Attestation_locs_fake_new 
+         [interface] Att_interface_new :=
+    Att_ideal := [package
+      #def  #[get_pk] (_ : 'unit) : 'pubkey
+      {
+        pk ← get pk_loc ;;
+        ret pk
+      };
+
+      #def #[attest] (_ : 'unit) : 'attest
+      {
+        chal ←  sample uniform i_chal ;;
+        #put chal_loc := chal ;;
+        A ← get attest_loc ;;
+        s ← get state_loc ;;
+        let (sk,pk) := KeyGen in
+        #put pk_loc := pk ;;
+        #put sk_loc := sk ;;
+        let msg := Hash' s chal in
+        let att := Sign sk msg in
+        #put attest_loc := setm A ( att, msg ) tt ;;
+        ret att
+      };
+
+      #def #[verify_att] ('(chal, att) : ('challenge × 'attest)) : 'bool
+      {
+        A ← get attest_loc ;;
+        chal ← get chal_loc ;;
+        state ← get state_loc ;;
+        let msg := Hash' state chal in
+        let b :=  (att, msg) \in domm A in
+        ret b
+      }
+    ].
+    Next Obligation.
+      ssprove_valid; rewrite /Attestation_locs_fake_new/Attestation_locs_real_new in_fsetU; apply /orP.
+      1,3,7: right;auto_in_fset.
+      all: left; auto_in_fset.
+    Defined.
+
+End HeapHash.
