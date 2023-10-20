@@ -59,163 +59,7 @@ Obligation Tactic := idtac.
 
 #[local] Open Scope package_scope.
 
-(*From examples Require Import Signature.*)
-
-Variable (n: nat).
-Definition pos_n: nat := 2^n.
-
-(**
-  We can't use sets directly in [choice_type] so instead we use a map to units.
-  We can then use [domm] to get the domain, which is a set.
- *)
-Definition chSet t := chMap t 'unit.
-Notation " 'set t " := (chSet t) (in custom pack_type at level 2).
-Notation " 'set t " := (chSet t) (at level 2): package_scope.
-
-Definition tt := Datatypes.tt.
-
-Module Type SignatureParams.
-
-    Definition SecKey : choice_type := chFin(mkpos pos_n).
-    Definition PubKey : choice_type := chFin(mkpos pos_n).
-    Definition Signature : choice_type := chFin(mkpos pos_n).
-
-End SignatureParams.
-
-Module Type SignatureConstraints.
-  Definition chMessage : choice_type := 'fin (mkpos pos_n).
-End SignatureConstraints.
-
-Module Type SignatureConstraintsFail.
-  Parameter Message : finType.
-
-  (* FIXME THis is broken.
-     It creates the space [I_(pos_n)].
-     But that might be because I chose the wrong message type!
-     Maybe give it another try.
-   *)
-  Parameter Message_pos : Positive #|Message|.
-  #[local] Existing Instance Message_pos.
-  Definition chMessage := 'fin #|Message|.
-
-  Notation " 'chal " := ('fin (2^n)%N) (in custom pack_type at level 2).
-  Definition i_chal : nat := 2^n.
-
-End SignatureConstraintsFail.
-
-(** |  SIGNATURE  |
-    |   SCHEME    | **)
-
-Module Type SignatureAlgorithms (π1 : SignatureParams) (π2 : SignatureConstraints).
-
-  Import π1.
-  Import π2.
-
-  (*TODO Use the [kgen] function from MACCA.
-    Also check out AsymmScheme on how to define it in a module type.
-   *)
-  Parameter KeyGen : (SecKey × PubKey).
-
-  Parameter Sign : ∀ (sk : SecKey) (m : chMessage), Signature.
-
-  Parameter Ver_sig : ∀ (pk : PubKey) (sig : Signature) (m : chMessage), 'bool.
-
-End SignatureAlgorithms.
-
-Module Type SignatureScheme
-  (π1 : SignatureParams)
-  (π2 : SignatureConstraints)
-  (Alg : SignatureAlgorithms π1 π2).
-
-  Import π1.
-  Import π2.
-  Import Alg.
-
-  (* #[local] Open Scope package_scope. *)
-
-  Notation " 'pubkey "    := PubKey      (in custom pack_type at level 2).
-  Notation " 'pubkey "    := PubKey      (at level 2): package_scope.
-  Notation " 'signature " := Signature   (in custom pack_type at level 2).
-  Notation " 'signature " := Signature   (at level 2): package_scope.
-  Notation " 'message "   := chMessage     (in custom pack_type at level 2).
-  Notation " 'message "   := chMessage     (at level 2): package_scope.
-
-  Definition pk_loc      : Location := (PubKey    ; 0%N).
-  Definition sk_loc      : Location := (SecKey    ; 1%N).
-  Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
-
-  Definition get_pk    : nat := 42. (* routine to get the public key *)
-  Definition sign      : nat := 44. (* routine to sign a message *)
-  Definition verify_sig: nat := 45. (* routine to verify the signature *)
-
-  (* The signature scheme requires a heap location to store the seen signatures. *)
-  Definition Signature_locs_real := fset [:: pk_loc ; sk_loc].
-  Definition Signature_locs_fake := Signature_locs_real :|: fset [:: sign_loc ].
-
-  Definition Sign_interface := [interface
-    #val #[get_pk] : 'unit → 'pubkey ;
-    #val #[sign] : 'message → 'signature ;
-    #val #[verify_sig] : ('signature × 'message) → 'bool
-  ].
-
-  Definition Sig_real : package Signature_locs_real [interface] Sign_interface
-  := [package
-    #def  #[get_pk] (_ : 'unit) : 'pubkey
-    {
-      pk ← get pk_loc  ;;
-      ret pk
-    } ;
-
-    #def #[sign] ( 'msg : 'message ) : 'signature
-    {
-      let (sk,pk) := KeyGen in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      let sig := Sign sk msg in
-      ret sig
-    };
-
-    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
-    {
-      pk ← get pk_loc  ;;
-      let bool := Ver_sig pk sig msg in
-      ret bool
-    }
-  ].
-
-  Equations Sig_ideal : package Signature_locs_fake [interface] Sign_interface :=
-  Sig_ideal := [package
-    #def  #[get_pk] (_ : 'unit) : 'pubkey
-    {
-      pk ← get pk_loc ;;
-      ret pk
-    };
-
-    #def #[sign] ( 'msg : 'message ) : 'signature
-    {
-      let (sk,pk) := KeyGen in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      let sig := Sign sk msg in
-      S ← get sign_loc ;;
-      let S' := setm S (sig, msg) tt in
-      #put sign_loc := S' ;;
-      ret sig
-    };
-
-    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
-    {
-      S ← get sign_loc ;;
-      ret ( (sig,msg) \in domm S)
-    }
-  ].
-  Next Obligation.
-    ssprove_valid; rewrite /Signature_locs_fake/Signature_locs_real in_fsetU; apply /orP.
-    2,3,6: left;auto_in_fset.
-    all: right; auto_in_fset.
-  Defined.
-
-End SignatureScheme.
+Require Import examples.Signature.
 
 (* Sadly, this approach being polymorphic about the heap location
    did not work out.
@@ -233,26 +77,12 @@ Module Type RemoteAttestationParamsFail <: SignatureConstraintsFail.
   Definition chChallenge : choice_type := 'fin (mkpos pos_n). (* ordinal_choiceType pos_n. *)
   (*Definition chChallenge : choice_type := 'fin (mkpos pos_n). *)
   Definition Attestation : choice_type := 'fin (mkpos pos_n).
-  Notation " 'chal " := ('fin (2^n)%N) (in custom pack_type at level 2).
-  Definition i_chal : nat := 2^n.
+  
 
   Definition Message := prod_finType Challenge State.
   #[export] Instance Message_pos : Positive #|Message|.
   Admitted.
   Definition chMessage := 'fin #|Message|. 
-  (*
-  J: Not sure if we still need this. 
-  --> can't rewrite, because then the "End RemmoteAttestationParamsFail" command gives:
-  Error: 'Signature components for label chMessage do not match:
-   the body of definitions differs.'
-
-   Now everything is defined
-  *)
-  Definition Message' : finType := [finType of 'I_(pos_n)].
-  Definition chMessage' : choice_type := 'fin (mkpos pos_n).
-  #[export] Instance Message_pos' : Positive #|Message|.
-  Admitted.
-  
 
 End RemoteAttestationParamsFail.
 
@@ -264,11 +94,11 @@ Module HeapHash.
 
   Module Type RemoteAttestationParams <: SignatureConstraints.
 
-    Definition chState : choice_type := 'fin (mkpos pos_n).
+    Definition chState     : choice_type := 'fin (mkpos pos_n).
     Definition chChallenge : choice_type := 'fin (mkpos pos_n).
     Definition Attestation : choice_type := 'fin (mkpos pos_n).
 
-    Definition chMessage := 'fin (mkpos pos_n).
+    Definition chMessage   : choice_type := 'fin (mkpos pos_n).
 
   End RemoteAttestationParams.
 
@@ -449,30 +279,6 @@ Module HeapHash.
       }
     ].
 
-    (* Explicit definition of an attacker/distinguisher
-
-    Definition Dist :
-      package
-        Dist_locs Att_interface
-        [interface
-           #val #[RUN] : 'unit → 'bool ]
-    :=
-    [package
-      #def #[RUN] (_ : 'unit) : 'bool
-      {
-        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk
-        #import {sig #[attest] : 'challenge → 'signature } as attest
-        #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att
-
-        (* distinguisher code -- attack *)
-        let pk := get_pk () in
-        ...
-      };
-
-    ].
-
-    *)
-
     Definition mkpair {Lt Lf E}
       (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
       fun b => if b then {locpackage t} else {locpackage f}.
@@ -562,7 +368,6 @@ Module HeapHash.
 
   End RemoteAttestation.
 
-
 (** We need a specification for remote attestation that
     carves out the properties of the [Hash] function.
 
@@ -576,9 +381,39 @@ Module HeapHash.
       already hashed [msg].
  *)
 
+ (*
+This had the purpose of explaining the Import/ Export definition of SSProve.
+The tool defines the distinguisher polymorphically, we don't do it. 
 
+  Definition Dist :
+    package
+      Dist_locs Att_interface
+      [interface
+         #val #[RUN] : 'unit → 'bool ]
+  :=
+  [package
+    #def #[RUN] (_ : 'unit) : 'bool
+    {
+      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+      #import {sig #[attest] : 'challenge → 'signature } as attest ;;
+      #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
+
+      (* distinguisher code -- attack *)
+      let pk := get_pk () in
+      ...
+    };
+
+    ].
+*)
+
+(* #####################################################*)
+(* #####################################################*)
+(* #####################################################*)
 (* THIS IS THE NEW VERSION (with sampling the challenge) 
     incl. defining all sorts of stuff *)
+(* #####################################################*)
+(* #####################################################*)
+(* #####################################################*)
 
 
   Module RemoteAttestation_Protocol
@@ -589,11 +424,16 @@ Module HeapHash.
       (π5 : SignatureScheme π1 π2 π3).
 
       Import π1 π2 π3 π4 π5.
+    
+    Definition Message : finType := [finType of 'I_(pos_n)].
+    Definition chMessage : choice_type := 'fin (mkpos pos_n).
+    #[export] Instance Message_pos' : Positive #|Message|.
+    Admitted.  
 
-    Definition chChal : choice_type := 'fin ((2^n)%N).
+    Definition chChal : choice_type := 'fin (pos_n).
     Notation " 'chal "     := chChal       (in custom pack_type at level 2).
     Notation " 'chal "     := chChal       (at level 2): package_scope.
-    Definition i_chal : nat := 2^n.
+    Definition i_chal : nat := pos_n.
 
     Parameter Hash' : chState -> chChal -> chMessage.
 
@@ -605,7 +445,7 @@ Module HeapHash.
     Definition Att_interface_new := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
     #val #[attest] : 'unit → 'signature ;
-    #val #[verify_att] : 'signature → 'bool
+    #val #[verify_att] : ('chal × 'signature) → 'bool
     ].
 
     Definition Att_real_sample_chal : package Attestation_locs_real_new 
@@ -630,7 +470,7 @@ Module HeapHash.
         ret att
       };
 
-      #def #[verify_att] ( att : 'signature) : 'bool
+      #def #[verify_att]  ('(chal, att) : ('chal × 'signature)) : 'bool
       {
         pk ← get pk_loc ;;
         chal ← get chal_loc ;;
@@ -676,9 +516,55 @@ Module HeapHash.
       }
     ].
     Next Obligation.
-      ssprove_valid; rewrite /Attestation_locs_fake_new/Attestation_locs_real_new in_fsetU; apply /orP.
-      1,3,7: right;auto_in_fset.
+    
+      ssprove_valid. 
+      all: rewrite /Attestation_locs_fake_new/Attestation_locs_real_new.
+      all: rewrite in_fsetU; apply /orP.
+      1,5,9: right; auto_in_fset.
       all: left; auto_in_fset.
     Defined.
+
+  (* Explicit definition of an attacker/distinguisher *)
+
+  Definition Attestation_locs_real_new' := fset [:: pk_loc ; sk_loc; state_loc ; chal_loc ].
+  Definition Attestation_locs_fake_new' := Attestation_locs_real_new :|: fset [:: attest_loc ].
+
+
+Definition RA_real :
+    package
+      locs interface
+      [interface ]
+  :=
+  [package
+    #def #[RA (_ : 'unit) : (_,_)
+    {
+      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+      #import {sig #[attest] : 'challenge → 'signature } as attest ;;
+      #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
+      
+      ...
+    };
+
+    ].
+
+Definition RA_ideal :
+    package
+      locs interface
+      [interface ]
+  :=
+  [package
+    #def #[RA (_ : 'unit) : (_,_)
+    {
+      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+      #import {sig #[attest] : 'challenge → 'signature } as attest ;;
+      #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
+      
+      ...
+    };
+
+    ].
+
+
+  End RemoteAttestation_Protocol.
 
 End HeapHash.
