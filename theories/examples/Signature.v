@@ -91,8 +91,7 @@ End SignatureConstraintsFail.
 
 Module Type SignatureAlgorithms (π1 : SignatureParams) (π2 : SignatureConstraints).
 
-  Import π1.
-  Import π2.
+  
 
   (*TODO Use the [kgen] function from MACCA.
     Also check out AsymmScheme on how to define it in a module type.

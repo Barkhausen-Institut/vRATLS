@@ -61,44 +61,21 @@ Obligation Tactic := idtac.
 
 Require Import examples.Signature.
 
-(* Sadly, this approach being polymorphic about the heap location
-   did not work out.
-   I was unable to create a message of type [choice_type] in the RA part.
- *)
-Module Type RemoteAttestationParamsFail <: SignatureConstraintsFail.
-
-  (*
-    Internally, ['fin (mkpos pos_n] creates [ordinal of pos_n] which is [I_(pos_n)].
-    It would just be nice to find a way to derive [chState] from [State].
-   *)
-  Definition State : finType := [finType of 'I_(pos_n)].
-  Definition chState : choice_type := 'fin (mkpos pos_n). (* ordinal_choiceType (pos_n). *)
-  Definition Challenge : finType := [finType of 'I_(pos_n)].
-  Definition chChallenge : choice_type := 'fin (mkpos pos_n). (* ordinal_choiceType pos_n. *)
-  (*Definition chChallenge : choice_type := 'fin (mkpos pos_n). *)
-  Definition Attestation : choice_type := 'fin (mkpos pos_n).
-  
-
-  Definition Message := prod_finType Challenge State.
-  #[export] Instance Message_pos : Positive #|Message|.
-  Admitted.
-  Definition chMessage := 'fin #|Message|. 
-
-End RemoteAttestationParamsFail.
-
-(*
-  The below specification is complete but insufficient.
-  See the comments on the [Hash] function.
- *)
-Module HeapHash.
+Module RemoteAttestationProtocol.
 
   Module Type RemoteAttestationParams <: SignatureConstraints.
 
     Definition chState     : choice_type := 'fin (mkpos pos_n).
-    Definition chChallenge : choice_type := 'fin (mkpos pos_n).
     Definition Attestation : choice_type := 'fin (mkpos pos_n).
 
-    Definition chMessage   : choice_type := 'fin (mkpos pos_n).
+    Definition Challenge : finType := [finType of 'I_(pos_n)].
+    Definition chChal : choice_type := 'fin (mkpos pos_n).
+    Definition chChal' := Arit (uniform pos_n).
+
+    Definition Message : choice_type := 'fin (mkpos pos_n).
+    #[export] Instance Message_pos' : Positive #|Message|.
+    Admitted.
+    Definition chMessage := 'fin (mkpos pos_n).
 
   End RemoteAttestationParams.
 
@@ -114,8 +91,8 @@ Module HeapHash.
 
     Notation " 'state "     := chState       (in custom pack_type at level 2).
     Notation " 'state "     := chState       (at level 2): package_scope.
-    Notation " 'challenge " := chChallenge   (in custom pack_type at level 2).
-    Notation " 'challenge " := chChallenge   (at level 2): package_scope.
+    Notation " 'challenge " := chChal        (in custom pack_type at level 2).
+    Notation " 'challenge " := chChal        (at level 2): package_scope.
 
     Definition state_loc   : Location := ('state    ; 4%N).
     Definition attest_loc  : Location := ('set (Signature × chMessage) ; 2%N).
@@ -129,7 +106,7 @@ Module HeapHash.
       FIXME this hash function spec is insufficient.
       It allows to discard one of the arguments and just return the other as message!
      *)
-    Parameter Hash : chState -> chChallenge -> chMessage.
+    Parameter Hash : chState -> chChal -> chMessage.
 
   End RemoteAttestationAlgorithms.
 
@@ -367,49 +344,161 @@ Module HeapHash.
     Qed.
 
   End RemoteAttestation.
-End HeapHash.  
 
-(** We need a specification for remote attestation that
-    carves out the properties of the [Hash] function.
+  Module RemoteAttestation_Protocol
+      (π1 : SignatureParams)
+      (π2 : RemoteAttestationParams)
+      (π3 : SignatureAlgorithms π1 π2)
+      (π4 : RemoteAttestationAlgorithms π1 π2 π3)
+      (π5 : SignatureScheme π1 π2 π3)
+      (π6 : RemoteAttestation π1 π2 π3 π4 π5).
 
-   Two approaches (may) exist:
-   [HeapHashAltAlgo] We leave the heap structures equal with respect to the
-      signature scheme and try to change the spec of the algorithms
-      such as [verify_att] in the ideal case accordingly.
-   [NoHeapHash] We write the attestation spec pretending that
-      we are not aware of the heaps of the signature scheme.
-      That is, we store the [(challenge,state)] tuple insted of the
-      already hashed [msg].
- *)
+      Import π1 π2 π3 π4 π5 π6.    
 
- (*
-This had the purpose of explaining the Import/ Export definition of SSProve.
-The tool defines the distinguisher polymorphically, we don't do it. 
+    Parameter Hash' : chState -> chChal -> chMessage.
 
-  Definition Dist :
-    package
-      Dist_locs Att_interface
-      [interface
-         #val #[RUN] : 'unit → 'bool ]
-  :=
-  [package
-    #def #[RUN] (_ : 'unit) : 'bool
-    {
-      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-      #import {sig #[attest] : 'challenge → 'signature } as attest ;;
-      #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
+    Definition chal_loc    : Location := ('challenge ; 5%N).
+    Definition RA_locs := fset [:: chal_loc ; sk_loc ; pk_loc ; state_loc].
+    Definition RA   : nat := 46. (* routine to get the public key *)
+    Definition RA_prot_interface := [interface #val #[RA] : 'unit → 'bool ].
 
-      (* distinguisher code -- attack *)
-      let pk := get_pk () in
-      ...
-    };
 
+    (* those are redefined, change above once fixed *)
+    Definition Challenge := Arit (uniform pos_n).
+    Definition chChal : choice_type := 'fin (mkpos pos_n).    
+    Notation " 'challenge " := Challenge       (in custom pack_type at level 2).
+    Notation " 'challenge " := chChal        (at level 2): package_scope.
+
+    Definition RA_real :
+        package
+          RA_locs
+          Att_interface
+          RA_prot_interface
+      :=
+      [package
+        #def #[RA] (_ : 'unit) : 'bool
+        {
+          #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+          #import {sig #[attest] : 'challenge → 'signature } as attest ;;
+          #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
+          (* PROTOCOL *)
+          (* KeyGen *)
+          let (sk,pk) := KeyGen in
+          #put pk_loc := pk ;;
+          #put sk_loc := sk ;;
+          (* sample the challenge *)
+          chal ← sample uniform pos_n ;;
+          #put chal_loc := chal ;;
+          (* take the state *)
+          state ← get state_loc ;; (* not sure here. Would like to sample, but it's not random*)
+          (* compute message *)
+          let msg := Hash' state chal in
+          (* sign (=attest) message *)
+          att ← attest msg ;;
+          bool ← verify_att chal att ;;
+          ret bool      
+        }
+      ].
+
+    Definition RA_ideal :
+        package
+          locs interface
+          [interface ]
+      :=
+      [package
+        #def #[RA (_ : 'unit) : (_,_)
+        {
+          #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+          #import {sig #[attest] : 'challenge → 'signature } as attest ;;
+          #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
+          
+          ...
+        };
+
+        ].
+
+
+  End RemoteAttestation_Protocol.
+
+End HeapHash.
+
+
+(* probably not needed *)
+
+Definition Attestation_locs_real_new := fset [:: pk_loc ; sk_loc; state_loc ; chal_loc ].
+Definition Attestation_locs_fake_new := Attestation_locs_real_new :|: fset [:: attest_loc ].   
+
+
+Definition Att_interface_new := [interface
+    #val #[get_pk] : 'unit → 'pubkey ;
+    #val #[attest'] : 'message → 'signature ;
+    #val #[verify_att'] : ('chal × 'signature) → 'bool
     ].
-*)
 
-
-
-
-
-
-(
+    Definition Att_real_sample_chal : package Attestation_locs_real_new 
+              [interface] Att_interface_new
+    := [package
+      #def  #[get_pk] (_ : 'unit) : 'pubkey
+      {
+        pk ← get pk_loc  ;;
+        ret pk
+      };
+      #def #[attest'] (_ : 'unit) : 'signature
+      {
+        chal ←  sample uniform i_chal ;;
+        #put chal_loc := chal ;;
+        state ← get state_loc ;;
+        let (sk,pk) := KeyGen in
+        #put pk_loc := pk ;;
+        #put sk_loc := sk ;;
+        let msg := Hash' state chal in
+        let att := Sign sk msg in
+        ret att
+      };
+      #def #[verify_att']  ('(chal, att) : ('chal × 'signature)) : 'bool
+      {
+        pk ← get pk_loc ;;
+        chal ← get chal_loc ;;
+        state ← get state_loc ;;
+        let msg := Hash' state chal in
+        let bool := Ver_sig pk att msg in
+        ret bool
+      }
+    ].
+    Equations Att_ideal : package Attestation_locs_fake_new 
+         [interface] Att_interface_new :=
+    Att_ideal := [package
+      #def  #[get_pk] (_ : 'unit) : 'pubkey
+      {
+        pk ← get pk_loc ;;
+        ret pk
+      };
+      #def #[attest'] (_ : 'unit) : 'attest
+      {
+        chal ←  sample uniform i_chal ;;
+        #put chal_loc := chal ;;
+        A ← get attest_loc ;;
+        s ← get state_loc ;;
+        let (sk,pk) := KeyGen in
+        #put pk_loc := pk ;;
+        #put sk_loc := sk ;;
+        let msg := Hash' s chal in
+        let att := Sign sk msg in
+        #put attest_loc := setm A ( att, msg ) tt ;;
+        ret att
+      };
+      #def #[verify_att'] ('(chal, att) : ('challenge × 'attest)) : 'bool
+      {
+        A ← get attest_loc ;;
+        chal ← get chal_loc ;;
+        state ← get state_loc ;;
+        let msg := Hash' state chal in
+        let b :=  (att, msg) \in domm A in
+        ret b
+      }
+    ].
+    Next Obligation.
+      ssprove_valid; rewrite /Attestation_locs_fake_new/Attestation_locs_real_new in_fsetU; apply /orP.
+      1,5,9: right;auto_in_fset.
+      all: left;auto_in_fset.
+    Defined.
