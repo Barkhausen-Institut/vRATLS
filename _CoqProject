@@ -1,6 +1,4 @@
 -Q ssprove/theories ""
 
-theories/examples/SigmaProtocolExplained.v
-theories/examples/Signature.v
-theories/examples/RA.v
-theories/examples/RAExtended.v
+-R _build/default/theories vRATLS
+_build/default/theories

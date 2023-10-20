@@ -84,9 +84,6 @@ Module Type SignatureConstraintsFail.
   #[local] Existing Instance Message_pos.
   Definition chMessage := 'fin #|Message|.
 
-  Notation " 'chal " := ('fin (2^n)%N) (in custom pack_type at level 2).
-  Definition i_chal : nat := 2^n.
-
 End SignatureConstraintsFail.
 
 (** |  SIGNATURE  |
@@ -202,3 +199,4 @@ Module Type SignatureScheme
   Defined.
 
 End SignatureScheme.
+

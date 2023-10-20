@@ -1,6 +1,5 @@
-(include_subdirs qualified)
 (coq.theory
- (name vratls)
+ (name vRATLS)
  (modules :standard)
  ;; SSProve is not dune based.
  ;; dune builds in '_build/default'.
@@ -23,3 +22,4 @@
 
  (theories )
 )
+(include_subdirs qualified)
