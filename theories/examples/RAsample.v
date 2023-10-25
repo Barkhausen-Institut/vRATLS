@@ -72,10 +72,13 @@ Module Protocol
 
   Import π1 π2 π3 π4 π5 π6.
 
-  Definition chal_loc    : Location := ('challenge ; 5%N).
-  Definition RA_locs := fset [:: chal_loc ; sk_loc ; pk_loc ; state_loc].
+  Definition chal_loc   : Location := ('challenge ; 5%N).
+  Definition RA_locs := fset [:: state_loc ; chal_loc ; pk_loc].
   Definition RA   : nat := 46. (* routine to get the public key *)
-  Definition RA_prot_interface := [interface #val #[RA] : 'unit → 'bool ].
+  Definition RA_prot_interface := 
+    [interface #val #[RA] : 'unit → ('pubkey × ('challenge × 'signature) ) ].
+
+  
 
   Parameter Hash' : chState -> chChallenge -> chMessage.
 
@@ -86,7 +89,7 @@ Module Protocol
   Notation " 'challenge " := Challenge       (in custom pack_type at level 2).
   Notation " 'challenge " := chChal        (at level 2): package_scope.*)
 
-  
+  Definition i_chal := #|Challenge|.
 
   Definition RA_real :
       package
@@ -95,76 +98,69 @@ Module Protocol
         RA_prot_interface
     :=
     [package
-      #def #[RA] (_ : 'unit) : 'bool
+      #def #[RA] (_ : 'unit) : ('pubkey × ('challenge × 'signature) )
       {
         #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-        #import {sig #[attest] : 'challenge → 'signature } as attest ;;
+        #import {sig #[attest] : 'challenge → ('signature × 'message) } as attest ;;
         #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
 
         (* PROTOCOL *)
 
         (* Verifier-side *)
+        (* ------------> *)
+            (* get the public key *)
+            pk ← get pk_loc ;;
+            (* sample the challenge *)
+            chal ← sample uniform i_chal ;;
+            #put chal_loc := chal ;;
+            (* take the state *)
 
-        (* KeyGen *)
-        let (sk,pk) := KeyGen in
-        #put pk_loc := pk ;;
-        #put sk_loc := sk ;;
-        (* sample the challenge *)
-        chal ← sample uniform pos_n ;;
-        #put chal_loc := chal ;;
-        let a := otf a in
-        (* take the state *)
-        state ← get state_loc ;; (* not sure here. Would like to sample, but it's not random*)
-        (* compute message *)
-        let msg := Hash' state chal in
-
-        (* Send message to prover *)
-        let chal_p := chal in
+            (* Send message to prover *)
+            let chal_v := chal in
 
         (* Prover-side *)
-        (* sign (=attest) message *)
-        att ← attest chal_p ;;
+        (* <---------- *)
 
-        (* Send attestation to verifier *)
-        let att_v := att in
+            (* sign (=attest) message *)
+            attest_tuple ← attest chal_v ;;
+            let (att, msg) := attest_tuple in
+            (* Send attestation to verifier *)
+            let att_p := att in
+            (* Send message to verifier *)
+            let msg_p := msg in
 
         (* Verifier-side *)
-        bool ← verify_att chal att_v ;;
+        (* ------------> *)
+            bool ← verify_att (chal, att_p) ;;
+            if bool then
 
-        (* Variant 1: unhash *)
-        let state_at_prover := get_state att_v in
-        if state_at_prover == state then
-          #put trust_loc := true;;
-        else
-          #put trust_loc := false;;
-
-        (* Variant 2: verifier knows Hash function *)
-        let h_p := Hash state chal in
-        let h_v := Dec att_v in
-        if h_p == h_v then
-          #put trust_loc := true;;
-        else
-          #put trust_loc := false;;
-
-
-        (* TODO
-           This verification does not make sense to me.
-           It is a routine on the prover side, I believe.
-           What does that even mean?
-           At this point the verifier asks:
-           Is the prover actually running a system that has my state?
-         *)
-
-        (* We make the whole communication and the pk available to the attacker. *)
-        ret (pk, (chal, att))
-
-        (* FIXME
-           I do not think that the handling of state is properly done here.
-           Not that this protocol assumes that the verifier and the prover
-           have the verify same [pk] and [sk].
-         *)
+              (* Verifier checks state *)
+              state ← get state_loc ;;
+              let msg_v := Hash state chal_v in
+              if msg_v == msg_p then
+                (* We make the whole communication and the pk available to the attacker. *)
+                 ret (pk, (chal, att))
+              else
+                (* We make the whole communication and the pk available to the attacker. *)
+                 ret (pk, (chal, att)) 
+            
+            else 
+              ret (pk, (chal, att)) 
+          (* FIXME
+            I do not think that the handling of state is properly done here.
+            Not that this protocol assumes that the verifier and the prover
+            have the verify same [pk] and [sk].
+          *)
       }
     ].
+
+              (* J: I think this is not the right way.
+          (* Variant 1: unhash *)
+          let state_at_prover := get_state att_v in
+          if state_at_prover == state then
+            #put trust_loc := true;;
+          else
+            #put trust_loc := false;;
 
   Definition RA_ideal :
       package

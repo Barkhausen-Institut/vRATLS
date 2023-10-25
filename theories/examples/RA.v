@@ -77,6 +77,7 @@ Module Type RemoteAttestationParamsFail <: SignatureConstraintsFail.
   Definition chChallenge : choice_type := 'fin (mkpos pos_n). (* ordinal_choiceType pos_n. *)
   (*Definition chChallenge : choice_type := 'fin (mkpos pos_n). *)
   Definition Attestation : choice_type := 'fin (mkpos pos_n).
+
   
 
   Definition Message := prod_finType Challenge State.
@@ -95,10 +96,15 @@ Module HeapHash.
   Module Type RemoteAttestationParams <: SignatureConstraints.
 
     Definition chState     : choice_type := 'fin (mkpos pos_n).
-    Definition chChallenge : choice_type := 'fin (mkpos pos_n).
     Definition Attestation : choice_type := 'fin (mkpos pos_n).
 
     Definition chMessage   : choice_type := 'fin (mkpos pos_n).
+
+    Parameter Challenge : finType.
+     Parameter Challenge_pos : Positive #|Challenge|.
+     #[local] Existing Instance Challenge_pos.
+     Definition chChallenge := 'fin #|Challenge|.
+     
 
   End RemoteAttestationParams.
 
@@ -159,10 +165,9 @@ Module HeapHash.
       This is the second approach.
      *)
 
-
     Definition Att_interface := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
-    #val #[attest] : 'challenge → 'signature ;
+    #val #[attest] : 'challenge → ('signature × 'message) ;
     #val #[verify_att] : ('challenge × 'signature) → 'bool
     ].
 
@@ -175,7 +180,7 @@ Module HeapHash.
         ret pk
       };
 
-      #def #[attest] (chal : 'challenge) : 'signature
+      #def #[attest] (chal : 'challenge) : ('signature × 'message)
       {
         state ← get state_loc ;;
         let (sk,pk) := KeyGen in
@@ -183,7 +188,7 @@ Module HeapHash.
         #put sk_loc := sk ;;
         let msg := Hash state chal in
         let att := Sign sk msg in
-        ret att
+        ret (att, msg)
       };
 
       #def #[verify_att] ('(chal, att) : ('challenge × 'signature)) : 'bool
@@ -204,7 +209,7 @@ Module HeapHash.
         ret pk
       };
 
-      #def #[attest] (chal : 'challenge) : 'attest
+      #def #[attest] (chal : 'challenge) : ('signature × 'message)
       {
         A ← get attest_loc ;;
         s ← get state_loc ;;
@@ -214,7 +219,7 @@ Module HeapHash.
         let msg := Hash s chal in
         let att := Sign sk msg in
         #put attest_loc := setm A ( att, msg ) tt ;;
-        ret att
+        ret (att, msg)
       };
 
       #def #[verify_att] ('(chal, att) : ('challenge × 'attest)) : 'bool
@@ -256,13 +261,13 @@ Module HeapHash.
         ret pk
       };
 
-      #def #[attest] ( chal : 'challenge ) : 'signature
+      #def #[attest] ( chal : 'challenge ) : ('signature × 'message)
       {
         #import {sig #[sign] : 'message  → 'signature } as sign ;;
         state ← get state_loc ;;
         let msg := Hash state chal in
         att ← sign msg ;;
-        ret att
+        ret (att, msg)
       };
 
       #def #[verify_att] ('(chal, att) : 'challenge × 'signature) : 'bool
