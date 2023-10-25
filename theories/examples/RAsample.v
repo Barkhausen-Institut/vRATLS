@@ -64,27 +64,29 @@ Require Import examples.RA.
 
 Module Protocol
     (π1 : SignatureParams)
-    (π2 : RemoteAttestationParams)
+    (π2 : HeapHash.RemoteAttestationParams)
     (π3 : SignatureAlgorithms π1 π2)
-    (π4 : RemoteAttestationAlgorithms π1 π2 π3)
+    (π4 : HeapHash.RemoteAttestationAlgorithms π1 π2 π3)
     (π5 : SignatureScheme π1 π2 π3)
-    (π6 : RemoteAttestation π1 π2 π3 π4 π5).
+    (π6 : HeapHash.RemoteAttestation π1 π2 π3 π4 π5).
 
   Import π1 π2 π3 π4 π5 π6.
-
-  Parameter Hash' : chState -> chChal -> chMessage.
 
   Definition chal_loc    : Location := ('challenge ; 5%N).
   Definition RA_locs := fset [:: chal_loc ; sk_loc ; pk_loc ; state_loc].
   Definition RA   : nat := 46. (* routine to get the public key *)
   Definition RA_prot_interface := [interface #val #[RA] : 'unit → 'bool ].
 
+  Parameter Hash' : chState -> chChallenge -> chMessage.
 
+  (*
   (* those are redefined, change above once fixed *)
   Definition Challenge := Arit (uniform pos_n).
   Definition chChal : choice_type := 'fin (mkpos pos_n).
   Notation " 'challenge " := Challenge       (in custom pack_type at level 2).
-  Notation " 'challenge " := chChal        (at level 2): package_scope.
+  Notation " 'challenge " := chChal        (at level 2): package_scope.*)
+
+  
 
   Definition RA_real :
       package
@@ -110,6 +112,7 @@ Module Protocol
         (* sample the challenge *)
         chal ← sample uniform pos_n ;;
         #put chal_loc := chal ;;
+        let a := otf a in
         (* take the state *)
         state ← get state_loc ;; (* not sure here. Would like to sample, but it's not random*)
         (* compute message *)

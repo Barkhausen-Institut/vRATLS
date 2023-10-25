@@ -367,6 +367,7 @@ Module HeapHash.
     Qed.
 
   End RemoteAttestation.
+
 End HeapHash.  
 
 (** We need a specification for remote attestation that
@@ -408,8 +409,3 @@ The tool defines the distinguisher polymorphically, we don't do it.
 *)
 
 
-
-
-
-
-(
