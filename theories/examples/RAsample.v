@@ -116,17 +116,33 @@ Module Protocol
         let msg := Hash' state chal in
 
         (* Send message to prover *)
-        let msg_p :=msg in
+        let chal_p := chal in
 
         (* Prover-side *)
         (* sign (=attest) message *)
-        att ← attest msg_p ;;
+        att ← attest chal_p ;;
 
         (* Send attestation to verifier *)
         let att_v := att in
 
         (* Verifier-side *)
         bool ← verify_att chal att_v ;;
+
+        (* Variant 1: unhash *)
+        let state_at_prover := get_state att_v in
+        if state_at_prover == state then
+          #put trust_loc := true;;
+        else
+          #put trust_loc := false;;
+
+        (* Variant 2: verifier knows Hash function *)
+        let h_p := Hash state chal in
+        let h_v := Dec att_v in
+        if h_p == h_v then
+          #put trust_loc := true;;
+        else
+          #put trust_loc := false;;
+
 
         (* TODO
            This verification does not make sense to me.
@@ -137,7 +153,7 @@ Module Protocol
          *)
 
         (* We make the whole communication and the pk available to the attacker. *)
-        ret (pk, (msg, att))
+        ret (pk, (chal, att))
 
         (* FIXME
            I do not think that the handling of state is properly done here.
