@@ -154,30 +154,95 @@ Module Protocol
       }
     ].
 
-              (* J: I think this is not the right way.
-          (* Variant 1: unhash *)
-          let state_at_prover := get_state att_v in
-          if state_at_prover == state then
-            #put trust_loc := true;;
-          else
-            #put trust_loc := false;;
+  (* J: I think this is not the right way. *)
+  (* Variant 1: unhash 
+     let state_at_prover := get_state att_v in
+     if state_at_prover == state then
+       #put trust_loc := true;;
+     else
+       #put trust_loc := false;;
+  *)
 
-  Definition RA_ideal :
+    Definition RA_ideal :
       package
-        locs interface
-        [interface ]
+        RA_locs
+        Att_interface
+        RA_prot_interface
     :=
     [package
-      #def #[RA (_ : 'unit) : (_,_)
+      #def #[RA] (_ : 'unit) : ('pubkey × ('challenge × 'signature) )
       {
         #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-        #import {sig #[attest] : 'challenge → 'signature } as attest ;;
+        #import {sig #[attest] : 'challenge → ('signature × 'message) } as attest ;;
         #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
-        
-        ...
-      };
 
-      ].
+        (* PROTOCOL *)
+
+        (* Verifier-side *)
+        (* ------------> *)
+            (* get the public key *)
+            pk ← get pk_loc ;;
+            (* sample the challenge *)
+            chal ← sample uniform i_chal ;;
+            #put chal_loc := chal ;;
+            (* take the state *)
+
+            (* Send message to prover *)
+            let chal_v := chal in
+
+        (* Prover-side *)
+        (* <---------- *)
+
+            (* sign (=attest) message *)
+            att ← sample uniform pos_n ;;
+            msg ← sample uniform pos_n ;;
+            (* Send attestation to verifier *)
+            let att_p := att in
+            (* Send message to verifier *)
+            let msg_p := msg in
+
+        (* Verifier-side *)
+        (* ------------> *)
+            bool ← verify_att (chal, att_p) ;;
+            if bool then
+
+              (* Verifier checks state *)
+              state ← get state_loc ;;
+              let msg_v := Hash state chal_v in
+              if msg_v == msg_p then
+                (* We make the whole communication and the pk available to the attacker. *)
+                 ret (pk, (chal, att))
+              else
+                (* We make the whole communication and the pk available to the attacker. *)
+                 ret (pk, (chal, att)) 
+            
+              else 
+                 ret (pk, (chal, att)) 
+          (* FIXME
+            I do not think that the handling of state is properly done here.
+            Not that this protocol assumes that the verifier and the prover
+            have the verify same [pk] and [sk].
+          *)
+      }
+    ].
+    
+    Definition mkpair' {Lt Lf E}
+      (t: package Lt E E) (f: package Lf E E): loc_GamePair E :=
+      fun b => if b then {locpackage t} else {locpackage f}.
+    
+
+    Definition RA_unforg := @mkpair RA_locs RA_locs RA_prot_interface RA_real RA_ideal.
+
+
+    Theorem RA_prot_unforg LA A :
+        ValidPackage LA Att_interface A_export A →
+        fdisjoint LA (Sig_unforg true).(locs) →
+        fdisjoint LA (Sig_unforg false).(locs) →
+        fdisjoint LA Aux_locs →
+        fdisjoint LA (Att_unforg true).(locs) →
+        fdisjoint LA (Att_unforg false).(locs) →
+        (Advantage Att_unforg A <= AdvantageE Sig_ideal Sig_real (A ∘ Aux))%R.
+    Proof.
 
 
 End Protocol.
