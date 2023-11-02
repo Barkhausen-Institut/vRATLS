@@ -146,6 +146,52 @@ Module Protocol
   Defined.
 
 
+  Definition Aux_locs := fset [:: pk_loc ; state_loc ; chal_loc].
+
+  Definition Aux : package Aux_locs Sign_interface2 RA_prot_interface :=
+    [package
+      #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
+      {
+        #import {sig #[sign] : 'message → 'pubkey × ('signature × 'bool)}  as sign ;;
+        state ← get state_loc ;;
+        chal  ← get chal_loc ;;
+        let msg := Hash state chal in
+        sig ← sign msg ;;
+        let '(pk, ( att, bool )) := sig in
+        ret (pk, ( att, bool ))
+      }
+    ].
+
+  Definition Sig_prot_unforg := 
+    @mkpair Signature_locs_real Signature_locs_ideal Sign_interface2 
+       Sig_prot_real Sig_prot_ideal.
+  Definition Att_prot_unforg := 
+    @mkpair RA_locs_real RA_locs_ideal RA_prot_interface 
+       Att_prot_real Att_prot_ideal.
+
+  Lemma prot_sig_real_vs_att_real_true:
+    Att_prot_unforg true ≈₀  Aux ∘ Sig_prot_unforg true.
+  Proof.
+  Admitted.
+
+  Lemma prot_sig_ideal_vs_att_ideal_false :
+    Att_prot_unforg false ≈₀ Aux ∘ Sig_prot_unforg false.
+  Proof.
+  Admitted.
+
+  Theorem RA_protunforg LA A :
+      ValidPackage LA Att_interface A_export A →
+      fdisjoint LA (Sig_prot_unforg true).(locs) →
+      fdisjoint LA (Sig_prot_unforg false).(locs) →
+      fdisjoint LA Aux_locs →
+      fdisjoint LA (Att_prot_unforg true).(locs) →
+      fdisjoint LA (Att_prot_unforg false).(locs) →
+      (Advantage Att_prot_unforg A <= 
+          AdvantageE Sig_prot_ideal Sig_prot_real (A ∘ Aux))%R.
+   Proof.
+   Admitted.
+  
+
 
 
 
