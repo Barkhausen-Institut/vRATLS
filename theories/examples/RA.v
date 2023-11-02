@@ -153,7 +153,7 @@ Module HeapHash.
        it stores the attestations handed out.
      *)
     Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
-    Definition Attestation_locs_fake := Attestation_locs_real :|: fset [:: attest_loc ].
+    Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc ].
 
     (*
       The key challenge: relate [sign_loc] and [attest_loc].
@@ -201,7 +201,7 @@ Module HeapHash.
       }
     ].
 
-    Equations Att_ideal : package Attestation_locs_fake [interface] Att_interface :=
+    Equations Att_ideal : package Attestation_locs_ideal [interface] Att_interface :=
     Att_ideal := [package
       #def  #[get_pk] (_ : 'unit) : 'pubkey
       {
@@ -232,13 +232,10 @@ Module HeapHash.
       }
     ].
     Next Obligation.
-      ssprove_valid; rewrite /Attestation_locs_fake/Attestation_locs_real in_fsetU; apply /orP.
+      ssprove_valid; rewrite /Attestation_locs_ideal/Attestation_locs_real in_fsetU; apply /orP.
       1,3,7: right;auto_in_fset.
       all: left; auto_in_fset.
     Defined.
-
- 
-
 
     (*
       TODO:
@@ -288,8 +285,10 @@ Module HeapHash.
       (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
       fun b => if b then {locpackage t} else {locpackage f}.
 
-    Definition Sig_unforg := @mkpair Signature_locs_real Signature_locs_fake Sign_interface Sig_real Sig_ideal.
-    Definition Att_unforg := @mkpair Attestation_locs_real Attestation_locs_fake Att_interface Att_real Att_ideal.
+    Definition Sig_unforg := 
+      @mkpair Signature_locs_real Signature_locs_ideal Sign_interface Sig_real Sig_ideal.
+    Definition Att_unforg := 
+      @mkpair Attestation_locs_real Attestation_locs_ideal Att_interface Att_real Att_ideal.
 
     Lemma sig_real_vs_att_real_true:
       Att_unforg true ≈₀  Aux ∘ Sig_unforg true.

@@ -75,8 +75,6 @@ Module Protocol
   Definition chal_loc   : Location := ('challenge ; 5%N).
   Definition RA_locs := fset [:: state_loc ; chal_loc ; pk_loc].
   Definition RA   : nat := 46. (* routine to get the public key *)
-  Definition RA_prot_interface := 
-    [interface #val #[RA] : 'unit → ('pubkey × ('challenge × 'signature) ) ].
 
   
 
@@ -90,6 +88,70 @@ Module Protocol
   Notation " 'challenge " := chChal        (at level 2): package_scope.*)
 
   Definition i_chal := #|Challenge|.
+
+  (* New Version *)
+
+  Definition RA_locs_real := fset [:: pk_loc ; sk_loc ; chal_loc ; state_loc].
+  Definition RA_locs_ideal := RA_locs_real :|: fset [:: attest_loc ].
+
+  (* NEW VERSION *)
+
+  Definition RA_prot_interface := 
+    [interface #val #[attest] : 'unit → 'pubkey × ('attest × 'bool) ].
+
+  Definition Att_prot_real : package RA_locs_real [interface] RA_prot_interface
+  := [package
+    #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
+    {
+      let (sk,pk) := KeyGen in
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+
+      chal ← sample uniform i_chal ;;
+      #put chal_loc := chal ;;
+      state ← get state_loc ;;
+      let msg := Hash' state chal in
+      let sig := Sign sk msg in
+      let bool := Ver_sig pk sig msg in
+      ret (pk, ( sig, bool ))
+    } 
+  ].
+
+  Equations Att_prot_ideal : package RA_locs_ideal [interface] RA_prot_interface :=
+  Att_prot_ideal := [package
+    #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
+    {
+      let (sk,pk) := KeyGen in
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+
+      chal ← sample uniform i_chal ;;
+      #put chal_loc := chal ;;
+      state ← get state_loc ;;
+      let msg := Hash' state chal in
+      let att := Sign sk msg in
+
+      A ← get attest_loc ;;
+      let A' := setm A (att, msg) tt in
+      #put attest_loc := A' ;;
+
+      let bool := ( (att,msg) \in domm A) in
+      ret (pk, ( att, bool ))
+    } 
+].
+ Next Obligation.
+ ssprove_valid; rewrite /RA_locs_ideal/RA_locs_real in_fsetU; apply /orP.
+    1,2,3,4: left; auto_in_fset.
+    1,2: right; auto_in_fset.
+  Defined.
+
+
+
+
+
+
+
+  (* Old Version *)
 
   Definition RA_real :
       package
@@ -225,13 +287,21 @@ Module Protocol
           *)
       }
     ].
+
+    Lemma RA_security:
+      RA_prot_real ≈₀ RA_prot_ideal.
     
+    Definition mkpair {Lt Lf E}
+    (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
+    fun b => if b then {locpackage t} else {locpackage f}.
+
+
     Definition mkpair' {Lt Lf E}
-      (t: package Lt E E) (f: package Lf E E): loc_GamePair E :=
+      (t: package Lt E) (f: package Lf E): loc_GamePair E :=
       fun b => if b then {locpackage t} else {locpackage f}.
     
 
-    Definition RA_unforg := @mkpair RA_locs RA_locs RA_prot_interface RA_real RA_ideal.
+    Definition RA_prot_unforg := @mkpair RA_locs RA_locs RA_prot_interface RA_real RA_ideal.
 
 
     Theorem RA_prot_unforg LA A :
@@ -241,7 +311,7 @@ Module Protocol
         fdisjoint LA Aux_locs →
         fdisjoint LA (Att_unforg true).(locs) →
         fdisjoint LA (Att_unforg false).(locs) →
-        (Advantage Att_unforg A <= AdvantageE Sig_ideal Sig_real (A ∘ Aux))%R.
+        (Advantage RA_prot_unforg <= Advantage Sig_unforg).
     Proof.
 
 

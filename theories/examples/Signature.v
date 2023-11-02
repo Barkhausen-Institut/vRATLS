@@ -133,7 +133,44 @@ Module Type SignatureScheme
 
   (* The signature scheme requires a heap location to store the seen signatures. *)
   Definition Signature_locs_real := fset [:: pk_loc ; sk_loc].
-  Definition Signature_locs_fake := Signature_locs_real :|: fset [:: sign_loc ].
+  Definition Signature_locs_ideal := Signature_locs_real :|: fset [:: sign_loc ].
+
+  (* NEW VERSION *)
+
+  Definition Sign_interface2 := 
+    [interface #val #[sign] : 'message → 'pubkey × ('signature × 'bool) ].
+
+  Definition Sig_prot_real : package Signature_locs_real [interface] Sign_interface2
+  := [package
+    #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
+    {
+      let (sk,pk) := KeyGen in
+      let sig := Sign sk msg in
+      let bool := Ver_sig pk sig msg in
+      ret (pk, ( sig, bool ))
+    } 
+  ].
+
+  Equations Sig_prot_ideal : package Signature_locs_ideal [interface] Sign_interface2 :=
+  Sig_prot_ideal := [package
+    #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
+    {
+      let (sk,pk) := KeyGen in
+      let sig := Sign sk msg in
+      S ← get sign_loc ;;
+      let S' := setm S (sig, msg) tt in
+      #put sign_loc := S' ;;    
+      let bool := ( (sig,msg) \in domm S) in
+      ret (pk, ( sig, bool ))
+    } 
+  ].
+ Next Obligation.
+ ssprove_valid; rewrite /Signature_locs_ideal/Signature_locs_real in_fsetU; apply /orP.
+    all: right; auto_in_fset.
+  Defined.
+
+
+  (* Old Stuff *)
 
   Definition Sign_interface := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
@@ -166,7 +203,7 @@ Module Type SignatureScheme
     }
   ].
 
-  Equations Sig_ideal : package Signature_locs_fake [interface] Sign_interface :=
+  Equations Sig_ideal : package Signature_locs_ideal [interface] Sign_interface :=
   Sig_ideal := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     {
@@ -179,6 +216,7 @@ Module Type SignatureScheme
       let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
+      
       let sig := Sign sk msg in
       S ← get sign_loc ;;
       let S' := setm S (sig, msg) tt in
@@ -193,7 +231,7 @@ Module Type SignatureScheme
     }
   ].
   Next Obligation.
-    ssprove_valid; rewrite /Signature_locs_fake/Signature_locs_real in_fsetU; apply /orP.
+    ssprove_valid; rewrite /Signature_locs_ideal/Signature_locs_real in_fsetU; apply /orP.
     2,3,6: left;auto_in_fset.
     all: right; auto_in_fset.
   Defined.
