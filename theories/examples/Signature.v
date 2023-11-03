@@ -85,6 +85,14 @@ Module Type SignatureAlgorithms (π1 : SignatureParams) (π2 : SignatureConstrai
 
   Parameter KeyGen : (SecKey × PubKey).
 
+(*
+The following holds:
+[KeyGen] is just some Coq function. That is, it returns some Coq type. It also states that it is pure.
+[KeyGen_monadic] is a function in the monad of SSProve. That is, it may alter the state. As a result, it cannot be left unspecified when doing a proof!
+We need to specify an implementation in RA and then the weird cast error should disappear.
+That still does not explain the weird error that we see when using the union of sets for locations. Maybe this does not go well with a monadic function used in the code.
+*)
+
   Parameter Sign : ∀ (sk : SecKey) (m : chMessage), Signature.
 
   Parameter Ver_sig : ∀ (pk : PubKey) (sig : Signature) (m : chMessage), 'bool.
