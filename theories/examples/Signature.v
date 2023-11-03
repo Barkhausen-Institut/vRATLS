@@ -72,32 +72,15 @@ Module Type SignatureConstraints.
   Definition chMessage : choice_type := 'fin (mkpos pos_n).
 End SignatureConstraints.
 
-Module Type SignatureConstraintsFail.
-  Parameter Message : finType.
-
-  (* FIXME THis is broken.
-     It creates the space [I_(pos_n)].
-     But that might be because I chose the wrong message type!
-     Maybe give it another try.
-   *)
-  Parameter Message_pos : Positive #|Message|.
-  #[local] Existing Instance Message_pos.
-  Definition chMessage := 'fin #|Message|.
-
-End SignatureConstraintsFail.
-
 (** |  SIGNATURE  |
     |   SCHEME    | **)
 
 Module Type SignatureAlgorithms (π1 : SignatureParams) (π2 : SignatureConstraints).
 
-  Import π1 π2.  
+  Import π1 π2.
 
-  (*TODO Use the [kgen] function from MACCA.
-    Also check out AsymmScheme on how to define it in a module type.
-   *)
-
-  Parameter KeyGen : (SecKey × PubKey).
+  Parameter KeyGen : ∀ {L : {fset Location}},
+     code L [interface] (SecKey × PubKey).
 
   Parameter Sign : ∀ (sk : SecKey) (m : chMessage), Signature.
 
@@ -134,6 +117,7 @@ Module Type SignaturePrimitives
   (* The signature scheme requires a heap location to store the seen signatures. *)
   Definition Prim_locs_real := fset [:: pk_loc ; sk_loc].
   Definition Prim_locs_ideal := Prim_locs_real :|: fset [:: sign_loc ].
+  
 
   (* Old Stuff *)
 
@@ -153,7 +137,7 @@ Module Type SignaturePrimitives
 
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
-      let (sk,pk) := KeyGen in
+      '(sk,pk) ← KeyGen ;;
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let sig := Sign sk msg in
@@ -168,6 +152,43 @@ Module Type SignaturePrimitives
     }
   ].
 
+  (* 
+    FixMe
+    have to define it like this, so I can use Definition instead of Equation
+    Oterwise, it outputs fail: "Not valid package" 
+  *)
+  Definition Prim_locs_ideal2 := fset [:: pk_loc ; sk_loc ; sign_loc].
+
+  Definition Prim_ideal : package Prim_locs_ideal2 [interface] Prim_interface :=
+   [package
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    {
+      pk ← get pk_loc ;;
+      ret pk
+    };
+
+    #def #[sign] ( 'msg : 'message ) : 'signature
+    {
+      '(sk,pk) ← KeyGen ;;
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+      let sig := Sign sk msg in
+      S ← get sign_loc ;;
+      let S' := setm S (sig, msg) tt in
+      #put sign_loc := S' ;;
+      ret sig
+    };
+
+    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
+    {
+      S ← get sign_loc ;;
+      ret ( (sig,msg) \in domm S)
+    }
+  ].
+(*
+  Here I get output: invalid package (from changing KeyGen to monadic)
+
+
   Equations Prim_ideal : package Prim_locs_ideal [interface] Prim_interface :=
   Prim_ideal := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
@@ -178,10 +199,9 @@ Module Type SignaturePrimitives
 
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
-      let (sk,pk) := KeyGen in
+      '(sk,pk) ← KeyGen ;;
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
-
       let sig := Sign sk msg in
       S ← get sign_loc ;;
       let S' := setm S (sig, msg) tt in
@@ -200,6 +220,7 @@ Module Type SignaturePrimitives
     2,3,6: left;auto_in_fset.
     all: right; auto_in_fset.
   Defined.
+*)
 
 End SignaturePrimitives.
 
