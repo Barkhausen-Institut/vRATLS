@@ -163,7 +163,10 @@ Module HeapHash.
       #def #[attest] (chal : 'challenge) : ('signature × 'message)
       {
         state ← get state_loc ;;
-        '(sk,pk) ← KeyGen ;;
+        let (sk,pk) := KeyGen in
+      (*
+      '(sk,pk) ← KeyGen ;;
+      *)
         #put pk_loc := pk ;;
         #put sk_loc := sk ;;
         let msg := Hash state chal in
@@ -182,14 +185,10 @@ Module HeapHash.
     ].
 
     Definition Attestation_locs_ideal2 := fset [:: pk_loc ; sk_loc ; state_loc ; attest_loc ].
-    (*
-    Old head
 
     Equations Att_ideal : package Attestation_locs_ideal [interface] Att_interface :=
     Att_ideal := [package
-    *)
-    Definition Att_ideal : package Attestation_locs_ideal2 [interface] Att_interface :=
-       [package
+
       #def  #[get_pk] (_ : 'unit) : 'pubkey
       {
         pk ← get pk_loc ;;
@@ -200,7 +199,10 @@ Module HeapHash.
       {
         A ← get attest_loc ;;
         s ← get state_loc ;;
+        let (sk,pk) := KeyGen in
+        (*
         '(sk,pk) ← KeyGen ;;
+        *)
         #put pk_loc := pk ;;
         #put sk_loc := sk ;;
         let msg := Hash s chal in
@@ -218,21 +220,11 @@ Module HeapHash.
         ret b
       }
     ].
-    (*
     Next Obligation.
       ssprove_valid; rewrite /Attestation_locs_ideal/Attestation_locs_real in_fsetU; apply /orP.
       1,3,7: right;auto_in_fset.
       all: left; auto_in_fset.
     Defined.
-    *)
-
-    (*
-      TODO:
-      Currently, these descriptions do not facilitate an actual protocol.
-      A protocol really is where I call [attest] and [verify_att] in one single piece of code.
-      The thing that happens then is that there need to be two locations for the state:
-      one in the client and the other in the server.
-     *)
 
     (* We need a common interface, so we need to define an [AUX] for the
        signature scheme.
@@ -274,13 +266,13 @@ Module HeapHash.
       (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
       fun b => if b then {locpackage t} else {locpackage f}.
 
-    Definition Sig_unforg := 
-      @mkpair Prim_locs_real Prim_locs_ideal2 Prim_interface Prim_real Prim_ideal.
+    Definition Prim_unforg := 
+      @mkpair Prim_locs_real Prim_locs_ideal Prim_interface Prim_real Prim_ideal.
     Definition Att_unforg := 
-      @mkpair Attestation_locs_real Attestation_locs_ideal2 Att_interface Att_real Att_ideal.
+      @mkpair Attestation_locs_real Attestation_locs_ideal Att_interface Att_real Att_ideal.
 
     Lemma sig_real_vs_att_real_true:
-      Att_unforg true ≈₀  Aux ∘ Sig_unforg true.
+      Att_unforg true ≈₀  Aux ∘ Prim_unforg true.
     Proof.
       eapply eq_rel_perf_ind_eq.
       simplify_eq_rel x.
@@ -291,10 +283,6 @@ Module HeapHash.
         intuition auto.
       - destruct x.
         ssprove_sync_eq => state.
-        (* here *)
-        Admitted.
-      
-        (*
         do 2! ssprove_sync_eq.
         by [apply r_ret].
       - case x => s s0.
@@ -304,10 +292,9 @@ Module HeapHash.
         ssprove_sync_eq => pk.
         by [apply r_ret].
     Qed.
-    *)
 
     Lemma sig_ideal_vs_att_ideal_false :
-      Att_unforg false ≈₀ Aux ∘ Sig_unforg false.
+      Att_unforg false ≈₀ Aux ∘ Prim_unforg false.
     Proof.
       eapply eq_rel_perf_ind_eq.
       simplify_eq_rel x.
@@ -315,9 +302,6 @@ Module HeapHash.
       - ssprove_sync_eq => pk_loc.
         by [apply r_ret].
       - ssprove_swap_lhs 0; ssprove_sync_eq => state.
-      (* here *)
-      Admitted.
-      (*
         do 2! (ssprove_swap_lhs 0; ssprove_sync_eq).
         ssprove_sync_eq => sig.
         ssprove_sync_eq.
@@ -328,12 +312,10 @@ Module HeapHash.
         by [apply r_ret].
     Qed.
 
-  *)
-
     Theorem RA_unforg LA A :
         ValidPackage LA Att_interface A_export A →
-        fdisjoint LA (Sig_unforg true).(locs) →
-        fdisjoint LA (Sig_unforg false).(locs) →
+        fdisjoint LA (Prim_unforg true).(locs) →
+        fdisjoint LA (Prim_unforg false).(locs) →
         fdisjoint LA Aux_locs →
         fdisjoint LA (Att_unforg true).(locs) →
         fdisjoint LA (Att_unforg false).(locs) →
@@ -347,8 +329,8 @@ Module HeapHash.
       simpl in H4.
       simpl in H5.
       ssprove triangle (Att_unforg true) [::
-        Aux ∘ Sig_unforg true ;
-        Aux ∘ Sig_unforg false
+        Aux ∘ Prim_unforg true ;
+        Aux ∘ Prim_unforg false
         ] (Att_unforg false) A as ineq.
       eapply le_trans.
       1: { exact: ineq. }
@@ -373,6 +355,11 @@ Module HeapHash.
 
 End HeapHash.  
 
+
+
+
+
+
 (** We need a specification for remote attestation that
     carves out the properties of the [Hash] function.
 
@@ -386,29 +373,5 @@ End HeapHash.
       already hashed [msg].
  *)
 
- (*
-This had the purpose of explaining the Import/ Export definition of SSProve.
-The tool defines the distinguisher polymorphically, we don't do it. 
-
-  Definition Dist :
-    package
-      Dist_locs Att_interface
-      [interface
-         #val #[RUN] : 'unit → 'bool ]
-  :=
-  [package
-    #def #[RUN] (_ : 'unit) : 'bool
-    {
-      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-      #import {sig #[attest] : 'challenge → 'signature } as attest ;;
-      #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
-
-      (* distinguisher code -- attack *)
-      let pk := get_pk () in
-      ...
-    };
-
-    ].
-*)
 
 

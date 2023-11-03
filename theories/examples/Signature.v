@@ -78,9 +78,12 @@ End SignatureConstraints.
 Module Type SignatureAlgorithms (π1 : SignatureParams) (π2 : SignatureConstraints).
 
   Import π1 π2.
-
-  Parameter KeyGen : ∀ {L : {fset Location}},
+  
+  (* currently not used *)
+  Parameter KeyGen_monadic : ∀ {L : {fset Location}},
      code L [interface] (SecKey × PubKey).
+
+  Parameter KeyGen : (SecKey × PubKey).
 
   Parameter Sign : ∀ (sk : SecKey) (m : chMessage), Signature.
 
@@ -116,8 +119,7 @@ Module Type SignaturePrimitives
 
   (* The signature scheme requires a heap location to store the seen signatures. *)
   Definition Prim_locs_real := fset [:: pk_loc ; sk_loc].
-  Definition Prim_locs_ideal := Prim_locs_real :|: fset [:: sign_loc ].
-  
+  Definition Prim_locs_ideal := Prim_locs_real :|: fset [:: sign_loc ]. 
 
   (* Old Stuff *)
 
@@ -137,7 +139,10 @@ Module Type SignaturePrimitives
 
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
+      let (sk,pk) := KeyGen in
+      (*
       '(sk,pk) ← KeyGen ;;
+      *)
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let sig := Sign sk msg in
@@ -157,6 +162,8 @@ Module Type SignaturePrimitives
     have to define it like this, so I can use Definition instead of Equation
     Oterwise, it outputs fail: "Not valid package" 
   *)
+
+(*
   Definition Prim_locs_ideal2 := fset [:: pk_loc ; sk_loc ; sign_loc].
 
   Definition Prim_ideal : package Prim_locs_ideal2 [interface] Prim_interface :=
@@ -169,7 +176,10 @@ Module Type SignaturePrimitives
 
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
-      '(sk,pk) ← KeyGen ;;
+    let (sk,pk) := KeyGen in
+    (*
+    '(sk,pk) ← KeyGen ;;
+    *)
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let sig := Sign sk msg in
@@ -185,9 +195,7 @@ Module Type SignaturePrimitives
       ret ( (sig,msg) \in domm S)
     }
   ].
-(*
-  Here I get output: invalid package (from changing KeyGen to monadic)
-
+*)
 
   Equations Prim_ideal : package Prim_locs_ideal [interface] Prim_interface :=
   Prim_ideal := [package
@@ -199,7 +207,10 @@ Module Type SignaturePrimitives
 
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
-      '(sk,pk) ← KeyGen ;;
+    let (sk,pk) := KeyGen in
+    (*
+    '(sk,pk) ← KeyGen ;;
+    *)
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let sig := Sign sk msg in
@@ -220,7 +231,7 @@ Module Type SignaturePrimitives
     2,3,6: left;auto_in_fset.
     all: right; auto_in_fset.
   Defined.
-*)
+
 
 End SignaturePrimitives.
 
