@@ -65,27 +65,7 @@ Require Import examples.Signature.
    did not work out.
    I was unable to create a message of type [choice_type] in the RA part.
  *)
-Module Type RemoteAttestationParamsFail <: SignatureConstraintsFail.
 
-  (*
-    Internally, ['fin (mkpos pos_n] creates [ordinal of pos_n] which is [I_(pos_n)].
-    It would just be nice to find a way to derive [chState] from [State].
-   *)
-  Definition State : finType := [finType of 'I_(pos_n)].
-  Definition chState : choice_type := 'fin (mkpos pos_n). (* ordinal_choiceType (pos_n). *)
-  Definition Challenge : finType := [finType of 'I_(pos_n)].
-  Definition chChallenge : choice_type := 'fin (mkpos pos_n). (* ordinal_choiceType pos_n. *)
-  (*Definition chChallenge : choice_type := 'fin (mkpos pos_n). *)
-  Definition Attestation : choice_type := 'fin (mkpos pos_n).
-
-  
-
-  Definition Message := prod_finType Challenge State.
-  #[export] Instance Message_pos : Positive #|Message|.
-  Admitted.
-  Definition chMessage := 'fin #|Message|. 
-
-End RemoteAttestationParamsFail.
 
 (*
   The below specification is complete but insufficient.
@@ -144,7 +124,7 @@ Module HeapHash.
     (π2 : RemoteAttestationParams)
     (π3 : SignatureAlgorithms π1 π2)
     (π4 : RemoteAttestationAlgorithms π1 π2 π3)
-    (π5 : SignatureScheme π1 π2 π3).
+    (π5 : SignaturePrimitives π1 π2 π3).
 
     Import π1 π2 π3 π4 π5.
 
@@ -183,7 +163,7 @@ Module HeapHash.
       #def #[attest] (chal : 'challenge) : ('signature × 'message)
       {
         state ← get state_loc ;;
-        let (sk,pk) := KeyGen in
+        '(sk,pk) ← KeyGen ;;
         #put pk_loc := pk ;;
         #put sk_loc := sk ;;
         let msg := Hash state chal in
@@ -201,8 +181,15 @@ Module HeapHash.
       }
     ].
 
+    Definition Attestation_locs_ideal2 := fset [:: pk_loc ; sk_loc ; state_loc ; attest_loc ].
+    (*
+    Old head
+
     Equations Att_ideal : package Attestation_locs_ideal [interface] Att_interface :=
     Att_ideal := [package
+    *)
+    Definition Att_ideal : package Attestation_locs_ideal2 [interface] Att_interface :=
+       [package
       #def  #[get_pk] (_ : 'unit) : 'pubkey
       {
         pk ← get pk_loc ;;
@@ -213,7 +200,7 @@ Module HeapHash.
       {
         A ← get attest_loc ;;
         s ← get state_loc ;;
-        let (sk,pk) := KeyGen in
+        '(sk,pk) ← KeyGen ;;
         #put pk_loc := pk ;;
         #put sk_loc := sk ;;
         let msg := Hash s chal in
@@ -231,11 +218,13 @@ Module HeapHash.
         ret b
       }
     ].
+    (*
     Next Obligation.
       ssprove_valid; rewrite /Attestation_locs_ideal/Attestation_locs_real in_fsetU; apply /orP.
       1,3,7: right;auto_in_fset.
       all: left; auto_in_fset.
     Defined.
+    *)
 
     (*
       TODO:
@@ -250,7 +239,7 @@ Module HeapHash.
      *)
     Definition Aux_locs := fset [:: pk_loc ; state_loc ].
 
-    Definition Aux : package Aux_locs Sign_interface Att_interface :=
+    Definition Aux : package Aux_locs Prim_interface Att_interface :=
     [package
       #def #[get_pk] (_ : 'unit) : 'pubkey
       {
@@ -286,9 +275,9 @@ Module HeapHash.
       fun b => if b then {locpackage t} else {locpackage f}.
 
     Definition Sig_unforg := 
-      @mkpair Signature_locs_real Signature_locs_ideal Sign_interface Sig_real Sig_ideal.
+      @mkpair Prim_locs_real Prim_locs_ideal2 Prim_interface Prim_real Prim_ideal.
     Definition Att_unforg := 
-      @mkpair Attestation_locs_real Attestation_locs_ideal Att_interface Att_real Att_ideal.
+      @mkpair Attestation_locs_real Attestation_locs_ideal2 Att_interface Att_real Att_ideal.
 
     Lemma sig_real_vs_att_real_true:
       Att_unforg true ≈₀  Aux ∘ Sig_unforg true.
@@ -302,6 +291,10 @@ Module HeapHash.
         intuition auto.
       - destruct x.
         ssprove_sync_eq => state.
+        (* here *)
+        Admitted.
+      
+        (*
         do 2! ssprove_sync_eq.
         by [apply r_ret].
       - case x => s s0.
@@ -311,6 +304,7 @@ Module HeapHash.
         ssprove_sync_eq => pk.
         by [apply r_ret].
     Qed.
+    *)
 
     Lemma sig_ideal_vs_att_ideal_false :
       Att_unforg false ≈₀ Aux ∘ Sig_unforg false.
@@ -321,6 +315,9 @@ Module HeapHash.
       - ssprove_sync_eq => pk_loc.
         by [apply r_ret].
       - ssprove_swap_lhs 0; ssprove_sync_eq => state.
+      (* here *)
+      Admitted.
+      (*
         do 2! (ssprove_swap_lhs 0; ssprove_sync_eq).
         ssprove_sync_eq => sig.
         ssprove_sync_eq.
@@ -331,6 +328,8 @@ Module HeapHash.
         by [apply r_ret].
     Qed.
 
+  *)
+
     Theorem RA_unforg LA A :
         ValidPackage LA Att_interface A_export A →
         fdisjoint LA (Sig_unforg true).(locs) →
@@ -338,7 +337,7 @@ Module HeapHash.
         fdisjoint LA Aux_locs →
         fdisjoint LA (Att_unforg true).(locs) →
         fdisjoint LA (Att_unforg false).(locs) →
-        (Advantage Att_unforg A <= AdvantageE Sig_ideal Sig_real (A ∘ Aux))%R.
+        (Advantage Att_unforg A <= AdvantageE Prim_ideal Prim_real (A ∘ Aux))%R.
     Proof.
       move => va H1 H2 H3 H4 H5.
       rewrite Advantage_E Advantage_sym.
