@@ -105,7 +105,7 @@ Module Type SignatureAlgorithms (π1 : SignatureParams) (π2 : SignatureConstrai
 
 End SignatureAlgorithms.
 
-Module Type SignatureScheme
+Module Type SignaturePrimitives
   (π1 : SignatureParams)
   (π2 : SignatureConstraints)
   (Alg : SignatureAlgorithms π1 π2).
@@ -132,53 +132,18 @@ Module Type SignatureScheme
   Definition verify_sig: nat := 45. (* routine to verify the signature *)
 
   (* The signature scheme requires a heap location to store the seen signatures. *)
-  Definition Signature_locs_real := fset [:: pk_loc ; sk_loc].
-  Definition Signature_locs_ideal := Signature_locs_real :|: fset [:: sign_loc ].
-
-  (* NEW VERSION *)
-
-  Definition Sign_interface2 := 
-    [interface #val #[sign] : 'message → 'pubkey × ('signature × 'bool) ].
-
-  Definition Sig_prot_real : package Signature_locs_real [interface] Sign_interface2
-  := [package
-    #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
-    {
-      let (sk,pk) := KeyGen in
-      let sig := Sign sk msg in
-      let bool := Ver_sig pk sig msg in
-      ret (pk, ( sig, bool ))
-    } 
-  ].
-
-  Equations Sig_prot_ideal : package Signature_locs_ideal [interface] Sign_interface2 :=
-  Sig_prot_ideal := [package
-    #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
-    {
-      let (sk,pk) := KeyGen in
-      let sig := Sign sk msg in
-      S ← get sign_loc ;;
-      let S' := setm S (sig, msg) tt in
-      #put sign_loc := S' ;;    
-      let bool := ( (sig,msg) \in domm S) in
-      ret (pk, ( sig, bool ))
-    } 
-  ].
- Next Obligation.
- ssprove_valid; rewrite /Signature_locs_ideal/Signature_locs_real in_fsetU; apply /orP.
-    all: right; auto_in_fset.
-  Defined.
-
+  Definition Prim_locs_real := fset [:: pk_loc ; sk_loc].
+  Definition Prim_locs_ideal := Prim_locs_real :|: fset [:: sign_loc ].
 
   (* Old Stuff *)
 
-  Definition Sign_interface := [interface
+  Definition Prim_interface := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
     #val #[sign] : 'message → 'signature ;
     #val #[verify_sig] : ('signature × 'message) → 'bool
   ].
 
-  Definition Sig_real : package Signature_locs_real [interface] Sign_interface
+  Definition Prim_real : package Prim_locs_real [interface] Prim_interface
   := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     {
@@ -203,8 +168,8 @@ Module Type SignatureScheme
     }
   ].
 
-  Equations Sig_ideal : package Signature_locs_ideal [interface] Sign_interface :=
-  Sig_ideal := [package
+  Equations Prim_ideal : package Prim_locs_ideal [interface] Prim_interface :=
+  Prim_ideal := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     {
       pk ← get pk_loc ;;
@@ -216,7 +181,7 @@ Module Type SignatureScheme
       let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
-      
+
       let sig := Sign sk msg in
       S ← get sign_loc ;;
       let S' := setm S (sig, msg) tt in
@@ -231,10 +196,68 @@ Module Type SignatureScheme
     }
   ].
   Next Obligation.
-    ssprove_valid; rewrite /Signature_locs_ideal/Signature_locs_real in_fsetU; apply /orP.
+    ssprove_valid; rewrite /Prim_locs_ideal/Prim_locs_real in_fsetU; apply /orP.
     2,3,6: left;auto_in_fset.
     all: right; auto_in_fset.
   Defined.
 
-End SignatureScheme.
+End SignaturePrimitives.
+
+Module Type SignatureProt
+  (π1 : SignatureParams)
+  (π2 : SignatureConstraints)
+  (Alg : SignatureAlgorithms π1 π2)
+  (Prim : SignaturePrimitives π1 π2 Alg).
+
+  Import π1.
+  Import π2.
+  Import Alg.
+  Import Prim.
+  (* NEW VERSION *)
+
+  Definition Signature_locs_real := Prim_locs_real.
+  Definition Signature_locs_ideal := Prim_locs_ideal.
+
+  Definition Sig_interface := 
+    [interface #val #[sign] : 'message → 'pubkey × ('signature × 'bool) ].
+
+  Definition Sig_real : package Signature_locs_real Prim_interface Sig_interface
+  := [package
+    #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
+    {
+      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+      #import {sig #[sign] : 'message → 'signature  } as sign ;;
+      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
+
+      (* Protocol *)
+      pk ← get_pk tt ;;
+      sig ← sign msg ;;
+      bool ← verify_sig (sig, msg) ;;
+      ret (pk, ( sig, bool ))
+    } 
+  ].
+
+  Equations Sig_ideal : package Signature_locs_ideal Prim_interface Sig_interface :=
+  Sig_ideal := [package
+    #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
+    {
+      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+      #import {sig #[sign] : 'message → 'signature  } as sign ;;
+      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
+      (* Protocol *)
+      pk ← get_pk tt ;;
+      sig ← sign msg ;;
+      S ← get sign_loc ;;
+      let S' := setm S (sig, msg) tt in
+      #put sign_loc := S' ;;   
+      let bool := ( (sig,msg) \in domm S) in
+      ret (pk, ( sig, bool ))
+    } 
+  ].
+ Next Obligation.
+ ssprove_valid; rewrite /Signature_locs_ideal/Signature_locs_real in_fsetU; apply /orP.
+    all: right; auto_in_fset.
+  Defined.  
+
+End SignatureProt.
 
