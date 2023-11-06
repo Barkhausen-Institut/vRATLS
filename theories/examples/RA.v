@@ -102,14 +102,17 @@ Module HeapHash.
     Notation " 'state "     := chState       (at level 2): package_scope.
     Notation " 'challenge " := chChallenge   (in custom pack_type at level 2).
     Notation " 'challenge " := chChallenge   (at level 2): package_scope.
-
+    Notation " 'attest "    := Attestation    (in custom pack_type at level 2).
+    
     Definition state_loc   : Location := ('state    ; 4%N).
     Definition attest_loc  : Location := ('set (Signature × chMessage) ; 2%N).
 
-    Definition verify_att: nat := 46.
+    Definition verify_att   : nat := 46.
+    Definition verify_att_f : nat := 47.
 
-    Notation " 'attest "    := Attestation    (in custom pack_type at level 2).
-    Definition attest    : nat := 47. (* routine to attest *)
+    Definition attest       : nat := 48. 
+    Definition attest_f     : nat := 49.
+
 
     (*
       FIXME this hash function spec is insufficient.
@@ -151,6 +154,12 @@ Module HeapHash.
     #val #[verify_att] : ('challenge × 'signature) → 'bool
     ].
 
+    Definition Att_interface_f := [interface
+    #val #[get_pk] : 'unit → 'pubkey ;
+    #val #[attest_f] : 'challenge → ('signature × 'message) ;
+    #val #[verify_att_f] : ('challenge × 'signature) → 'bool
+    ].
+
     (* OLD VERION, NEW VERSION underneath *)
     Definition Att_real : package Attestation_locs_real [interface] Att_interface
     := [package
@@ -186,7 +195,7 @@ Module HeapHash.
 
     Definition Attestation_locs_ideal2 := fset [:: pk_loc ; sk_loc ; state_loc ; attest_loc ].
 
-    Equations Att_ideal : package Attestation_locs_ideal [interface] Att_interface :=
+    Equations Att_ideal : package Attestation_locs_ideal [interface] Att_interface_f :=
     Att_ideal := [package
 
       #def  #[get_pk] (_ : 'unit) : 'pubkey
@@ -195,7 +204,7 @@ Module HeapHash.
         ret pk
       };
 
-      #def #[attest] (chal : 'challenge) : ('signature × 'message)
+      #def #[attest_f] (chal : 'challenge) : ('signature × 'message)
       {
         A ← get attest_loc ;;
         s ← get state_loc ;;
@@ -211,7 +220,7 @@ Module HeapHash.
         ret (att, msg)
       };
 
-      #def #[verify_att] ('(chal, att) : ('challenge × 'attest)) : 'bool
+      #def #[verify_att_f] ('(chal, att) : ('challenge × 'attest)) : 'bool
       {
         A ← get attest_loc ;;
         state ← get state_loc ;;
@@ -266,10 +275,18 @@ Module HeapHash.
       (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
       fun b => if b then {locpackage t} else {locpackage f}.
 
+      (*
+    Definition mkpair {Lt Lf E}
+      (t: package Lt [interface] E) (f: package Lf Prim_interface_f E): loc_GamePair E :=
+      fun b => if b then {locpackage t} else {locpackage f}.
+      *)
+
     Definition Prim_unforg := 
-      @mkpair Prim_locs_real Prim_locs_ideal Prim_interface Prim_real Prim_ideal.
+      @mkpair Prim_locs_real Prim_locs_ideal Prim_interface
+        Prim_real Prim_ideal.
     Definition Att_unforg := 
-      @mkpair Attestation_locs_real Attestation_locs_ideal Att_interface Att_real Att_ideal.
+      @mkpair Attestation_locs_real Attestation_locs_ideal Att_interface
+        Att_real Att_ideal.
 
     Lemma sig_real_vs_att_real_true:
       Att_unforg true ≈₀  Aux ∘ Prim_unforg true.

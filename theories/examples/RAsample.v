@@ -165,7 +165,7 @@ Module Protocol
 
   (* Need to change that such that interface is not empty *)  
   Definition mkpair {Lt Lf E}
-    (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
+    (t: package Lt Sig_int E) (f: package Lf Sig_inf E): loc_GamePair E :=
     fun b => if b then {locpackage t} else {locpackage f}.
 
   Definition Sig_prot_unforg := 

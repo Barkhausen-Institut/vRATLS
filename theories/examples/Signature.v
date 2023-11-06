@@ -121,9 +121,11 @@ Module Type SignaturePrimitives
   Definition sk_loc      : Location := (SecKey    ; 1%N).
   Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
 
-  Definition get_pk    : nat := 42. (* routine to get the public key *)
-  Definition sign      : nat := 44. (* routine to sign a message *)
-  Definition verify_sig: nat := 45. (* routine to verify the signature *)
+  Definition get_pk      : nat := 42. (* routine to get the public key *)
+  Definition sign        : nat := 44. (* routine to sign a message *)
+  Definition verify_sig  : nat := 45. (* routine to verify the signature *)
+  Definition sign_f      : nat := 46. (* routine to sign a message *)
+  Definition verify_sig_f: nat := 47. (* routine to verify the signature *)
 
   (* The signature scheme requires a heap location to store the seen signatures. *)
   Definition Prim_locs_real := fset [:: pk_loc ; sk_loc].
@@ -136,6 +138,12 @@ Module Type SignaturePrimitives
     #val #[sign] : 'message → 'signature ;
     #val #[verify_sig] : ('signature × 'message) → 'bool
   ].
+
+  Definition Prim_interface_f := [interface
+  #val #[get_pk] : 'unit → 'pubkey ;
+  #val #[sign_f] : 'message → 'signature ;
+  #val #[verify_sig_f] : ('signature × 'message) → 'bool
+].
 
   Definition Prim_real : package Prim_locs_real [interface] Prim_interface
   := [package
@@ -165,47 +173,7 @@ Module Type SignaturePrimitives
     }
   ].
 
-  (* 
-    FixMe
-    have to define it like this, so I can use Definition instead of Equation
-    Oterwise, it outputs fail: "Not valid package" 
-  *)
-
-(*
-  Definition Prim_locs_ideal2 := fset [:: pk_loc ; sk_loc ; sign_loc].
-
-  Definition Prim_ideal : package Prim_locs_ideal2 [interface] Prim_interface :=
-   [package
-    #def  #[get_pk] (_ : 'unit) : 'pubkey
-    {
-      pk ← get pk_loc ;;
-      ret pk
-    };
-
-    #def #[sign] ( 'msg : 'message ) : 'signature
-    {
-    let (sk,pk) := KeyGen in
-    (*
-    '(sk,pk) ← KeyGen ;;
-    *)
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      let sig := Sign sk msg in
-      S ← get sign_loc ;;
-      let S' := setm S (sig, msg) tt in
-      #put sign_loc := S' ;;
-      ret sig
-    };
-
-    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
-    {
-      S ← get sign_loc ;;
-      ret ( (sig,msg) \in domm S)
-    }
-  ].
-*)
-
-  Equations Prim_ideal : package Prim_locs_ideal [interface] Prim_interface :=
+  Equations Prim_ideal : package Prim_locs_ideal [interface] Prim_interface_f :=
   Prim_ideal := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     {
@@ -213,7 +181,7 @@ Module Type SignaturePrimitives
       ret pk
     };
 
-    #def #[sign] ( 'msg : 'message ) : 'signature
+    #def #[sign_f] ( 'msg : 'message ) : 'signature
     {
     let (sk,pk) := KeyGen in
     (*
@@ -228,7 +196,7 @@ Module Type SignaturePrimitives
       ret sig
     };
 
-    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
+    #def #[verify_sig_f] ( '(sig,msg) : 'signature × 'message) : 'bool
     {
       S ← get sign_loc ;;
       ret ( (sig,msg) \in domm S)
@@ -261,7 +229,42 @@ Module Type SignatureProt
   Definition Sig_interface := 
     [interface #val #[sign] : 'message → 'pubkey × ('signature × 'bool) ].
 
+(* pure definition relying on primitives *)
+
   Definition Sig_real : package Signature_locs_real Prim_interface Sig_interface
+    := [package
+      #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
+      {
+        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+        #import {sig #[sign] : 'message → 'signature  } as sign ;;
+        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
+  
+        (* Protocol *)
+        pk ← get_pk tt ;;
+        sig ← sign msg ;;
+        bool ← verify_sig (sig, msg) ;;
+        ret (pk, ( sig, bool ))
+      } 
+    ].
+  
+    Equations Sig_ideal : package Signature_locs_ideal Prim_interface_f Sig_interface :=
+    Sig_ideal := [package
+      #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
+      {
+        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+        #import {sig #[sign_f] : 'message → 'signature  } as sign ;;
+        #import {sig #[verify_sig_f] : ('signature × 'message) → 'bool } as verify_sig ;;
+        (* Protocol *)
+        pk ← get_pk tt ;;
+        sig ← sign msg ;;
+        bool ← verify_sig (sig, msg) ;;
+        ret (pk, ( sig, bool ))
+      } 
+    ].
+
+  (* Semi-old version, 50:50 prims and protocol*)
+
+  Definition Sig_real2 : package Signature_locs_real Prim_interface Sig_interface
   := [package
     #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
     {
@@ -277,13 +280,13 @@ Module Type SignatureProt
     } 
   ].
 
-  Equations Sig_ideal : package Signature_locs_ideal Prim_interface Sig_interface :=
-  Sig_ideal := [package
+  Equations Sig_ideal2 : package Signature_locs_ideal Prim_interface_f Sig_interface :=
+  Sig_ideal2 := [package
     #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
     {
       #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-      #import {sig #[sign] : 'message → 'signature  } as sign ;;
-      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
+      #import {sig #[sign_f] : 'message → 'signature  } as sign ;;
+      #import {sig #[verify_sig_f] : ('signature × 'message) → 'bool } as verify_sig ;;
       (* Protocol *)
       pk ← get_pk tt ;;
       sig ← sign msg ;;
