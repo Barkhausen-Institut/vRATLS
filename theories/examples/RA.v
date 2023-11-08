@@ -271,25 +271,42 @@ Module HeapHash.
       }
     ].
 
-    Definition mkpair {Lt Lf E}
-      (t: package Lt [interface] E) (f: package Lf [interface] E): loc_GamePair E :=
+    (*
+    Definition mkpair {Lt Lf Et Ef}
+      (t: package Lt [interface] Et) (f: package Lf [interface] Ef): loc_GamePair Ef :=
       fun b => if b then {locpackage t} else {locpackage f}.
 
       (*
     Definition mkpair {Lt Lf E}
       (t: package Lt [interface] E) (f: package Lf Prim_interface_f E): loc_GamePair E :=
       fun b => if b then {locpackage t} else {locpackage f}.
-      *)
+       *)
 
-    Definition Prim_unforg := 
+    Print Prim_interface.
+    (*
+Prim_interface =
+[interface #val #[get_pk] : 'unit → 'pubkey ; #val #[sign] : 'message → 'signature ;
+           #val #[verify_sig] : ('signature) × ('message) → 'bool ]
+     : {fset prod_ordType nat_ordType (prod_ordType choice_type_ordType choice_type_ordType)}
+
+     *)
+    Print Prim_interface_f.
+
+    Definition Prim_unforg := mkpair Prim_real Prim_ideal.
       @mkpair Prim_locs_real Prim_locs_ideal Prim_interface
         Prim_real Prim_ideal.
-    Definition Att_unforg := 
+    Definition Att_unforg :=
       @mkpair Attestation_locs_real Attestation_locs_ideal Att_interface
         Att_real Att_ideal.
+     *)
+
+    Definition Att_unforg_real := {locpackage Att_real}.
+    Definition Att_unforg_ideal := {locpackage Att_ideal}.
+    Definition Prim_unforg_real := {locpackage Prim_real}.
+    Definition Prim_unforg_ideal := {locpackage Prim_ideal}.
 
     Lemma sig_real_vs_att_real_true:
-      Att_unforg true ≈₀  Aux ∘ Prim_unforg true.
+      Att_unforg_real ≈₀  Aux ∘ Prim_unforg_real.
     Proof.
       eapply eq_rel_perf_ind_eq.
       simplify_eq_rel x.
@@ -310,8 +327,18 @@ Module HeapHash.
         by [apply r_ret].
     Qed.
 
+    Definition Comp_locs := fset [:: pk_loc ; sk_loc; sign_loc; state_loc ].
+
+    Equations Aux_Prim_unforg_ideal : package Comp_locs Att_interface [interface] :=
+      Aux_Prim_unforg_ideal := {package Aux ∘ Prim_unforg_ideal}.
+    Next Obligation.
+      ssprove_valid.
+      3: {
+        eexists.
+      }.
+
     Lemma sig_ideal_vs_att_ideal_false :
-      Att_unforg false ≈₀ Aux ∘ Prim_unforg false.
+      Att_unforg_ideal ≈₀ Aux ∘ Prim_unforg_ideal.
     Proof.
       eapply eq_rel_perf_ind_eq.
       simplify_eq_rel x.
