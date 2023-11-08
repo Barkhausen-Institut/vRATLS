@@ -271,42 +271,8 @@ Module HeapHash.
       }
     ].
 
-    (*
-    Definition mkpair {Lt Lf Et Ef}
-      (t: package Lt [interface] Et) (f: package Lf [interface] Ef): loc_GamePair Ef :=
-      fun b => if b then {locpackage t} else {locpackage f}.
-
-      (*
-    Definition mkpair {Lt Lf E}
-      (t: package Lt [interface] E) (f: package Lf Prim_interface_f E): loc_GamePair E :=
-      fun b => if b then {locpackage t} else {locpackage f}.
-       *)
-
-    Print Prim_interface.
-    (*
-Prim_interface =
-[interface #val #[get_pk] : 'unit → 'pubkey ; #val #[sign] : 'message → 'signature ;
-           #val #[verify_sig] : ('signature) × ('message) → 'bool ]
-     : {fset prod_ordType nat_ordType (prod_ordType choice_type_ordType choice_type_ordType)}
-
-     *)
-    Print Prim_interface_f.
-
-    Definition Prim_unforg := mkpair Prim_real Prim_ideal.
-      @mkpair Prim_locs_real Prim_locs_ideal Prim_interface
-        Prim_real Prim_ideal.
-    Definition Att_unforg :=
-      @mkpair Attestation_locs_real Attestation_locs_ideal Att_interface
-        Att_real Att_ideal.
-     *)
-
-    Definition Att_unforg_real := {locpackage Att_real}.
-    Definition Att_unforg_ideal := {locpackage Att_ideal}.
-    Definition Prim_unforg_real := {locpackage Prim_real}.
-    Definition Prim_unforg_ideal := {locpackage Prim_ideal}.
-
-    Lemma sig_real_vs_att_real_true:
-      Att_unforg_real ≈₀  Aux ∘ Prim_unforg_real.
+    Lemma sig_real_vs_att_real:
+      Att_real ≈₀  Aux ∘ Prim_real.
     Proof.
       eapply eq_rel_perf_ind_eq.
       simplify_eq_rel x.
@@ -329,16 +295,53 @@ Prim_interface =
 
     Definition Comp_locs := fset [:: pk_loc ; sk_loc; sign_loc; state_loc ].
 
-    Equations Aux_Prim_unforg_ideal : package Comp_locs Att_interface [interface] :=
-      Aux_Prim_unforg_ideal := {package Aux ∘ Prim_unforg_ideal}.
+    (* You need to redefine [Aux] to match the import interface of [Aux] to
+       the export interface of [Prim_ideal]  *)
+    Definition Aux_ideal : package Aux_locs Prim_interface_f Att_interface :=
+    [package
+      #def #[get_pk] (_ : 'unit) : 'pubkey
+      {
+        pk ← get pk_loc ;;
+        ret pk
+      };
+
+      #def #[attest] ( chal : 'challenge ) : ('signature × 'message)
+      {
+        #import {sig #[sign_f] : 'message  → 'signature } as sign ;;
+        state ← get state_loc ;;
+        let msg := Hash state chal in
+        att ← sign msg ;;
+        ret (att, msg)
+      };
+
+      #def #[verify_att] ('(chal, att) : 'challenge × 'signature) : 'bool
+      {
+        #import {sig #[verify_sig_f] : ('signature × 'message) → 'bool } as verify ;;
+        state ← get state_loc ;;
+        let msg := Hash state chal in
+        b  ← verify (att,msg) ;;
+        ret b
+        (* When I just write:
+           [verify (att,msg)]
+           Then SSProve errors out and cannot validate the package. Why?
+         *)
+      }
+    ].
+
+    Equations Aux_Prim_ideal : package Comp_locs [interface] Att_interface :=
+      Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal}.
     Next Obligation.
       ssprove_valid.
-      3: {
-        eexists.
-      }.
+      (* TODO Jannik can solve these two for sure.
+         Some of your friends are [auto_in_fset] and [in_fsetU].
+       *)
+      - rewrite /Aux_locs/Comp_locs. admit. (* TODO please finish the proof. *)
+      - rewrite /Prim_locs_ideal/Comp_locs. admit. (* TODO please finish the proof. *)
+    Admitted.
 
-    Lemma sig_ideal_vs_att_ideal_false :
-      Att_unforg_ideal ≈₀ Aux ∘ Prim_unforg_ideal.
+    (* I suppose the below lemma works again once the above definition is properly defined. *)
+    Lemma sig_ideal_vs_att_ideal :
+      Att_ideal ≈₀ Aux_Prim_ideal.
     Proof.
       eapply eq_rel_perf_ind_eq.
       simplify_eq_rel x.
@@ -363,7 +366,7 @@ Prim_interface =
         fdisjoint LA Aux_locs →
         fdisjoint LA (Att_unforg true).(locs) →
         fdisjoint LA (Att_unforg false).(locs) →
-        (Advantage Att_unforg A <= AdvantageE Prim_ideal Prim_real (A ∘ Aux))%R.
+        (AdvantageE Att_ideal Att_real A <= AdvantageE Prim_ideal Prim_real (A ∘ Aux))%R.
     Proof.
       move => va H1 H2 H3 H4 H5.
       rewrite Advantage_E Advantage_sym.
@@ -379,7 +382,7 @@ Prim_interface =
       eapply le_trans.
       1: { exact: ineq. }
       clear ineq.
-      rewrite sig_real_vs_att_real_true.
+      rewrite sig_real_vs_att_real.
       2: simpl; exact: H4.
       2: {
         simpl.
@@ -388,7 +391,7 @@ Prim_interface =
       }
       rewrite GRing.add0r.
       rewrite [X in (_ + X <= _)%R]Advantage_sym.
-      rewrite sig_ideal_vs_att_ideal_false.
+      rewrite sig_ideal_vs_att_ideal.
       2: { simpl; exact: H5. }
       2: { rewrite fdisjointUr; apply/andP; split; assumption. }
       rewrite GRing.addr0.
