@@ -303,14 +303,19 @@ Module HeapHash.
       }
     ].
 
+    Definition Prim_real_locp := {locpackage Prim_real}.
+    Definition Prim_ideal_locp := {locpackage Prim_ideal}.
+    Definition Att_real_locp := {locpackage Att_real}.
+    Definition Att_ideal_locp := {locpackage Att_ideal}.
+
     Equations Aux_Prim_ideal : package Comp_locs [interface] Att_interface_f :=
-      Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal}.
+      Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal_locp}.
     Next Obligation.
       ssprove_valid.
       (* TODO Jannik can solve these two for sure.
          Some of your friends are [auto_in_fset] and [in_fsetU].
        *)
-      - rewrite /Aux_locs/Comp_locs. 
+      - rewrite /Aux_locs/Comp_locs.
         unfold fsubset.     
 
       admit. (* TODO please finish the proof. *)
@@ -322,7 +327,7 @@ Module HeapHash.
 
     (* I suppose the below lemma works again once the above definition is properly defined. *)
     Lemma sig_ideal_vs_att_ideal :
-      Att_ideal ≈₀ Aux_Prim_ideal.
+      Att_ideal_locp ≈₀ Aux_Prim_ideal.
     Proof.
       eapply eq_rel_perf_ind_eq.
       simplify_eq_rel x.
@@ -342,24 +347,24 @@ Module HeapHash.
 
     Theorem RA_unforg LA A :
         ValidPackage LA Att_interface A_export A →
-        fdisjoint LA (Prim_real).(locs) →
-        fdisjoint LA (Prim_ideal).(locs) →
+        fdisjoint LA (Prim_real_locp).(locs) →
+        fdisjoint LA (Prim_ideal_locp).(locs) →
         fdisjoint LA Aux_locs →
-        fdisjoint LA (Att_real).(locs) →
-        fdisjoint LA (Att_ideal).(locs) →
-        (AdvantageE Att_ideal Att_real A <= AdvantageE Prim_ideal Prim_real (A ∘ Aux))%R.
+        fdisjoint LA (Att_real_locp).(locs) →
+        fdisjoint LA (Att_ideal_locp).(locs) →
+        (AdvantageE Att_ideal_locp Att_real_locp A <= AdvantageE Aux_Prim_ideal (A ∘ Prim_real) A)%R.
     Proof.
       move => va H1 H2 H3 H4 H5.
-      rewrite Advantage_E Advantage_sym.
+      rewrite Advantage_sym.
       simpl in H1.
       simpl in H2.
       simpl in H3.
       simpl in H4.
       simpl in H5.
-      ssprove triangle (Att_unforg true) [::
-        Aux ∘ Prim_unforg true ;
-        Aux ∘ Prim_unforg false
-        ] (Att_unforg false) A as ineq.
+      ssprove triangle (Att_real_locp) [::
+        Aux ∘ Prim_real ;
+        Aux_ideal ∘ Prim_ideal
+        ] (Att_ideal_locp) A as ineq.
       eapply le_trans.
       1: { exact: ineq. }
       clear ineq.
@@ -372,7 +377,7 @@ Module HeapHash.
       }
       rewrite GRing.add0r.
       rewrite [X in (_ + X <= _)%R]Advantage_sym.
-      rewrite sig_ideal_vs_att_ideal.
+      rewrite sig_ideal_vs_att_ideal. (* Type class inference fails here. Hopefully it works once the about proofs are complete. *)
       2: { simpl; exact: H5. }
       2: { rewrite fdisjointUr; apply/andP; split; assumption. }
       rewrite GRing.addr0.
