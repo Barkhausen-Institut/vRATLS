@@ -61,16 +61,6 @@ Obligation Tactic := idtac.
 
 Require Import examples.Signature.
 
-(* Sadly, this approach being polymorphic about the heap location
-   did not work out.
-   I was unable to create a message of type [choice_type] in the RA part.
- *)
-
-
-(*
-  The below specification is complete but insufficient.
-  See the comments on the [Hash] function.
- *)
 Module HeapHash.
 
   Module Type RemoteAttestationParams <: SignatureConstraints.
@@ -138,15 +128,6 @@ Module HeapHash.
     Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
     Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc ].
 
-    (*
-      The key challenge: relate [sign_loc] and [attest_loc].
-      There are 2 approaches:
-      1) we compute a [message] (Signature Scheme) from the [state] and the [challenge] of the
-         remote attestation algorithm.
-      2) we make the type of the [sign_loc] in the Signature Scheme polymorph.
-
-      This is the second approach.
-     *)
 
     Definition Att_interface := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
@@ -160,7 +141,7 @@ Module HeapHash.
     #val #[verify_att_f] : ('challenge × 'signature) → 'bool
     ].
 
-    (* OLD VERION, NEW VERSION underneath *)
+
     Definition Att_real : package Attestation_locs_real [interface] Att_interface
     := [package
       #def  #[get_pk] (_ : 'unit) : 'pubkey
@@ -192,8 +173,6 @@ Module HeapHash.
         ret bool
       }
     ].
-
-    Definition Attestation_locs_ideal2 := fset [:: pk_loc ; sk_loc ; state_loc ; attest_loc ].
 
     Equations Att_ideal : package Attestation_locs_ideal [interface] Att_interface_f :=
     Att_ideal := [package
@@ -264,10 +243,6 @@ Module HeapHash.
         let msg := Hash state chal in
         b  ← verify (att,msg) ;;
         ret b
-        (* When I just write:
-           [verify (att,msg)]
-           Then SSProve errors out and cannot validate the package. Why?
-         *)
       }
     ].
 
@@ -297,7 +272,7 @@ Module HeapHash.
 
     (* You need to redefine [Aux] to match the import interface of [Aux] to
        the export interface of [Prim_ideal]  *)
-    Definition Aux_ideal : package Aux_locs Prim_interface_f Att_interface :=
+    Definition Aux_ideal : package Aux_locs Prim_interface_f Att_interface_f :=
     [package
       #def #[get_pk] (_ : 'unit) : 'pubkey
       {
@@ -305,7 +280,7 @@ Module HeapHash.
         ret pk
       };
 
-      #def #[attest] ( chal : 'challenge ) : ('signature × 'message)
+      #def #[attest_f] ( chal : 'challenge ) : ('signature × 'message)
       {
         #import {sig #[sign_f] : 'message  → 'signature } as sign ;;
         state ← get state_loc ;;
@@ -314,7 +289,7 @@ Module HeapHash.
         ret (att, msg)
       };
 
-      #def #[verify_att] ('(chal, att) : 'challenge × 'signature) : 'bool
+      #def #[verify_att_f] ('(chal, att) : 'challenge × 'signature) : 'bool
       {
         #import {sig #[verify_sig_f] : ('signature × 'message) → 'bool } as verify ;;
         state ← get state_loc ;;
@@ -328,15 +303,21 @@ Module HeapHash.
       }
     ].
 
-    Equations Aux_Prim_ideal : package Comp_locs [interface] Att_interface :=
+    Equations Aux_Prim_ideal : package Comp_locs [interface] Att_interface_f :=
       Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal}.
     Next Obligation.
       ssprove_valid.
       (* TODO Jannik can solve these two for sure.
          Some of your friends are [auto_in_fset] and [in_fsetU].
        *)
-      - rewrite /Aux_locs/Comp_locs. admit. (* TODO please finish the proof. *)
-      - rewrite /Prim_locs_ideal/Comp_locs. admit. (* TODO please finish the proof. *)
+      - rewrite /Aux_locs/Comp_locs. 
+        unfold fsubset.     
+
+      admit. (* TODO please finish the proof. *)
+      - rewrite /Prim_locs_ideal/Comp_locs. 
+        unfold fsubset. 
+        
+        admit. (* TODO please finish the proof. *)
     Admitted.
 
     (* I suppose the below lemma works again once the above definition is properly defined. *)
@@ -361,11 +342,11 @@ Module HeapHash.
 
     Theorem RA_unforg LA A :
         ValidPackage LA Att_interface A_export A →
-        fdisjoint LA (Prim_unforg true).(locs) →
-        fdisjoint LA (Prim_unforg false).(locs) →
+        fdisjoint LA (Prim_real).(locs) →
+        fdisjoint LA (Prim_ideal).(locs) →
         fdisjoint LA Aux_locs →
-        fdisjoint LA (Att_unforg true).(locs) →
-        fdisjoint LA (Att_unforg false).(locs) →
+        fdisjoint LA (Att_real).(locs) →
+        fdisjoint LA (Att_ideal).(locs) →
         (AdvantageE Att_ideal Att_real A <= AdvantageE Prim_ideal Prim_real (A ∘ Aux))%R.
     Proof.
       move => va H1 H2 H3 H4 H5.
