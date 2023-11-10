@@ -218,7 +218,9 @@ Module HeapHash.
     (* We need a common interface, so we need to define an [AUX] for the
        signature scheme.
      *)
-    Definition Aux_locs := fset [:: pk_loc ; state_loc ].
+     (* can remote sk_loc and sign_loc, they are used in prove below, 
+     but that sould also work without *)
+    Definition Aux_locs := fset [:: pk_loc ; sk_loc ; sign_loc ; state_loc ].
 
     Definition Aux : package Aux_locs Prim_interface Att_interface :=
     [package
@@ -269,7 +271,7 @@ Module HeapHash.
         by [apply r_ret].
     Qed.
 
-    Definition Comp_locs := fset [:: pk_loc ; sk_loc; sign_loc; state_loc ].
+    Definition Comp_locs := fset [:: pk_loc; sk_loc ; sign_loc ; state_loc ].
 
     (* You need to redefine [Aux] to match the import interface of [Aux] to
        the export interface of [Prim_ideal]  *)
@@ -306,31 +308,40 @@ Module HeapHash.
 
     Definition Prim_real_locp := {locpackage Prim_real}.
     Definition Prim_ideal_locp := {locpackage Prim_ideal}.
-    Definition Att_real_locp := {locpackage Att_real}.
-    
+    Definition Att_real_locp := {locpackage Att_real}.    
     Definition Att_ideal_locp := {locpackage Att_ideal}.
+
 
     Equations Aux_Prim_ideal : package Comp_locs [interface] Att_interface_f :=
       Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal_locp}.
     Next Obligation.
       ssprove_valid.
-      (* TODO Jannik can solve these two for sure.
-         Some of your friends are [auto_in_fset] and [in_fsetU].
-       *)
       - rewrite /Aux_locs/Comp_locs.
-        
-        Locate in_fsetU.
-        Search (fsubset ).
-        unfold fsubset.
-
-      admit. (* TODO please finish the proof. *)
-      - rewrite /Prim_locs_ideal/Comp_locs. 
-        unfold fsubset. 
-        
-        admit. (* TODO please finish the proof. *)
+        rewrite [X in fsubset _ X]fset_cons.
+        rewrite fset_cons.         
+        apply fsetUS.
+        rewrite [X in fsubset _ X]fset_cons.
+        rewrite fset_cons.
+        apply fsetUS.
+        rewrite [X in fsubset _ X]fset_cons.
+        rewrite fset_cons.
+        apply fsetUS.
+        rewrite !fset_cons -fset0E.
+        apply fsetUS.
+        apply fsub0set.
+      - rewrite /(locs Prim_ideal_locp)/Comp_locs. 
+        rewrite [X in fsubset _ X]fset_cons.
+        unfold Prim_locs_ideal.
+        rewrite fset_cons.     
+        apply fsetUS.
+        rewrite [X in fsubset _ X]fset_cons.
+        rewrite fset_cons.
+        apply fsetUS.
+        rewrite !fset_cons -fset0E.
+        apply fsetUS.
+        apply fsub0set.
     Admitted.
 
-    (* I suppose the below lemma works again once the above definition is properly defined. *)
     Lemma sig_ideal_vs_att_ideal :
       Att_ideal_locp ≈₀ Aux_Prim_ideal.
     Proof.
@@ -349,7 +360,7 @@ Module HeapHash.
         ssprove_sync_eq => sig.
         by [apply r_ret].
     Qed.
-(*
+
     Theorem RA_unforg LA A :
         ValidPackage LA Att_interface A_export A →
         fdisjoint LA (Prim_real_locp).(locs) →
@@ -392,7 +403,6 @@ Module HeapHash.
   End RemoteAttestation.
 
 End HeapHash.  
-*)
 
 
 

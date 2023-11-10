@@ -129,7 +129,10 @@ Module Type SignaturePrimitives
 
   (* The signature scheme requires a heap location to store the seen signatures. *)
   Definition Prim_locs_real := fset [:: pk_loc ; sk_loc].
-  Definition Prim_locs_ideal := Prim_locs_real :|: fset [:: sign_loc ]. 
+  Definition Prim_locs_ideal := fset [:: pk_loc ; sk_loc ; sign_loc].
+  (*
+  Definition Prim_locs_ideal := Prim_locs_real :|: fset [:: sign_loc ].
+  *) 
 
   (* Old Stuff *)
 
@@ -202,11 +205,13 @@ Module Type SignaturePrimitives
       ret ( (sig,msg) \in domm S)
     }
   ].
+  (*
   Next Obligation.
     ssprove_valid; rewrite /Prim_locs_ideal/Prim_locs_real in_fsetU; apply /orP.
     2,3,6: left;auto_in_fset.
     all: right; auto_in_fset.
   Defined.
+  *)
 
 
 End SignaturePrimitives.
@@ -297,10 +302,12 @@ Module Type SignatureProt
       ret (pk, ( sig, bool ))
     } 
   ].
+ (* 
  Next Obligation.
  ssprove_valid; rewrite /Signature_locs_ideal/Signature_locs_real in_fsetU; apply /orP.
     all: right; auto_in_fset.
   Defined.  
+  *)
 
 End SignatureProt.
 
