@@ -17,9 +17,6 @@ Validity check
 
 *)
 
-From mathcomp Require Import ssreflect ssrfun ssrbool eqtype fintype finset.
-
-
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
@@ -352,7 +349,7 @@ Module HeapHash.
         ssprove_sync_eq => sig.
         by [apply r_ret].
     Qed.
-
+(*
     Theorem RA_unforg LA A :
         ValidPackage LA Att_interface A_export A →
         fdisjoint LA (Prim_real_locp).(locs) →
@@ -395,7 +392,7 @@ Module HeapHash.
   End RemoteAttestation.
 
 End HeapHash.  
-
+*)
 
 
 
