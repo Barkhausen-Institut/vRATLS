@@ -16,6 +16,10 @@ Validity check
   *)
 
 *)
+
+From mathcomp Require Import ssreflect ssrfun ssrbool eqtype fintype finset.
+
+
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
@@ -306,6 +310,7 @@ Module HeapHash.
     Definition Prim_real_locp := {locpackage Prim_real}.
     Definition Prim_ideal_locp := {locpackage Prim_ideal}.
     Definition Att_real_locp := {locpackage Att_real}.
+    
     Definition Att_ideal_locp := {locpackage Att_ideal}.
 
     Equations Aux_Prim_ideal : package Comp_locs [interface] Att_interface_f :=
@@ -316,7 +321,10 @@ Module HeapHash.
          Some of your friends are [auto_in_fset] and [in_fsetU].
        *)
       - rewrite /Aux_locs/Comp_locs.
-        unfold fsubset.     
+        
+        Locate in_fsetU.
+        Search (fsubset ).
+        unfold fsubset.
 
       admit. (* TODO please finish the proof. *)
       - rewrite /Prim_locs_ideal/Comp_locs. 
