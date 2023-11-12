@@ -134,8 +134,6 @@ Module Type SignaturePrimitives
   Definition Prim_locs_ideal := Prim_locs_real :|: fset [:: sign_loc ].
   *) 
 
-  (* Old Stuff *)
-
   Definition Prim_interface := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
     #val #[sign] : 'message → 'signature ;
@@ -236,7 +234,8 @@ Module Type SignatureProt
 
 (* pure definition relying on primitives *)
 
-  Definition Sig_real : package Signature_locs_real Prim_interface Sig_interface
+  Definition Sig_real : package Signature_locs_real 
+    Prim_interface Sig_interface
     := [package
       #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
       {
@@ -252,7 +251,8 @@ Module Type SignatureProt
       } 
     ].
   
-    Equations Sig_ideal : package Signature_locs_ideal Prim_interface_f Sig_interface :=
+    Equations Sig_ideal : package Signature_locs_ideal Prim_interface_f 
+      Sig_interface :=
     Sig_ideal := [package
       #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
       {
@@ -267,7 +267,17 @@ Module Type SignatureProt
       } 
     ].
 
-  (* Semi-old version, 50:50 prims and protocol*)
+
+
+End SignatureProt.
+
+  (* 
+  Currently not needed
+  Semi-old version, 50:50 prims and protocol 
+  *)
+
+
+  (*
 
   Definition Sig_real2 : package Signature_locs_real Prim_interface Sig_interface
   := [package
@@ -302,12 +312,12 @@ Module Type SignatureProt
       ret (pk, ( sig, bool ))
     } 
   ].
+
+*)
  (* 
  Next Obligation.
  ssprove_valid; rewrite /Signature_locs_ideal/Signature_locs_real in_fsetU; apply /orP.
     all: right; auto_in_fset.
   Defined.  
   *)
-
-End SignatureProt.
 

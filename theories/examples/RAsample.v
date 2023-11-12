@@ -92,7 +92,7 @@ Module Protocol
 
   (* New Version *)
 
-  Definition RA_locs_real := fset [:: pk_loc ; sk_loc ; chal_loc ; state_loc].
+  Definition RA_locs_real := fset [:: pk_loc ; sk_loc ; chal_loc ; state_loc ; sign_loc ].
   Definition RA_locs_ideal := RA_locs_real :|: fset [:: attest_loc ].
 
   (* NEW VERSION *)
@@ -100,56 +100,48 @@ Module Protocol
   Definition RA_prot_interface := 
     [interface #val #[attest] : 'unit → 'pubkey × ('attest × 'bool) ].
 
-  Definition Att_prot_real : package RA_locs_real [interface] RA_prot_interface
+  (* New *)
+
+  Definition Att_prot_real : package RA_locs_real 
+     Att_interface RA_prot_interface
   := [package
     #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
     {
-      let (sk,pk) := KeyGen in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-
+      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+      #import {sig #[attest] : 'challenge → ('signature × 'message)  } as attest ;;
+      #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
+  
+      (* Protocol *)
+      pk ← get_pk tt ;;
       chal ← sample uniform i_chal ;;
-      #put chal_loc := chal ;;
-      state ← get state_loc ;;
-      let msg := Hash' state chal in
-      let sig := Sign sk msg in
-      let bool := Ver_sig pk sig msg in
-      ret (pk, ( sig, bool ))
+      '(att, msg) ← attest chal ;;
+      bool ← verify_att (chal, att) ;;
+      ret (pk, ( att, bool ))
     } 
   ].
 
-  Equations Att_prot_ideal : package RA_locs_ideal [interface] RA_prot_interface :=
-  Att_prot_ideal := [package
+  Definition Att_prot_ideal : package RA_locs_real 
+    Att_interface_f RA_prot_interface
+  := [package
     #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
     {
-      let (sk,pk) := KeyGen in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
+      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+      #import {sig #[attest_f] : 'challenge → ('signature × 'message)  } as attest ;;
+      #import {sig #[verify_att_f] : ('challenge × 'signature) → 'bool } as verify_att ;;
 
+      (* Protocol *)
+      pk ← get_pk tt ;;
       chal ← sample uniform i_chal ;;
-      #put chal_loc := chal ;;
-      state ← get state_loc ;;
-      let msg := Hash' state chal in
-      let att := Sign sk msg in
-
-      A ← get attest_loc ;;
-      let A' := setm A (att, msg) tt in
-      #put attest_loc := A' ;;
-
-      let bool := ( (att,msg) \in domm A) in
+      '(att, msg) ← attest chal ;;
+      bool ← verify_att (chal, att) ;;
       ret (pk, ( att, bool ))
     } 
-].
- Next Obligation.
- ssprove_valid; rewrite /RA_locs_ideal/RA_locs_real in_fsetU; apply /orP.
-    1,2,3,4: left; auto_in_fset.
-    1,2: right; auto_in_fset.
-  Defined.
+  ].
 
+  Definition Aux_locs := fset [:: pk_loc ; sk_loc ; state_loc ; chal_loc].
 
-  Definition Aux_locs := fset [:: pk_loc ; state_loc ; chal_loc].
-
-  Definition Aux : package Aux_locs Sig_interface RA_prot_interface :=
+  Definition Aux_prot : package Aux_locs Sig_interface 
+    RA_prot_interface :=
     [package
       #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
       {
@@ -162,44 +154,119 @@ Module Protocol
         ret (pk, ( att, bool ))
       }
     ].
+  
 
-  (* Need to change that such that interface is not empty *)  
-  Definition mkpair {Lt Lf E}
-    (t: package Lt Sig_int E) (f: package Lf Sig_inf E): loc_GamePair E :=
-    fun b => if b then {locpackage t} else {locpackage f}.
 
-  Definition Sig_prot_unforg := 
-    @mkpair Signature_locs_real Signature_locs_ideal Sig_interface
-       Sig_real Sig_ideal.
-  Definition Att_prot_unforg := 
-    @mkpair RA_locs_real RA_locs_ideal RA_prot_interface 
-       Att_prot_real Att_prot_ideal.
 
-  Lemma prot_sig_real_vs_att_real_true:
-    Att_prot_unforg true ≈₀  Aux ∘ Sig_prot_unforg true.
-  Proof.
-    eapply eq_rel_perf_ind_eq.
-    simplify_eq_rel m.
-    all: ssprove_code_simpl.
-    - 
-  Admitted.
+(*
+  Lemma att_prot_to_sig_prot_real:
+    Att_prot_real ≈₀  Aux_prot ∘ Sig_real.
+   
+    Problem:
+    In: []   Out: [Att_interface]
+    =
+    In: Prim_interface  Out: Att:interface
+    ∘
+    In: Prim_interface  Out: Prim_interface 
+   *)
 
-  Lemma prot_sig_ideal_vs_att_ideal_false :
-    Att_prot_unforg false ≈₀ Aux ∘ Sig_prot_unforg false.
-  Proof.
-  Admitted.
+  (* 
+  New "the second"
+  To have this Lemma, we want to base RA not on Att_primitives,
+  but on sig primitives directly
+  *)
 
-  Theorem RA_protunforg LA A :
-      ValidPackage LA Att_interface A_export A →
-      fdisjoint LA (Sig_prot_unforg true).(locs) →
-      fdisjoint LA (Sig_prot_unforg false).(locs) →
-      fdisjoint LA Aux_locs →
-      fdisjoint LA (Att_prot_unforg true).(locs) →
-      fdisjoint LA (Att_prot_unforg false).(locs) →
-      (Advantage Att_prot_unforg A <= 
-          AdvantageE Sig_prot_ideal Sig_prot_real (A ∘ Aux))%R.
-   Proof.
-   Admitted.
+  Definition Att_prot_real_sig : package RA_locs_real 
+     Prim_interface RA_prot_interface
+  := [package
+    #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
+    {
+      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+      #import {sig #[sign] : 'message → 'signature  } as sign ;;
+      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
+
+      (* Protocol *)
+      pk ← get_pk tt ;;      
+      state ← get state_loc ;;
+      chal ← sample uniform i_chal ;;
+      let msg := Hash state chal in
+      att ← sign msg ;;
+      bool ← verify_sig (att, msg) ;;
+      ret (pk, ( att, bool ))
+    } 
+  ].
+
+  Definition Att_prot_ideal_sig : package RA_locs_real 
+    Prim_interface_f RA_prot_interface
+  := [package
+    #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
+    {
+      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+      #import {sig #[sign_f] : 'message → 'signature  } as sign ;;
+      #import {sig #[verify_sig_f] : ('signature × 'message) → 'bool } as verify_sig ;;
+
+      (* Protocol *)
+      pk ← get_pk tt ;;
+      state ← get state_loc ;;
+      chal ← sample uniform i_chal ;;
+      let msg := Hash state chal in
+      att ← sign msg ;;
+      bool ← verify_sig (att, msg) ;;
+      ret (pk, ( att, bool ))
+    } 
+  ].
+
+  Definition Aux_protp := {locpackage Aux_prot}.
+  Definition Sig_realp := {locpackage Sig_real}.
+
+  Definition Comp_locs := fset [:: pk_loc; sk_loc ; state_loc; chal_loc ].
+
+
+  Equations test : package Comp_locs Prim_interface RA_prot_interface :=
+    test := {package Aux_protp ∘ Sig_realp}.
+  Next Obligation.
+  ssprove_valid.
+  - rewrite /(locs Aux_protp)/Comp_locs.
+    rewrite [X in fsubset _ X]fset_cons.
+    unfold Aux_locs.
+    rewrite fset_cons.
+    apply fsetUS.
+    rewrite [X in fsubset _ X]fset_cons.
+    rewrite fset_cons.
+    apply fsetUS.
+    rewrite [X in fsubset _ X]fset_cons.
+    rewrite fset_cons.
+    apply fsetUS.
+    rewrite !fset_cons -fset0E.
+    apply fsetUS.
+    apply fsub0set.
+  - rewrite /(locs Sig_realp)/Comp_locs.
+    rewrite [X in fsubset _ X]fset_cons.
+    unfold Signature_locs_real.
+    unfold Prim_locs_real.
+    rewrite fset_cons.
+    apply fsetUS.
+    rewrite [X in fsubset _ X]fset_cons.
+    rewrite fset_cons.
+    apply fsetUS.
+    rewrite !fset_cons -fset0E.
+    apply fsub0set.
+  Defined.
+  (*
+  Lemma att_prot_to_sig_prot_real:
+    Att_prot_real ≈₀  test.
+  *)
+
+  Definition Att_prot_real_sigp := {locpackage Att_prot_real_sig}.
+
+  
+  Lemma att_prot_to_sig_prot_real:
+   Att_prot_real_sigp ≈₀ test.
+
+
+
+
+  
   
 
 
