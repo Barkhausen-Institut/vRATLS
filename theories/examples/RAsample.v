@@ -121,13 +121,13 @@ Module Protocol
   ].
 
   Definition Att_prot_ideal : package RA_locs_real 
-    Att_interface_f RA_prot_interface
+    Att_interface RA_prot_interface
   := [package
     #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
     {
       #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-      #import {sig #[attest_f] : 'challenge → ('signature × 'message)  } as attest ;;
-      #import {sig #[verify_att_f] : ('challenge × 'signature) → 'bool } as verify_att ;;
+      #import {sig #[attest] : 'challenge → ('signature × 'message)  } as attest ;;
+      #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
 
       (* Protocol *)
       pk ← get_pk tt ;;
