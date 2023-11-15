@@ -141,10 +141,10 @@ Module Type SignaturePrimitives
   ].
 
   Definition Prim_interface_f := [interface
-  #val #[get_pk] : 'unit → 'pubkey ;
-  #val #[sign_f] : 'message → 'signature ;
-  #val #[verify_sig_f] : ('signature × 'message) → 'bool
-].
+    #val #[get_pk] : 'unit → 'pubkey ;
+    #val #[sign_f] : 'message → 'signature ;
+    #val #[verify_sig_f] : ('signature × 'message) → 'bool
+  ].
 
   Definition Prim_real : package Prim_locs_real [interface] Prim_interface
   := [package

@@ -95,17 +95,15 @@ Module Protocol
   Definition RA_locs_real := fset [:: pk_loc ; sk_loc ; chal_loc ; state_loc ; sign_loc ].
   Definition RA_locs_ideal := RA_locs_real :|: fset [:: attest_loc ].
 
-  (* NEW VERSION *)
+  Definition att : nat := 50.
 
   Definition RA_prot_interface := 
-    [interface #val #[attest] : 'unit → 'pubkey × ('attest × 'bool) ].
-
-  (* New *)
+    [interface #val #[att] : 'unit → 'pubkey × ('attest × 'bool) ].
 
   Definition Att_prot_real : package RA_locs_real 
      Att_interface RA_prot_interface
   := [package
-    #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
+    #def  #[att] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
     {
       #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
       #import {sig #[attest] : 'challenge → ('signature × 'message)  } as attest ;;
@@ -123,7 +121,7 @@ Module Protocol
   Definition Att_prot_ideal : package RA_locs_real 
     Att_interface RA_prot_interface
   := [package
-    #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
+    #def  #[att] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
     {
       #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
       #import {sig #[attest] : 'challenge → ('signature × 'message)  } as attest ;;
@@ -143,7 +141,7 @@ Module Protocol
   Definition Aux_prot : package Aux_locs Sig_interface 
     RA_prot_interface :=
     [package
-      #def  #[attest] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
+      #def  #[att] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
       {
         #import {sig #[sign] : 'message → 'pubkey × ('signature × 'bool)}  as sign ;;
         state ← get state_loc ;;
@@ -153,22 +151,63 @@ Module Protocol
         let '(pk, ( att, bool )) := sig in
         ret (pk, ( att, bool ))
       }
-    ].
+    ]. 
+
+  Definition Aux_protp := {locpackage Aux_prot}.
+  Definition Sig_realp := {locpackage Sig_real}.
+  Definition Att_prot_real_p := {locpackage Att_prot_real}.
   
+  Definition Comp_locs := fset [:: pk_loc; sk_loc ; state_loc; chal_loc ].
+  
+  
+  Equations test : package Comp_locs Prim_interface RA_prot_interface :=
+    test := {package Aux_protp ∘ Sig_realp}.
+  Next Obligation.
+    ssprove_valid.
+    - rewrite /(locs Aux_protp)/Comp_locs.
+      rewrite [X in fsubset _ X]fset_cons.
+      unfold Aux_locs.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite [X in fsubset _ X]fset_cons.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite [X in fsubset _ X]fset_cons.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite !fset_cons -fset0E.
+      apply fsetUS.
+      apply fsub0set.
+    - rewrite /(locs Sig_realp)/Comp_locs.
+      rewrite [X in fsubset _ X]fset_cons.
+      unfold Signature_locs_real.
+      unfold Prim_locs_real.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite [X in fsubset _ X]fset_cons.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite !fset_cons -fset0E.
+      apply fsub0set.
+    Defined.
 
-
-
-(*
   Lemma att_prot_to_sig_prot_real:
-    Att_prot_real ≈₀  Aux_prot ∘ Sig_real.
+    Att_prot_real_p ≈₀ Att_prot_ideal_p.
+
+
+
+  
+  Lemma att_prot_to_sig_prot_real:
+    Att_prot_real_p ≈₀ test.
    
+(*
     Problem:
-    In: []   Out: [Att_interface]
+    In: Att_int  Out: [RA_Prot_interface]
     =
-    In: Prim_interface  Out: Att:interface
+    In: Sig_interface  Out: RA_prot_interface
     ∘
-    In: Prim_interface  Out: Prim_interface 
-   *)
+    In: Prim_interface  Out: Sig_interface 
+*)
 
   (* 
   New "the second"

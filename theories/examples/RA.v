@@ -104,11 +104,6 @@ Module HeapHash.
     Definition attest       : nat := 48. 
     Definition attest_f     : nat := 49.
 
-
-    (*
-      FIXME this hash function spec is insufficient.
-      It allows to discard one of the arguments and just return the other as message!
-     *)
     Parameter Hash : chState -> chChallenge -> chMessage.
 
   End RemoteAttestationAlgorithms.
@@ -122,7 +117,6 @@ Module HeapHash.
 
     Import π1 π2 π3 π4 π5.
 
-
     (* The remote attestation protocol does the same as the signature scheme, i.e.,
        it stores the attestations handed out.
      *)
@@ -135,14 +129,6 @@ Module HeapHash.
     #val #[attest] : 'challenge → ('signature × 'message) ;
     #val #[verify_att] : ('challenge × 'signature) → 'bool
     ].
-
-    (*
-    Definition Att_interface_f := [interface
-    #val #[get_pk] : 'unit → 'pubkey ;
-    #val #[attest_f] : 'challenge → ('signature × 'message) ;
-    #val #[verify_att_f] : ('challenge × 'signature) → 'bool
-    ].
-     *)
 
     Definition Att_real : package Attestation_locs_real [interface] 
       Att_interface
@@ -199,6 +185,7 @@ Module HeapHash.
         let msg := Hash s chal in
         let att := Sign sk msg in
         #put attest_loc := setm A ( att, msg ) tt ;;
+        (* #put attest_loc := setm A ( att, (chal, s) ) tt ;; *)
         ret (att, msg)
       };
 
@@ -222,7 +209,7 @@ Module HeapHash.
     (* We need a common interface, so we need to define an [AUX] for the
        signature scheme.
      *)
-     (* can remote sk_loc and sign_loc, they are used in prove below, 
+     (* can remove sk_loc and sign_loc, they are used in prove below, 
      but that sould also work without *)
     Definition Aux_locs := fset [:: pk_loc ; sk_loc ; sign_loc ; state_loc ].
 
@@ -415,27 +402,306 @@ Module HeapHash.
 
   End RemoteAttestation.
 
+  (* ############################################################################################## *)
+  (* ############################################################################################## *)
+  (* ############################################################################################## *)
+
+  Module Type RemoteAttestationHash
+  (π1 : SignatureParams)
+  (π2 : RemoteAttestationParams)
+  (π3 : SignatureAlgorithms π1 π2)
+  (π4 : RemoteAttestationAlgorithms π1 π2 π3)
+  (π5 : SignaturePrimitives π1 π2 π3).
+
+  Import π1 π2 π3 π4 π5.
+
+  Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
+  Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc ].
+
+  Definition Att_interface := [interface
+  #val #[get_pk] : 'unit → 'pubkey ;
+  #val #[attest] : 'challenge → ('signature × 'message) ;
+  #val #[verify_att] : ('challenge × 'signature) → 'bool
+  ].
+
+  Definition Att_real : package Attestation_locs_real [interface] 
+    Att_interface
+  := [package
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    {
+      pk ← get pk_loc  ;;
+      ret pk
+    };
+
+    #def #[attest] (chal : 'challenge) : ('signature × 'message)
+    {
+      state ← get state_loc ;;
+      let (sk,pk) := KeyGen in
+    (*
+    '(sk,pk) ← KeyGen ;;
+    *)
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+      let msg := Hash state chal in
+      let att := Sign sk msg in
+      ret (att, msg)
+    };
+
+    #def #[verify_att] ('(chal, att) : ('challenge × 'signature)) : 'bool
+    {
+      pk ← get pk_loc ;;
+      state ← get state_loc ;;
+      let msg := Hash state chal in
+      let bool := Ver_sig pk att msg in
+      ret bool
+    }
+  ].
+
+  Definition hash_loc  : Location := ('set  (chChallenge × chState) ; 2%N).
+
+  Definition Attestation_locs_ideal_hash := Attestation_locs_real :|: fset [:: attest_loc ; hash_loc ].
+
+  Equations Att_ideal : package Attestation_locs_ideal_hash [interface] Att_interface :=
+  Att_ideal := [package
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    {
+      pk ← get pk_loc ;;
+      ret pk
+    };
+
+    #def #[attest] (chal : 'challenge) : ('signature × 'message)
+    {
+      A ← get attest_loc ;;
+      H ← get hash_loc ;;
+      state ← get state_loc ;;
+      let (sk,pk) := KeyGen in
+      (*
+      '(sk,pk) ← KeyGen ;;
+      *)
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+      let msg := Hash state chal in
+      let att := Sign sk msg in
+      #put attest_loc := setm A ( att, msg ) tt ;;
+      #put hash_loc   := setm H (chal, state) tt ;;
+      ret (att, msg)
+    };
+
+    #def #[verify_att] ('(chal, att) : ('challenge × 'attest)) : 'bool
+    {
+      A ← get attest_loc ;;
+      H ← get hash_loc ;;
+      state ← get state_loc ;;
+      let msg := Hash state chal in
+      let b1 :=  (chal, state) \in domm H in
+      if (b1 == false) 
+        then ret false
+      else 
+        let b :=  (att, msg) \in domm A in
+        ret b
+    }
+  ].
+  Next Obligation.
+    ssprove_valid; rewrite /Attestation_locs_ideal_hash/Attestation_locs_real in_fsetU; apply /orP.
+    1,2,4,5,9,10: right;auto_in_fset.
+    all: left; auto_in_fset.
+  Defined.
+
+  (* We need a common interface, so we need to define an [AUX] for the
+     signature scheme.
+  Definition Aux_locs := fset [:: pk_loc  ; state_loc ]. *)
+
+  Definition Aux_locs := fset [:: pk_loc ; sk_loc ; sign_loc ; state_loc ].
+
+  Definition Aux : package Aux_locs Prim_interface Att_interface :=
+  [package
+    #def #[get_pk] (_ : 'unit) : 'pubkey
+    {
+      pk ← get pk_loc ;;
+      ret pk
+    };
+
+    #def #[attest] ( chal : 'challenge ) : ('signature × 'message)
+    {
+      #import {sig #[sign] : 'message  → 'signature } as sign ;;
+      state ← get state_loc ;;
+      let msg := Hash state chal in
+      att ← sign msg ;;
+      ret (att, msg)
+    };
+
+    #def #[verify_att] ('(chal, att) : 'challenge × 'signature) : 'bool
+    {
+      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
+      state ← get state_loc ;;
+      let msg := Hash state chal in
+      b  ← verify (att,msg) ;;
+      ret b
+    }
+  ].
+
+  Lemma sig_real_vs_att_real:
+    Att_real ≈₀ Aux ∘ Prim_real.
+  Proof.
+    eapply eq_rel_perf_ind_eq.
+    simplify_eq_rel x.
+    all: ssprove_code_simpl.
+    - eapply rpost_weaken_rule.
+      1: eapply rreflexivity_rule.
+      move => [a1 h1] [a2 h2] [Heqa Heqh].
+      intuition auto.
+    - destruct x.
+      ssprove_sync_eq => state.
+      do 2! ssprove_sync_eq.
+      by [apply r_ret].
+    - case x => s s0.
+      case s => s1 s2.
+      ssprove_swap_lhs 0.
+      ssprove_sync_eq => state.
+      ssprove_sync_eq => pk.
+      by [apply r_ret].
+  Qed.
+
+  Definition Comp_locs := fset [:: pk_loc; sk_loc ; sign_loc ; state_loc ].
+
+  (* You need to redefine [Aux] to match the import interface of [Aux] to
+     the export interface of [Prim_ideal]  *)
+  Definition Aux_ideal : package Aux_locs Prim_interface_f Att_interface :=
+  [package
+    #def #[get_pk] (_ : 'unit) : 'pubkey
+    {
+      pk ← get pk_loc ;;
+      ret pk
+    };
+
+    #def #[attest] ( chal : 'challenge ) : ('signature × 'message)
+    {
+      #import {sig #[sign_f] : 'message  → 'signature } as sign ;;
+      state ← get state_loc ;;
+      let msg := Hash state chal in
+      att ← sign msg ;;
+      ret (att, msg)
+    };
+
+    #def #[verify_att] ('(chal, att) : 'challenge × 'signature) : 'bool
+    {
+      #import {sig #[verify_sig_f] : ('signature × 'message) → 'bool } as verify ;;
+      state ← get state_loc ;;
+      let msg := Hash state chal in
+      b  ← verify (att,msg) ;;
+      ret b
+    }
+  ].
+
+  Definition Prim_real_locp := {locpackage Prim_real}.
+  Definition Prim_ideal_locp := {locpackage Prim_ideal}.
+  Definition Att_real_locp := {locpackage Att_real}.
+  Definition Att_ideal_locp := {locpackage Att_ideal}.
+
+
+  Equations Aux_Prim_ideal : package Comp_locs [interface] Att_interface :=
+    Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal_locp}.
+  Next Obligation.
+    ssprove_valid.
+    - rewrite /Aux_locs/Comp_locs.
+      rewrite [X in fsubset _ X]fset_cons.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite [X in fsubset _ X]fset_cons.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite [X in fsubset _ X]fset_cons.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite !fset_cons -fset0E.
+      apply fsetUS.
+      apply fsub0set.
+    - rewrite /(locs Prim_ideal_locp)/Comp_locs. 
+      rewrite [X in fsubset _ X]fset_cons.
+      unfold Prim_locs_ideal.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite [X in fsubset _ X]fset_cons.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite !fset_cons -fset0E.
+      apply fsetUS.
+      apply fsub0set.
+  Defined.
+
+  Lemma sig_ideal_vs_att_ideal :
+    Att_ideal_locp ≈₀ Aux_Prim_ideal.
+  Proof.
+    eapply eq_rel_perf_ind_eq.
+    simplify_eq_rel x.
+    all: ssprove_code_simpl.
+    - ssprove_sync_eq => pk_loc.
+      by [apply r_ret].
+    - ssprove_swap_lhs 0; ssprove_sync_eq => state.
+      do 2! (ssprove_swap_lhs 0; ssprove_sync_eq).
+      ssprove_sync_eq => sig.
+      ssprove_sync_eq.
+      by [apply r_ret].
+    - case x => a b.
+      ssprove_swap_lhs 0; ssprove_sync_eq => state.
+      ssprove_sync_eq => sig.
+      by [apply r_ret].
+  Qed.
+
+  Theorem RA_unforg LA A :
+      ValidPackage LA Att_interface A_export A →
+      fdisjoint LA (Prim_real_locp).(locs) →
+      fdisjoint LA (Prim_ideal_locp).(locs) →
+      fdisjoint LA Aux_locs →
+      fdisjoint LA (Att_real_locp).(locs) →
+      fdisjoint LA (Att_ideal_locp).(locs) →
+      (AdvantageE Att_ideal_locp Att_real_locp A <= AdvantageE Aux_Prim_ideal (Aux ∘ Prim_real_locp) A)%R.
+  Proof.
+    move => va H1 H2 H3 H4 H5.
+    rewrite Advantage_sym.
+    simpl in H1.
+    simpl in H2.
+    simpl in H3.
+    simpl in H4.
+    simpl in H5.
+    ssprove triangle (Att_real_locp) [::
+      Aux ∘ Prim_real_locp ;
+      Aux_ideal ∘ Prim_ideal_locp
+      ] (Att_ideal_locp) A as ineq.
+    eapply le_trans.
+    1: { exact: ineq. }
+    clear ineq.
+    rewrite sig_real_vs_att_real.
+    2: simpl; exact: H4.
+    2: {
+      simpl.
+      rewrite fdisjointUr.
+      apply/andP; split; assumption.
+    }
+    rewrite GRing.add0r.
+    rewrite [X in (_ + X <= _)%R]Advantage_sym.
+
+    (* Set Typeclasses Debug Verbosity 2. *)
+
+    rewrite sig_ideal_vs_att_ideal.
+    (* Type class resolution failed because of the [Att_interface_f].
+       Both advantages need to be on the same interface!
+     *)
+    2: { simpl; exact: H5. }
+    2: { rewrite /Comp_locs.
+         rewrite /Aux_locs in H3. exact H3.
+         (* rewrite fdisjointUr; apply/andP; split; assumption.*) }
+    rewrite GRing.addr0.
+    rewrite /Aux_Prim_ideal.
+    by [rewrite (* -Advantage_link *) Advantage_sym].
+  Qed.
+
+End RemoteAttestationHash.
+
+
+
 End HeapHash.
 
-
-
-
-
-
-(* ------------------------------------------------------------------------- *)
-
-(** We need a specification for remote attestation that
-    carves out the properties of the [Hash] function.
-
-   Two approaches (may) exist:
-   [HeapHashAltAlgo] We leave the heap structures equal with respect to the
-      signature scheme and try to change the spec of the algorithms
-      such as [verify_att] in the ideal case accordingly.
-   [NoHeapHash] We write the attestation spec pretending that
-      we are not aware of the heaps of the signature scheme.
-      That is, we store the [(challenge,state)] tuple insted of the
-      already hashed [msg].
- *)
 
 
 
