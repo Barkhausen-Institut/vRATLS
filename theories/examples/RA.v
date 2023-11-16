@@ -456,12 +456,11 @@ Module HeapHash.
       ret bool
     }
   ].
+  
+  Definition attest_loc  : Location := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
 
-  Definition hash_loc  : Location := ('set  (chChallenge × chState) ; 2%N).
 
-  Definition Attestation_locs_ideal_hash := Attestation_locs_real :|: fset [:: attest_loc ; hash_loc ].
-
-  Equations Att_ideal : package Attestation_locs_ideal_hash [interface] Att_interface :=
+  Equations Att_ideal : package Attestation_locs_ideal [interface] Att_interface :=
   Att_ideal := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     {
@@ -472,7 +471,6 @@ Module HeapHash.
     #def #[attest] (chal : 'challenge) : ('signature × 'message)
     {
       A ← get attest_loc ;;
-      H ← get hash_loc ;;
       state ← get state_loc ;;
       let (sk,pk) := KeyGen in
       (*
@@ -482,28 +480,22 @@ Module HeapHash.
       #put sk_loc := sk ;;
       let msg := Hash state chal in
       let att := Sign sk msg in
-      #put attest_loc := setm A ( att, msg ) tt ;;
-      #put hash_loc   := setm H (chal, state) tt ;;
+      #put attest_loc := setm A (att, msg, state, chal) tt ;;
       ret (att, msg)
     };
 
     #def #[verify_att] ('(chal, att) : ('challenge × 'attest)) : 'bool
     {
       A ← get attest_loc ;;
-      H ← get hash_loc ;;
       state ← get state_loc ;;
-      let msg := Hash state chal in
-      let b1 :=  (chal, state) \in domm H in
-      if (b1 == false) 
-        then ret false
-      else 
-        let b :=  (att, msg) \in domm A in
-        ret b
+      let msg := Hash state chal in 
+      let b :=  (att, msg, state, chal) \in domm A in
+      ret b
     }
   ].
   Next Obligation.
-    ssprove_valid; rewrite /Attestation_locs_ideal_hash/Attestation_locs_real in_fsetU; apply /orP.
-    1,2,4,5,9,10: right;auto_in_fset.
+    ssprove_valid; rewrite /Attestation_locs_ideal/Attestation_locs_real in_fsetU; apply /orP.
+    1,3,7: right; auto_in_fset.
     all: left; auto_in_fset.
   Defined.
 
