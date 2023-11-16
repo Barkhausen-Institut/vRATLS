@@ -415,8 +415,10 @@ Module HeapHash.
 
   Import π1 π2 π3 π4 π5.
 
+  Definition attest_loc_long  : Location := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
+
   Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
-  Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc ].
+  Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc_long ].
 
   Definition Att_interface := [interface
   #val #[get_pk] : 'unit → 'pubkey ;
@@ -456,9 +458,6 @@ Module HeapHash.
       ret bool
     }
   ].
-  
-  Definition attest_loc  : Location := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
-
 
   Equations Att_ideal : package Attestation_locs_ideal [interface] Att_interface :=
   Att_ideal := [package
@@ -470,7 +469,7 @@ Module HeapHash.
 
     #def #[attest] (chal : 'challenge) : ('signature × 'message)
     {
-      A ← get attest_loc ;;
+      A ← get attest_loc_long ;;
       state ← get state_loc ;;
       let (sk,pk) := KeyGen in
       (*
@@ -480,13 +479,13 @@ Module HeapHash.
       #put sk_loc := sk ;;
       let msg := Hash state chal in
       let att := Sign sk msg in
-      #put attest_loc := setm A (att, msg, state, chal) tt ;;
+      #put attest_loc_long := setm A (att, msg, state, chal) tt ;;
       ret (att, msg)
     };
 
     #def #[verify_att] ('(chal, att) : ('challenge × 'attest)) : 'bool
     {
-      A ← get attest_loc ;;
+      A ← get attest_loc_long ;;
       state ← get state_loc ;;
       let msg := Hash state chal in 
       let b :=  (att, msg, state, chal) \in domm A in
