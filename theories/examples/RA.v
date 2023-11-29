@@ -211,7 +211,8 @@ Module HeapHash.
      *)
      (* can remove sk_loc and sign_loc, they are used in prove below, 
      but that sould also work without *)
-    Definition Aux_locs := fset [:: pk_loc ; sk_loc ; sign_loc ; state_loc ].
+    Definition Aux_locs := fset [:: pk_loc ; state_loc ].
+
 
     Definition Aux : package Aux_locs Prim_interface Att_interface :=
     [package
@@ -307,19 +308,20 @@ Module HeapHash.
       Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal_locp}.
     Next Obligation.
       ssprove_valid.
+      
       - rewrite /Aux_locs/Comp_locs.
         rewrite [X in fsubset _ X]fset_cons.
         rewrite fset_cons.
         apply fsetUS.
-        rewrite [X in fsubset _ X]fset_cons.
-        rewrite fset_cons.
-        apply fsetUS.
-        rewrite [X in fsubset _ X]fset_cons.
-        rewrite fset_cons.
-        apply fsetUS.
-        rewrite !fset_cons -fset0E.
-        apply fsetUS.
-        apply fsub0set.
+        rewrite !fset_cons.
+        apply fsubsetU ; apply /orP ; right.
+        rewrite fsubUset ; apply /andP ; split.
+        -- apply fsubsetU ; apply /orP ; right.
+           apply fsubsetU ; apply /orP ; left.
+           apply fsubsetxx.
+        -- apply fsubsetU ; apply /orP ; right.
+           apply fsubsetU ; apply /orP ; right.
+           apply fsubsetxx.
       - rewrite /(locs Prim_ideal_locp)/Comp_locs. 
         rewrite [X in fsubset _ X]fset_cons.
         unfold Prim_locs_ideal.
@@ -352,6 +354,7 @@ Module HeapHash.
         by [apply r_ret].
     Qed.
 
+    (*
     Theorem RA_unforg LA A :
         ValidPackage LA Att_interface A_export A →
         fdisjoint LA (Prim_real_locp).(locs) →
@@ -399,6 +402,7 @@ Module HeapHash.
       rewrite /Aux_Prim_ideal.
       by [rewrite (* -Advantage_link *) Advantage_sym].
     Qed.
+    *)
 
   End RemoteAttestation.
 
@@ -499,10 +503,10 @@ Module HeapHash.
   Defined.
 
   (* We need a common interface, so we need to define an [AUX] for the
-     signature scheme.
-  Definition Aux_locs := fset [:: pk_loc  ; state_loc ]. *)
+     signature scheme.*)
+  Definition Aux_locs := fset [:: pk_loc  ; state_loc ]. 
 
-  Definition Aux_locs := fset [:: pk_loc ; sk_loc ; sign_loc ; state_loc ].
+  (*Definition Aux_locs := fset [:: pk_loc ; sk_loc ; sign_loc ; state_loc ]. *)
 
   Definition Aux : package Aux_locs Prim_interface Att_interface :=
   [package
@@ -599,27 +603,22 @@ Module HeapHash.
       rewrite fset_cons.
       apply fsetUS.
       rewrite [X in fsubset _ X]fset_cons.
-      rewrite fset_cons.
+      rewrite !fset_cons.
+      apply fsubsetU ; apply /orP ; right.
       apply fsetUS.
-      Search in_fsetU.
-      Search (fset -> fset).
-      rewrite [X in fsubset _ X]fset_cons.
-      rewrite fset_cons.
-      apply fsetUS.
-      rewrite !fset_cons -fset0E.
-      apply fsetUS.
-      apply fsub0set.
+      apply fsubsetU ; apply /orP ; right.
+      apply fsubsetxx.
     - rewrite /(locs Prim_ideal_locp)/Comp_locs. 
       rewrite [X in fsubset _ X]fset_cons.
       unfold Prim_locs_ideal.
       rewrite fset_cons.
       apply fsetUS.
       rewrite [X in fsubset _ X]fset_cons.
-      rewrite fset_cons.
+      rewrite !fset_cons.
       apply fsetUS.
-      rewrite !fset_cons -fset0E.
+      apply fsubsetU ; apply /orP ; right.
       apply fsetUS.
-      apply fsub0set.
+      apply fsubsetxx.      
   Defined.
 
   Definition Att_ideal_locp_heap := Attestation_locs_ideal.
