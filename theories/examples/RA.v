@@ -72,9 +72,9 @@ Module HeapHash.
     Definition chMessage   : choice_type := 'fin (mkpos pos_n).
 
     Parameter Challenge : finType.
-     Parameter Challenge_pos : Positive #|Challenge|.
-     #[local] Existing Instance Challenge_pos.
-     Definition chChallenge := 'fin #|Challenge|.
+    Parameter Challenge_pos : Positive #|Challenge|.
+    #[local] Existing Instance Challenge_pos.
+    Definition chChallenge := 'fin #|Challenge|.
      
 
   End RemoteAttestationParams.
@@ -553,7 +553,7 @@ Module HeapHash.
       by [apply r_ret].
   Qed.
 
-  Definition Comp_locs := fset [:: pk_loc; sk_loc ; sign_loc ; state_loc ].
+  Definition Comp_locs := fset [:: pk_loc; sk_loc ; state_loc ; sign_loc ].
 
   (* You need to redefine [Aux] to match the import interface of [Aux] to
      the export interface of [Prim_ideal]  *)
@@ -601,6 +601,8 @@ Module HeapHash.
       rewrite [X in fsubset _ X]fset_cons.
       rewrite fset_cons.
       apply fsetUS.
+      Search in_fsetU.
+      Search (fset -> fset).
       rewrite [X in fsubset _ X]fset_cons.
       rewrite fset_cons.
       apply fsetUS.
@@ -620,6 +622,15 @@ Module HeapHash.
       apply fsub0set.
   Defined.
 
+  Definition Att_ideal_locp_heap := Attestation_locs_ideal.
+  Definition Aux_prim_ideal_heap := Comp_locs.
+
+  Definition heap_prop : Att_ideal_locp_heap -> Aux_prim_ideal_heap -> Prop.
+  (* 
+  pattern match der Listen,
+  Use hash function to clarify difference between them
+  *)
+  
   Lemma sig_ideal_vs_att_ideal :
     Att_ideal_locp ≈₀ Aux_Prim_ideal.
   Proof.

@@ -112,6 +112,8 @@ Module Type SignaturePrimitives
 
   Notation " 'pubkey "    := PubKey      (in custom pack_type at level 2).
   Notation " 'pubkey "    := PubKey      (at level 2): package_scope.
+  Notation " 'seckey "    := SecKey      (in custom pack_type at level 2).
+  Notation " 'seckey "    := SecKey      (at level 2): package_scope.
   Notation " 'signature " := Signature   (in custom pack_type at level 2).
   Notation " 'signature " := Signature   (at level 2): package_scope.
   Notation " 'message "   := chMessage     (in custom pack_type at level 2).
@@ -138,12 +140,6 @@ Module Type SignaturePrimitives
     #val #[get_pk] : 'unit → 'pubkey ;
     #val #[sign] : 'message → 'signature ;
     #val #[verify_sig] : ('signature × 'message) → 'bool
-  ].
-
-  Definition Prim_interface_f := [interface
-    #val #[get_pk] : 'unit → 'pubkey ;
-    #val #[sign_f] : 'message → 'signature ;
-    #val #[verify_sig_f] : ('signature × 'message) → 'bool
   ].
 
   Definition Prim_real : package Prim_locs_real [interface] Prim_interface
@@ -174,7 +170,7 @@ Module Type SignaturePrimitives
     }
   ].
 
-  Equations Prim_ideal : package Prim_locs_ideal [interface] Prim_interface_f :=
+  Equations Prim_ideal : package Prim_locs_ideal [interface] Prim_interface :=
   Prim_ideal := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     {
@@ -182,7 +178,7 @@ Module Type SignaturePrimitives
       ret pk
     };
 
-    #def #[sign_f] ( 'msg : 'message ) : 'signature
+    #def #[sign] ( 'msg : 'message ) : 'signature
     {
     let (sk,pk) := KeyGen in
     (*
@@ -197,7 +193,7 @@ Module Type SignaturePrimitives
       ret sig
     };
 
-    #def #[verify_sig_f] ( '(sig,msg) : 'signature × 'message) : 'bool
+    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
     {
       S ← get sign_loc ;;
       ret ( (sig,msg) \in domm S)
@@ -210,7 +206,6 @@ Module Type SignaturePrimitives
     all: right; auto_in_fset.
   Defined.
   *)
-
 
 End SignaturePrimitives.
 
@@ -251,14 +246,14 @@ Module Type SignatureProt
       } 
     ].
   
-    Equations Sig_ideal : package Signature_locs_ideal Prim_interface_f 
+    Equations Sig_ideal : package Signature_locs_ideal Prim_interface 
       Sig_interface :=
     Sig_ideal := [package
       #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
       {
         #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-        #import {sig #[sign_f] : 'message → 'signature  } as sign ;;
-        #import {sig #[verify_sig_f] : ('signature × 'message) → 'bool } as verify_sig ;;
+        #import {sig #[sign] : 'message → 'signature  } as sign ;;
+        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
         (* Protocol *)
         pk ← get_pk tt ;;
         sig ← sign msg ;;
@@ -267,9 +262,112 @@ Module Type SignatureProt
       } 
     ].
 
-
-
 End SignatureProt.
+
+Module Type ExistentialUnforgeability
+  (π1 : SignatureParams)
+  (π2 : SignatureConstraints)
+  (Alg : SignatureAlgorithms π1 π2)
+  (Prim : SignaturePrimitives π1 π2 Alg).
+
+  Import π1.
+  Import π2.
+  Import Alg.
+  Import Prim.
+
+   (* Beginning of EU-CMA Definintion*)
+   Definition sign_oracle_loc    : Location := ('set ('signature × 'message); 1%N).
+ 
+   Definition Oracle_locs := fset [:: sk_loc ; sign_oracle_loc ].
+   
+   Definition SignOracle (msg : chMessage) :
+     code Oracle_locs [interface] 'signature :=
+     { code 
+       sk ← get sk_loc ;;
+       let sig := Sign sk msg in
+       S ← get sign_oracle_loc ;;
+       let S' := setm S (sig, msg) tt in
+       #put sign_oracle_loc := S' ;;
+       ret sig
+     }.
+
+  (*
+  Variable A : PubKey -> 
+      OracleComp Message Signature (Message * Signature).
+ 
+  Definition UF_CMA_G :=
+    [pri, pub] <-$2 KeyGen;
+    [m, s, ls] <-$3 A pub _ _ (SignOracle pri) nil;
+    ret (if (in_dec (EqDec_dec _) m ls) then false else
+    (Verify pub m s)).  
+
+  Definition UF_CMA_Advantage :=
+    Pr[UF_CMA_G].
+  *)
+  
+  Definition sign_oracle : nat := 48.
+  Definition ex_unforge : nat := 48.
+
+  Definition OA_interface := [interface
+    #val #[sign_oracle] : 'message → 'signature
+  ].
+
+  Definition Sign_oracle : package Oracle_locs [interface] OA_interface
+    := [package
+      #def  #[sign_oracle] (msg : 'message) : 'signature
+      {
+        sig ← SignOracle msg ;;
+        ret sig
+      } 
+  ].
+
+  Definition forgery : nat := 49.
+
+  Definition UF_interface := [interface
+    #val #[forgery] : 'unit → 'signature
+  ].
+
+  Definition UF_locs := fset [:: sk_loc ; sign_oracle_loc ; pk_loc].
+
+  (* 
+  This is not meant to compile yet.
+  I've started to collect Ideas of how to prove ex-unforge in SSProve
+  *)
+(*
+  Definition UF_CMA_g : package UF_locs OA_interface UF_interface 
+  := [package
+    #def  #[ex_unforge] (msg : 'message) : 'signature
+    { 
+      #import {sig #[sign_oracle] : 'message → 'signature } as sign_oracle ;;
+      let '(sk,pk) := KeyGen in
+      (* missing: where does the message come from? *)
+      S ← sign_oracle msg ;; (* looks like we only generate one (sig, msg) pair*)
+      (* want to ret the set S, which is then input to the Verify_code.*)
+      (msg, sig) ← Forge_signature pk ;;                                                 || This is missing
+      ret Verify (S, msg, sig)                                                          || This is also missing
+    }
+  ].
+*)
+
+(* 
+  Definition negligible(f : nat -> Rat) :=                                     || they use their own definiton for rational numbers
+  forall c, exists n, forall x (pf_nz : nz x),
+    x > n ->
+    ~ ((1 / expnat x c) <= f x)%rat.
+*)
+
+(*
+Theorem Sig_unforge LA A:
+  Validpackage UF_CMA_g LA OA_interface A_export
+  negligible (fun n => Pr[ UF_CMA_g == true]).
+*)
+
+End ExistentialUnforgeability.
+
+
+
+
+
 
   (* 
   Currently not needed
