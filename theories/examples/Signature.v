@@ -336,21 +336,21 @@ Module Type ExistentialUnforgeability
 (*
   Definition UF_CMA_g : package UF_locs OA_interface UF_interface 
   := [package
-    #def  #[ex_unforge] (msg : 'message) : 'signature
+    #def  #[ex_unforge] (msg : 'message) : 'bool
     { 
       #import {sig #[sign_oracle] : 'message → 'signature } as sign_oracle ;;
       let '(sk,pk) := KeyGen in
       (* missing: where does the message come from? *)
       S ← sign_oracle msg ;; (* looks like we only generate one (sig, msg) pair*)
       (* want to ret the set S, which is then input to the Verify_code.*)
-      (msg, sig) ← Forge_signature pk ;;                                                 || This is missing
-      ret Verify (S, msg, sig)                                                          || This is also missing
+      (msg, sig) ← Forge_signature pk ;;                       || This is missing
+      ret Verify (S, msg, sig)                                 || This is also missing
     }
   ].
 *)
 
 (* 
-  Definition negligible(f : nat -> Rat) :=                                     || they use their own definiton for rational numbers
+  Definition negligible (f : nat -> Rat) :=                    || they use their own definiton for rational numbers
   forall c, exists n, forall x (pf_nz : nz x),
     x > n ->
     ~ ((1 / expnat x c) <= f x)%rat.
@@ -359,7 +359,7 @@ Module Type ExistentialUnforgeability
 (*
 Theorem Sig_unforge LA A:
   Validpackage UF_CMA_g LA OA_interface A_export
-  negligible (fun n => Pr[ UF_CMA_g == true]).
+  negligible (fun n => Pr[ UF_CMA_g == true]).               || game == true is weird
 *)
 
 End ExistentialUnforgeability.

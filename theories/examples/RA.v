@@ -396,13 +396,16 @@ Module HeapHash.
        *)
       2: { simpl; exact: H5. }
       2: { rewrite /Comp_locs.
-           rewrite /Aux_locs in H3. exact H3.
+           rewrite /Aux_locs in H3. 
+           rewrite /Prim_locs_real in H1.
+           rewrite /Prim_locs_ideal in H2.
+           exact H3.
            (* rewrite fdisjointUr; apply/andP; split; assumption.*) }
       rewrite GRing.addr0.
       rewrite /Aux_Prim_ideal.
       by [rewrite (* -Advantage_link *) Advantage_sym].
-    Qed.
-    *)
+    Qed.*)
+    
 
   End RemoteAttestation.
 
@@ -624,11 +627,41 @@ Module HeapHash.
   Definition Att_ideal_locp_heap := Attestation_locs_ideal.
   Definition Aux_prim_ideal_heap := Comp_locs.
 
+  (* 
+  Comparing Locations:
+  *** From above:
+        Definition attest_loc  : Location := ('set (Signature × chMessage) ; 2%N).
+        Definition Comp_locs := fset [:: pk_loc; sk_loc ; sign_loc ; state_loc ].
+
+        Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
+        Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc ].
+  *** Here
+        Definition attest_loc_long  : Location := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
+        Definition Comp_locs := fset [:: pk_loc; sk_loc ; state_loc ; sign_loc ].
+
+        Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
+        Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc_long ].
+  *** Signature
+        Definition pk_loc      : Location := (PubKey    ; 0%N).
+        Definition sk_loc      : Location := (SecKey    ; 1%N).
+        Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
+  *)
+
+(*
   Definition heap_prop : Att_ideal_locp_heap -> Aux_prim_ideal_heap -> Prop.
+*)
   (* 
   pattern match der Listen,
   Use hash function to clarify difference between them
   *)
+
+  Lemma sig_ideal_vs_att_ideal :
+    Att_ideal_locp ≈₀ Aux_Prim_ideal.
+  Proof.
+    apply eq_rel_perf_ind_ignore with (fset [:: attest_loc_long] ). 
+    - rewrite -fset1E / Comp_locs /attest_loc_long. rewrite !fset_cons.
+      rewrite fsub1set.
+  Qed.
   
   Lemma sig_ideal_vs_att_ideal :
     Att_ideal_locp ≈₀ Aux_Prim_ideal.
