@@ -598,7 +598,8 @@ Module HeapHash.
 
 
   Equations Aux_Prim_ideal : package Comp_locs [interface] Att_interface :=
-    Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal_locp}.
+    Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal}.
+    (* Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal_locp}. *)
   Next Obligation.
     ssprove_valid.
     - rewrite /Aux_locs/Comp_locs.
@@ -653,12 +654,41 @@ Module HeapHash.
   (* 
   pattern match der Listen,
   Use hash function to clarify difference between them
+
+  
   *)
 
   Lemma sig_ideal_vs_att_ideal :
-    Att_ideal_locp ≈₀ Aux_Prim_ideal.
+    Att_ideal ≈₀ Aux_Prim_ideal.
+    (* Att_ideal_locp ≈₀ Aux_Prim_ideal. *)
   Proof.
     apply eq_rel_perf_ind_ignore with (fset [:: attest_loc_long] ). 
+    1: { 
+    apply: fsubset_trans.
+    - by apply fsubsetUl.
+    - rewrite -fset1E / Comp_locs / Attestation_locs_ideal / Attestation_locs_real.
+
+      rewrite -fset1E / locpackage Att_ideal.
+    (*
+    We have:
+    "fsubset (fset [:: attest_loc_long] :|: ?s2)
+       (locs Att_ideal_locp :|: Comp_locs)"
+    where
+    )
+      Definition Att_ideal_locp := {locpackage Att_ideal}.
+    where Att_ideal uses
+      Definition Attestation_locs_ideal 
+          := Attestation_locs_real :|: fset [:: attest_loc_long ].
+    where:
+      Definition attest_loc_long  : Location 
+          := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
+      Definition Attestation_locs_real 
+          := fset [:: pk_loc ; sk_loc; state_loc ].
+    ------------------------------------------------------------------
+    => it is a subset
+    *)
+    }
+    
     - rewrite -fset1E / Comp_locs /attest_loc_long. rewrite !fset_cons.
       rewrite fsub1set.
   Qed.
