@@ -422,7 +422,7 @@ Module HeapHash.
 
   Import π1 π2 π3 π4 π5.
 
-  Definition attest_loc_long  : Location := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
+  Definition attest_loc_long  : Location := ('set (Signature × chState × chChallenge) ; 2%N).
 
   Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
   Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc_long ].
@@ -486,7 +486,7 @@ Module HeapHash.
       #put sk_loc := sk ;;
       let msg := Hash state chal in
       let att := Sign sk msg in
-      #put attest_loc_long := setm A (att, msg, state, chal) tt ;;
+      #put attest_loc_long := setm A (att, state, chal) tt ;;
       ret (att, msg)
     };
 
@@ -495,7 +495,7 @@ Module HeapHash.
       A ← get attest_loc_long ;;
       state ← get state_loc ;;
       let msg := Hash state chal in 
-      let b :=  (att, msg, state, chal) \in domm A in
+      let b :=  (att, state, chal) \in domm A in
       ret b
     }
   ].
@@ -598,8 +598,7 @@ Module HeapHash.
 
 
   Equations Aux_Prim_ideal : package Comp_locs [interface] Att_interface :=
-    Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal}.
-    (* Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal_locp}. *)
+    Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal_locp}.
   Next Obligation.
     ssprove_valid.
     - rewrite /Aux_locs/Comp_locs.
@@ -628,39 +627,97 @@ Module HeapHash.
   Definition Att_ideal_locp_heap := Attestation_locs_ideal.
   Definition Aux_prim_ideal_heap := Comp_locs.
 
-  (* 
-  Comparing Locations:
-  *** From above:
-        Definition attest_loc  : Location := ('set (Signature × chMessage) ; 2%N).
-        Definition Comp_locs := fset [:: pk_loc; sk_loc ; sign_loc ; state_loc ].
+  Locate setm.
 
-        Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
-        Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc ].
-  *** Here
-        Definition attest_loc_long  : Location := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
-        Definition Comp_locs := fset [:: pk_loc; sk_loc ; state_loc ; sign_loc ].
+  Definition attest_set := 'set (Signature × chState × chChallenge).
+  Definition sign_set := 'set ('signature × 'message).
 
-        Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
-        Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc_long ].
-  *** Signature
-        Definition pk_loc      : Location := (PubKey    ; 0%N).
-        Definition sk_loc      : Location := (SecKey    ; 1%N).
-        Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
-  *)
+  Require Import extructures.fmap.
 
-(*
-  Definition heap_prop : Att_ideal_locp_heap -> Aux_prim_ideal_heap -> Prop.
-*)
-  (* 
-  pattern match der Listen,
-  Use hash function to clarify difference between them
-
+  Definition heap_prop (a_loc : Value attest_loc_long.π1) (s_loc : Value sign_loc.π1) : Prop :=
+    (map (fun t => 
+      match t with 
+      | ( (sig, state, challenge), x ) => ( (sig, Hash state challenge), x )
+      end)
+     (FMap.fmval a_loc)) = s_loc
+  .
   
+  Definition full_heap_prop  :=
+    fun (h : _*_) => 
+    let (h0,h1) := h in
+    get_heap h0 pk_loc = get_heap h1 pk_loc /\
+    get_heap h0 sk_loc = get_heap h1 sk_loc /\
+    get_heap h0 state_loc = get_heap h1 state_loc /\
+    heap_prop (get_heap h0 attest_loc_long) (get_heap h1 sign_loc).
+    
+  (*
+    Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
+    Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc ].
+  
+    Definition attest_loc_long  : Location := ('set (Signature × chState × chChallenge) ; 2%N).
+    Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
   *)
+  (* 
+  ch_Message (from sign_loc) = Hash(State, Challenge) (from att_long_loc)
+  *)
+
+  Check get_heap.
+  Print get_heap.
+  Print Value.
+  Print get_heap_clause_1.
 
   Lemma sig_ideal_vs_att_ideal :
-    Att_ideal ≈₀ Aux_Prim_ideal.
-    (* Att_ideal_locp ≈₀ Aux_Prim_ideal. *)
+    Att_ideal_locp ≈₀ Aux_Prim_ideal.
+  Proof.
+    eapply eq_rel_perf_ind with (full_heap_prop).
+    2: simplify_eq_rel x.
+    all: ssprove_code_simpl.
+    - ssprove_sync_eq => pk_loc.
+      by [apply r_ret].
+    - ssprove_swap_lhs 0; ssprove_sync_eq => state.
+      do 2! (ssprove_swap_lhs 0; ssprove_sync_eq).
+      (*
+      Definition attest_loc_long  : Location := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
+      Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
+      *)
+      ssprove_sync_eq => sig.
+      ssprove_sync_eq.
+      by [apply r_ret].
+    - case x => a b.
+      ssprove_swap_lhs 0; ssprove_sync_eq => state.
+      ssprove_sync_eq => sig.
+      by [apply r_ret].
+  Qed.
+
+
+
+  
+  Lemma sig_ideal_vs_att_ideal_old :
+    Att_ideal_locp ≈₀ Aux_Prim_ideal.
+  Proof.
+    eapply eq_rel_perf_ind_eq.
+    simplify_eq_rel x.
+    all: ssprove_code_simpl.
+    - ssprove_sync_eq => pk_loc.
+      by [apply r_ret].
+    - ssprove_swap_lhs 0; ssprove_sync_eq => state.
+      do 2! (ssprove_swap_lhs 0; ssprove_sync_eq).
+      (*
+      Definition attest_loc_long  : Location := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
+      Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
+      *)
+      ssprove_sync_eq => sig.
+      ssprove_sync_eq.
+      by [apply r_ret].
+    - case x => a b.
+      ssprove_swap_lhs 0; ssprove_sync_eq => state.
+      ssprove_sync_eq => sig.
+      by [apply r_ret].
+  Qed.
+
+  (*
+  Lemma sig_ideal_vs_att_ideal :
+     Att_ideal_locp ≈₀ Aux_Prim_ideal. 
   Proof.
     apply eq_rel_perf_ind_ignore with (fset [:: attest_loc_long] ). 
     1: { 
@@ -692,25 +749,7 @@ Module HeapHash.
     - rewrite -fset1E / Comp_locs /attest_loc_long. rewrite !fset_cons.
       rewrite fsub1set.
   Qed.
-  
-  Lemma sig_ideal_vs_att_ideal :
-    Att_ideal_locp ≈₀ Aux_Prim_ideal.
-  Proof.
-    eapply eq_rel_perf_ind_eq.
-    simplify_eq_rel x.
-    all: ssprove_code_simpl.
-    - ssprove_sync_eq => pk_loc.
-      by [apply r_ret].
-    - ssprove_swap_lhs 0; ssprove_sync_eq => state.
-      do 2! (ssprove_swap_lhs 0; ssprove_sync_eq).
-      ssprove_sync_eq => sig.
-      ssprove_sync_eq.
-      by [apply r_ret].
-    - case x => a b.
-      ssprove_swap_lhs 0; ssprove_sync_eq => state.
-      ssprove_sync_eq => sig.
-      by [apply r_ret].
-  Qed.
+  *)
 
   Theorem RA_unforg LA A :
       ValidPackage LA Att_interface A_export A →
