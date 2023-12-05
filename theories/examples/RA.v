@@ -267,7 +267,7 @@ Module HeapHash.
 
     (* You need to redefine [Aux] to match the import interface of [Aux] to
        the export interface of [Prim_ideal]  *)
-    Definition Aux_ideal : package Aux_locs Prim_interface_f Att_interface :=
+    Definition Aux_ideal : package Aux_locs Prim_interface Att_interface :=
     [package
       #def #[get_pk] (_ : 'unit) : 'pubkey
       {
@@ -277,7 +277,7 @@ Module HeapHash.
 
       #def #[attest] ( chal : 'challenge ) : ('signature × 'message)
       {
-        #import {sig #[sign_f] : 'message  → 'signature } as sign ;;
+        #import {sig #[sign] : 'message  → 'signature } as sign ;;
         state ← get state_loc ;;
         let msg := Hash state chal in
         att ← sign msg ;;
@@ -286,7 +286,7 @@ Module HeapHash.
 
       #def #[verify_att] ('(chal, att) : 'challenge × 'signature) : 'bool
       {
-        #import {sig #[verify_sig_f] : ('signature × 'message) → 'bool } as verify ;;
+        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
         state ← get state_loc ;;
         let msg := Hash state chal in
         b  ← verify (att,msg) ;;
@@ -564,7 +564,7 @@ Module HeapHash.
 
   (* You need to redefine [Aux] to match the import interface of [Aux] to
      the export interface of [Prim_ideal]  *)
-  Definition Aux_ideal : package Aux_locs Prim_interface_f Att_interface :=
+  Definition Aux_ideal : package Aux_locs Prim_interface Att_interface :=
   [package
     #def #[get_pk] (_ : 'unit) : 'pubkey
     {
@@ -574,7 +574,7 @@ Module HeapHash.
 
     #def #[attest] ( chal : 'challenge ) : ('signature × 'message)
     {
-      #import {sig #[sign_f] : 'message  → 'signature } as sign ;;
+      #import {sig #[sign] : 'message  → 'signature } as sign ;;
       state ← get state_loc ;;
       let msg := Hash state chal in
       att ← sign msg ;;
@@ -583,7 +583,7 @@ Module HeapHash.
 
     #def #[verify_att] ('(chal, att) : 'challenge × 'signature) : 'bool
     {
-      #import {sig #[verify_sig_f] : ('signature × 'message) → 'bool } as verify ;;
+      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
       state ← get state_loc ;;
       let msg := Hash state chal in
       b  ← verify (att,msg) ;;
