@@ -308,7 +308,6 @@ Module HeapHash.
       Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal_locp}.
     Next Obligation.
       ssprove_valid.
-      
       - rewrite /Aux_locs/Comp_locs.
         rewrite [X in fsubset _ X]fset_cons.
         rewrite fset_cons.
@@ -322,7 +321,7 @@ Module HeapHash.
         -- apply fsubsetU ; apply /orP ; right.
            apply fsubsetU ; apply /orP ; right.
            apply fsubsetxx.
-      - rewrite /(locs Prim_ideal_locp)/Comp_locs. 
+      - rewrite /(locs Prim_ideal_locp)/Comp_locs.
         rewrite [X in fsubset _ X]fset_cons.
         unfold Prim_locs_ideal.
         rewrite fset_cons.
@@ -354,7 +353,7 @@ Module HeapHash.
         by [apply r_ret].
     Qed.
 
-    (*
+
     Theorem RA_unforg LA A :
         ValidPackage LA Att_interface A_export A →
         fdisjoint LA (Prim_real_locp).(locs) →
@@ -399,13 +398,17 @@ Module HeapHash.
            rewrite /Aux_locs in H3. 
            rewrite /Prim_locs_real in H1.
            rewrite /Prim_locs_ideal in H2.
-           exact H3.
-           (* rewrite fdisjointUr; apply/andP; split; assumption.*) }
+           move: H3; rewrite fset_cons fdisjointUr; move/andP; case => disjoint_pk_loc disjoint_state_loc.
+           move: H2; rewrite fset_cons fdisjointUr; move/andP; case => _.
+           rewrite fset_cons fdisjointUr; move/andP; case => disjoint_sk_loc disjoint_sign_loc.
+           repeat (rewrite fset_cons fdisjointUr; apply/andP; split; try assumption).
+           rewrite fset1E; assumption.
+      }
       rewrite GRing.addr0.
       rewrite /Aux_Prim_ideal.
       by [rewrite (* -Advantage_link *) Advantage_sym].
-    Qed.*)
-    
+    Qed.
+
 
   End RemoteAttestation.
 
