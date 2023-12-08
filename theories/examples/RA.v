@@ -662,7 +662,7 @@ Module HeapHash.
   *)
 
     Lemma disjoint_noteq:
-      forall {T:ordType} l0 (L0: {fset T}), l0 \notin L0 -> forall l0', l0' \in L0 -> l0 != l0'.
+      forall {T:ordType} {l0} {L0: {fset T}}, l0 \notin L0 -> forall {l0'}, l0' \in L0 -> l0 != l0'.
     Proof.
       move => T l L H l'.
       move: H; elim/fset_ind: L.
@@ -701,7 +701,6 @@ Module HeapHash.
         case => state_loc_eq;
         case => attest_loc_eq other_eq l v notin_att_locs notin_comp_locs.
       repeat split.
-      Check get_set_heap_eq.
       + case in_att_locs: (l \in Attestation_locs_ideal).
         * move: in_att_locs; move/idP => in_att_locs.
           move: notin_att_locs; move/negP => //=.
@@ -709,10 +708,75 @@ Module HeapHash.
           ** move: in_comp_locs; move/idP => in_comp_locs.
           move: notin_comp_locs; move/negP => //=.
           ** clear in_att_locs; clear in_comp_locs.
-             Locate get_set_heap_eq.
-             Print Crypt.package.pkg_heap.
-             Search (_ \notin _).
-             Check Comp_locs.
+             have pk_loc_in_att_locs: pk_loc \in Attestation_locs_ideal.
+             {
+               clear.
+               rewrite /Attestation_locs_ideal /Attestation_locs_real in_fsetU; apply /orP.
+               left; auto_in_fset.
+             }
+             have pk_not_eq_l: pk_loc != l.
+             { rewrite eqtype.eq_sym; apply (disjoint_noteq notin_att_locs pk_loc_in_att_locs). }
+             by [do 2! rewrite (get_set_heap_neq _ _ _ _ pk_not_eq_l)].
+      + (* same as above but for  [sk_loc] *)
+        case in_att_locs: (l \in Attestation_locs_ideal).
+        * move: in_att_locs; move/idP => in_att_locs.
+          move: notin_att_locs; move/negP => //=.
+        * case in_comp_locs: (l \in Comp_locs).
+          ** move: in_comp_locs; move/idP => in_comp_locs.
+          move: notin_comp_locs; move/negP => //=.
+          ** clear in_att_locs; clear in_comp_locs.
+             have sk_loc_in_att_locs: sk_loc \in Attestation_locs_ideal.
+             {
+               clear.
+               rewrite /Attestation_locs_ideal /Attestation_locs_real in_fsetU; apply /orP.
+               left; auto_in_fset.
+             }
+             have sk_not_eq_l: sk_loc != l.
+             { rewrite eqtype.eq_sym; apply (disjoint_noteq notin_att_locs sk_loc_in_att_locs). }
+             by [do 2! rewrite (get_set_heap_neq _ _ _ _ sk_not_eq_l)].
+      + (* same as above but for  [state_loc] *)
+        case in_att_locs: (l \in Attestation_locs_ideal).
+        * move: in_att_locs; move/idP => in_att_locs.
+          move: notin_att_locs; move/negP => //=.
+        * case in_comp_locs: (l \in Comp_locs).
+          ** move: in_comp_locs; move/idP => in_comp_locs.
+          move: notin_comp_locs; move/negP => //=.
+          ** clear in_att_locs; clear in_comp_locs.
+             have state_loc_in_att_locs: state_loc \in Attestation_locs_ideal.
+             {
+               clear.
+               rewrite /Attestation_locs_ideal /Attestation_locs_real in_fsetU; apply /orP.
+               left; auto_in_fset.
+             }
+             have state_not_eq_l: state_loc != l.
+             { rewrite eqtype.eq_sym; apply (disjoint_noteq notin_att_locs state_loc_in_att_locs). }
+             by [do 2! rewrite (get_set_heap_neq _ _ _ _ state_not_eq_l)].
+      + (* same as above but for [attest_loc_long] and [sign_loc] *)
+        case in_att_locs: (l \in Attestation_locs_ideal).
+        * move: in_att_locs; move/idP => in_att_locs.
+          move: notin_att_locs; move/negP => //=.
+        * case in_comp_locs: (l \in Comp_locs).
+          ** move: in_comp_locs; move/idP => in_comp_locs.
+          move: notin_comp_locs; move/negP => //=.
+          ** clear in_att_locs; clear in_comp_locs.
+             have attest_loc_in_att_locs: attest_loc_long \in Attestation_locs_ideal.
+             {
+               clear.
+               rewrite /Attestation_locs_ideal /Attestation_locs_real in_fsetU; apply /orP.
+               right; auto_in_fset.
+             }
+             have attest_not_eq_l: attest_loc_long != l.
+             { rewrite eqtype.eq_sym; apply (disjoint_noteq notin_att_locs attest_loc_in_att_locs). }
+             have sign_loc_in_comp_locs: sign_loc \in Comp_locs.
+             { clear; rewrite /Comp_locs; auto_in_fset. }
+             have sign_not_eq_l: sign_loc != l.
+             { rewrite eqtype.eq_sym; apply (disjoint_noteq notin_comp_locs sign_loc_in_comp_locs). }
+             by [rewrite (get_set_heap_neq _ _ _ _ attest_not_eq_l) (get_set_heap_neq _ _ _ _ sign_not_eq_l)].
+      +
+        TODO simple by the assumptions given
+      
+      
+
 
              move: notin_comp_locs; move/memP.
 
