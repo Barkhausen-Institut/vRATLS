@@ -772,32 +772,15 @@ Module HeapHash.
              have sign_not_eq_l: sign_loc != l.
              { rewrite eqtype.eq_sym; apply (disjoint_noteq notin_comp_locs sign_loc_in_comp_locs). }
              by [rewrite (get_set_heap_neq _ _ _ _ attest_not_eq_l) (get_set_heap_neq _ _ _ _ sign_not_eq_l)].
-      +
-        TODO simple by the assumptions given
-      
-      
-
-
-             move: notin_comp_locs; move/memP.
-
-
-             rewrite get_set_heap_neq.
-
-
-      case => pk_loc_eq'.
-        case => sk_loc_eq';
-        case => state_loc_eq';
-        case => attest_loc_eq' other_eq'.
-      case in_att_locs: (l \in Attestation_locs_ideal).
-      + move: in_att_locs; move/idP => in_att_locs.
-        move: notin_att_locs; move/negP => //=.
-      + case in_comp_locs: (l \in Comp_locs).
-        * move: in_comp_locs; move/idP => in_comp_locs.
-          move: notin_comp_locs; move/negP => //=.
-        * clear in_att_locs; clear in_comp_locs.
-          (* up to here it is almost the same as above *)
-          
-
+      + move => l' l'_notin_att_locs l'_notin_comp_locs.
+        case E: (l==l').
+        * move: E; move/eqP => l_eq_l'.
+          rewrite -l_eq_l'.
+          by [do 2! (rewrite get_set_heap_eq)].
+        * move: E; move/negP/idP; rewrite eqtype.eq_sym => l_neq_l'.
+          do 2! rewrite (get_set_heap_neq _ _ _ _ l_neq_l').
+          apply: (other_eq l' l'_notin_att_locs l'_notin_comp_locs).
+  Qed.
 
   Lemma Invariant_heap_eq_ideal:
     Invariant Attestation_locs_ideal Comp_locs full_heap_eq.
