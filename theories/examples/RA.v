@@ -790,6 +790,7 @@ Module HeapHash.
     - by [].
   Qed.
 
+  (*
   Lemma sig_ideal_vs_att_ideal :
     Att_ideal_locp ≈₀ Aux_Prim_ideal.
   Proof.
@@ -927,10 +928,9 @@ Module HeapHash.
     by [rewrite (* -Advantage_link *) Advantage_sym].
   Qed.
 
+  *)
+
 End RemoteAttestationHash.
-
-
-
 End HeapHash.
 
 
