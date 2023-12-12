@@ -790,21 +790,91 @@ Module HeapHash.
     - by [].
   Qed.
 
+<<<<<<< HEAD
   (*
+=======
+  #[export] Hint Extern 10 (Invariant Attestation_locs_ideal Comp_locs full_heap_eq) =>
+    eapply Invariant_heap_eq_ideal
+    : typeclass_instances ssprove_invariant.
+
+  Print ssprove_sync.
+  Ltac sync_sig_att :=
+    lazymatch goal with
+    | |- ⊢ ⦃ _ ⦄ _ ≈ ?c ⦃ _ ⦄ =>
+        lazymatch c with
+(*        | x ← sample ?op ;; _ => eapply (rsame_head_cmd_alt (cmd_sample op)); [ eapply cmd_sample_preserve_pre |  ] *)
+        | #put ?ℓ := ?v ;;  _ => eapply (rsame_head_cmd_alt (cmd_put ℓ v));
+                                 [ eapply (cmd_put_preserve_pre ℓ full_heap_eq)
+                                 | intros [] ]
+        | x ← get ?ℓ ;;     _ => eapply (rsame_head_cmd_alt (cmd_get ℓ));
+                                 [ eapply (cmd_get_preserve_pre ℓ full_heap_eq);
+                                   rewrite /get_pre_cond/full_heap_eq => s0 s1;
+                                   repeat (case; intro); intros; move => //=
+                                 |  ]
+(*        | x ← cmd ?c ;;     _ => eapply (rsame_head_cmd_alt c) *)
+(*        | assertD ?b        _ => eapply (r_assertD_same A b) *)
+        | _ => fail "No head found"
+        end
+    | |- _ => fail "The goal should be a syntactic judgment"
+  end.
+
+  (* To rewrite the post condition I need to "rewrite under binders".
+     I could do so with setoid_rewrite: https://coq.inria.fr/refman/addendum/generalized-rewriting.html
+     But the SSReflect approach to this seems once more much more intuitive to me:
+     https://coq.inria.fr/refman/proof-engine/ssreflect-proof-language.html#rewriting-under-binders
+   *)
+
+  Import FunctionalExtensionality.
+  Lemma post_eq:
+    forall {t} {pre: precond} {l r: raw_code t} {post post' : t * heap -> t * heap -> Prop},
+      (forall a b, post a b = post' a b) ->
+      ⊢ ⦃ pre ⦄ l ≈ r ⦃ post ⦄ = ⊢ ⦃ pre ⦄ l ≈ r ⦃ post' ⦄.
+  Proof.
+    move => t pre l r post post' post_eq_post'.
+    f_equal.
+    do 2! apply functional_extensionality => ?.
+    apply post_eq_post'.
+  Qed.
+
+
+>>>>>>> 85449f0 (folding the post condition. (rewriting under binders))
   Lemma sig_ideal_vs_att_ideal :
     Att_ideal_locp ≈₀ Aux_Prim_ideal.
   Proof.
     eapply eq_rel_perf_ind with (full_heap_eq).
-    1:{ move => //=.
-        Check Invariant_eq.
-        ssprove_invariant.
-    }
-    2: simplify_eq_rel x.
-    all: ssprove_code_simpl.
-    - ssprove_sync_eq => pk_loc.
-      by [apply r_ret].
-    - ssprove_swap_lhs 0; ssprove_sync_eq => state.
-      do 2! (ssprove_swap_lhs 0; ssprove_sync_eq).
+    1: { apply: Invariant_heap_eq_ideal. }
+    simplify_eq_rel x.
+    all: ssprove_code_simpl;
+      rewrite -/full_heap_eq;
+      (** approach 1:
+       [ under @post_eq => [a b] do [ case: a => b₀ s₀; case: b => b₁ s₁; rewrite -/(full_heap_eq (s₀,s₁))]. ]
+       *)
+      (** approach 2:
+      [under @post_eq => a b.
+       1:{ case: a => b₀ s₀; case: b => b₁ s₁.
+          rewrite -/(full_heap_eq (s₀,s₁)).
+          by rewrite over. }]
+       *)
+      (* Both of the above approaches fail because the [over] tactic expects just rewrites.
+         So we do it the slightly more inconvenient way and have to state what we want.
+       *)
+      rewrite (@post_eq _ _ _ _ _
+                 (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀,s₁))).
+      2:{ case => b₀ s₀; case  => b₁ s₁. by [rewrite -/(full_heap_eq (s₀,s₁))]. }
+    - Fail ssprove_sync.
+      sync_sig_att.
+      move => a; by [apply r_ret].
+    - ssprove_swap_lhs 0.
+      sync_sig_att => state.
+      ssprove_swap_lhs 0.
+  Admitted.
+(* WIP
+      sync_sig_att.
+      eapply (rsame_head_cmd_alt (cmd_put pk_loc (nsnd KeyGen)) full_heap_eq (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀,s₁))).
+      eapply (cmd_put_preserve_pre ℓ full_heap_eq)
+                                 
+      sync_sig_att.
+      do 2! (ssprove_swap_lhs 0; sync_sig_att).
       (*
       Definition attest_loc_long  : Location := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
       Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
@@ -817,7 +887,7 @@ Module HeapHash.
       ssprove_sync_eq => sig.
       by [apply r_ret].
   Qed.
-
+*)
 
 
   
