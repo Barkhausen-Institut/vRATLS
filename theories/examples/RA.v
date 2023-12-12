@@ -790,9 +790,6 @@ Module HeapHash.
     - by [].
   Qed.
 
-<<<<<<< HEAD
-  (*
-=======
   #[export] Hint Extern 10 (Invariant Attestation_locs_ideal Comp_locs full_heap_eq) =>
     eapply Invariant_heap_eq_ideal
     : typeclass_instances ssprove_invariant.
@@ -837,7 +834,6 @@ Module HeapHash.
   Qed.
 
 
->>>>>>> 85449f0 (folding the post condition. (rewriting under binders))
   Lemma sig_ideal_vs_att_ideal :
     Att_ideal_locp ≈₀ Aux_Prim_ideal.
   Proof.
