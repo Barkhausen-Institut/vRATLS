@@ -89,14 +89,14 @@ Module Protocol
   Definition i_chal := #|Challenge|.
 
   Definition RA_locs_real := fset [:: pk_loc ; sk_loc ; chal_loc ; state_loc ; sign_loc ].
-  Definition RA_locs_ideal := RA_locs_real :|: fset [:: attest_loc ].
+  Definition RA_locs_ideal := fset [:: pk_loc ; sk_loc ; chal_loc ; state_loc ; sign_loc ; attest_loc].
 
   Definition att : nat := 50.
 
   Definition RA_prot_interface := 
     [interface #val #[att] : 'unit → 'pubkey × ('attest × 'bool) ].
 
-  Definition Att_prot_real : package RA_locs_real 
+  Definition Att_prot : package RA_locs_real 
      Att_interface RA_prot_interface
   := [package
     #def  #[att] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
@@ -114,23 +114,85 @@ Module Protocol
     } 
   ].
 
-  Definition Att_prot_ideal : package RA_locs_ideal
-    Att_interface RA_prot_interface
-  := [package
-    #def  #[att] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
-    {
-      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-      #import {sig #[attest] : 'challenge → ('signature × 'message)  } as attest ;;
-      #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
+  Print Att_real.
+  Print Attestation_locs_real.
+  Print RA_locs_real.
 
-      (* Protocol *)
-      pk ← get_pk tt ;;
-      chal ← sample uniform i_chal ;;
-      '(att, msg) ← attest chal ;;
-      bool ← verify_att (chal, att) ;;
-      ret (pk, ( att, bool ))
-    } 
-  ].
+  Equations Att_prot_real : package RA_locs_real [interface] RA_prot_interface :=
+    Att_prot_real := {package Att_prot ∘ Att_real }.
+  Next Obligation.
+    ssprove_valid. 
+    - rewrite /RA_locs_real.
+      rewrite !fset_cons.
+      apply fsetUS.
+      apply fsetUS.
+      apply fsetUS.
+      apply fsetUS.
+      apply fsetUS.
+      apply fsubsetxx.
+    - rewrite/ Attestation_locs_real/RA_locs_real.
+      rewrite fset_cons.
+      rewrite [X in fsubset _ X]fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      rewrite [X in fsubset _ X]fset_cons.
+      apply fsetUS.
+      rewrite !fset_cons.
+      apply fsubsetU ; apply /orP ; right.
+      apply fsetUS.
+      apply fsubsetU ; apply /orP ; right.
+      apply fsubsetxx.
+    Defined.
+
+  Equations Att_prot_ideal : package RA_locs_ideal [interface] RA_prot_interface :=
+    Att_prot_ideal := {package Att_prot ∘ Att_ideal }.
+  Next Obligation.
+    ssprove_valid.
+    Print fsubset. 
+    - rewrite /RA_locs_ideal/RA_locs_real.
+      rewrite fset_cons.
+      rewrite [X in fsubset _ X]fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      rewrite [X in fsubset _ X]fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      rewrite [X in fsubset _ X]fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      rewrite [X in fsubset _ X]fset_cons.
+      apply fsetUS.
+      rewrite !fset_cons -fset0E.
+      apply fsetUS.
+      apply fsub0set.
+    - rewrite/ Attestation_locs_ideal/Attestation_locs_real/RA_locs_ideal/RA_locs_real.
+      rewrite [X in fsubset _ X]fset_cons.
+      rewrite !fset_cons.
+    (*
+    Here, pk_loc is element of both sets, so I want to apply fsetUS to get rid of it and
+    continue with the remaining set. But, since Attestation_locs ideal is a concatenation 
+    of Attestation_locs_real and attest_los, the tactic can't be applied
+    *)
+      apply fsetUS.
+      rewrite fset_cons.
+      rewrite [X in fsubset _ X]fset_cons.
+      apply fsetUS.
+      rewrite !fset_cons.
+      apply fsubsetU ; apply /orP ; right.
+      apply fsetUS.
+      apply fsubsetU ; apply /orP ; right.
+      apply fsubsetxx.
+    Defined.
+    
+    
+    apply fsetUS.
+        apply fsub0set.
+    
+    rewrite /Attestation_locs_real/RA_locs_real in_fsetU; apply /orP.
+      1,3,7: right;auto_in_fset.
+      all: left; auto_in_fset.
+    Defined.
+  Qed.
 
   (* 
   1) 
@@ -141,10 +203,12 @@ Module Protocol
   Need to show that packages are valid
   *)
 
-  Equations? pkg : package RA_locs_real Att_interface RA_prot_interface :=
-    pkg := {package Att_prot_real }.
-  Proof.
-  Qed.
+  
+
+  
+
+  Lemma ra_prot_indist: 
+    Att_prot_real ≈₀ Att_prot_ideal.
 
   Theorem RA_prot_ind : ∀ LA A,
     ValidPackage RA_locs_real Att_interface RA_prot_interface Att_prot_real → 
@@ -152,8 +216,8 @@ Module Protocol
     Att_prot_real ≈₀ Att_prot_ideal.
   Proof.
 
-  Lemma ra_prot_indist: 
-    Att_prot_real ≈₀ Att_prot_ideal.
+  
+  
     
 End Protocol.
 
