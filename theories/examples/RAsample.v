@@ -68,7 +68,7 @@ Module Protocol
     (π3 : SignatureAlgorithms π1 π2)
     (π4 : HeapHash.RemoteAttestationAlgorithms π1 π2 π3)
     (π5 : SignaturePrimitives π1 π2 π3)
-    (π6 : HeapHash.RemoteAttestation π1 π2 π3 π4 π5)
+    (π6 : HeapHash.RemoteAttestationHash π1 π2 π3 π4 π5)
     (π7 : SignatureProt π1 π2 π3 π5).
 
   Import π1 π2 π3 π4 π5 π6 π7.
@@ -82,7 +82,7 @@ Module Protocol
   Definition i_chal := #|Challenge|.
 
   Definition RA_locs_real := fset [:: pk_loc ; sk_loc ; chal_loc ; state_loc ; sign_loc ].
-  Definition RA_locs_ideal :=  RA_locs_real :|: fset [:: attest_loc].
+  Definition RA_locs_ideal :=  RA_locs_real :|: fset [:: attest_loc_long].
 
   Definition att : nat := 50.
 
@@ -181,8 +181,17 @@ Module Protocol
     Att_prot_real ≈₀ Att_prot_ideal.
   Proof.
   eapply eq_rel_perf_ind_eq.
-  simplify_eq_rel x.
+  simplify_eq_rel x.  
   all: ssprove_code_simpl.
+  all: simplify_linking.
+  ssprove_sync_eq => pk_loc.
+  ssprove_sync_eq => i_chal.
+  ssprove_swap_rhs 0.
+  ssprove_sync_eq => state_loc.
+  ssprove_swap_rhs 0.
+  ssprove_swap_rhs 1.
+  ssprove_sync_eq.
+  ssprove_sync_eq.
   Admitted.
   
     
