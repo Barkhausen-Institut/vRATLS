@@ -794,7 +794,125 @@ Module HeapHash.
     eapply Invariant_heap_eq_ideal
     : typeclass_instances ssprove_invariant.
 
-  Print ssprove_sync.
+  Definition full_heap_eq' : precond  :=
+    λ '(s0, s1),
+        hash_eq (get_heap s0 attest_loc_long) (get_heap s1 sign_loc) /\
+          (forall {l:Location}, l \notin (fset [:: attest_loc_long ; sign_loc]) → get_heap s0 l = get_heap s1 l).
+
+  (* TODO generalize *)
+  Lemma not_in_diff: forall l,
+      l \notin Attestation_locs_ideal ->
+      l \notin Comp_locs ->
+      l \notin (fset [:: attest_loc_long ; sign_loc]).
+  Proof.
+    move => l h1 h2.
+    rewrite -fdisjoints1.
+    apply (@fdisjoint_trans _
+             (fset [:: attest_loc_long; sign_loc])
+             (Attestation_locs_ideal :|: Comp_locs)
+             (fset1 l)
+          ).
+    2: {
+      rewrite fdisjointC fdisjointUr.
+      apply/andP; split; by [rewrite fdisjoint1s].
+    }
+    rewrite fset_cons.
+    apply fsetUSS.
+    - rewrite /Attestation_locs_ideal fset1E.
+      apply fsubsetUr.
+    - rewrite /Comp_locs -fset1E fsub1set.
+      auto_in_fset.
+  Qed.
+
+  Lemma INV'_full_heap_eq':
+    INV' Attestation_locs_ideal Comp_locs full_heap_eq'.
+  Proof.
+    split.
+    - rewrite /full_heap_eq;
+        case => attest_loc_eq other_eq l notin_att_locs notin_comp_locs.
+      case in_att_locs: (l \in Attestation_locs_ideal).
+      + move: in_att_locs; move/idP => in_att_locs.
+        move: notin_att_locs; move/negP => //=.
+      + case in_comp_locs: (l \in Comp_locs).
+        * move: in_comp_locs; move/idP => in_comp_locs.
+          move: notin_comp_locs; move/negP => //=.
+        * clear in_att_locs; clear in_comp_locs.
+          apply (other_eq _ (not_in_diff _ notin_att_locs notin_comp_locs)).
+    - rewrite /full_heap_eq';
+        case => attest_loc_eq other_eq l v notin_att_locs notin_comp_locs.
+      repeat split.
+      + case in_att_locs: (l \in Attestation_locs_ideal).
+        * move: in_att_locs; move/idP => in_att_locs.
+          move: notin_att_locs; move/negP => //=.
+        * case in_comp_locs: (l \in Comp_locs).
+          ** move: in_comp_locs; move/idP => in_comp_locs.
+          move: notin_comp_locs; move/negP => //=.
+          ** clear in_att_locs; clear in_comp_locs.
+             have attest_loc_in_att_locs: attest_loc_long \in Attestation_locs_ideal.
+             {
+               clear.
+               rewrite /Attestation_locs_ideal /Attestation_locs_real in_fsetU; apply /orP.
+               right; auto_in_fset.
+             }
+             have attest_not_eq_l: attest_loc_long != l.
+             { rewrite eqtype.eq_sym; apply (disjoint_noteq notin_att_locs attest_loc_in_att_locs). }
+             have sign_loc_in_comp_locs: sign_loc \in Comp_locs.
+             { clear; rewrite /Comp_locs; auto_in_fset. }
+             have sign_not_eq_l: sign_loc != l.
+             { rewrite eqtype.eq_sym; apply (disjoint_noteq notin_comp_locs sign_loc_in_comp_locs). }
+             by [rewrite (get_set_heap_neq _ _ _ _ attest_not_eq_l) (get_set_heap_neq _ _ _ _ sign_not_eq_l)].
+      + move => l' l'_notin_diff_locs.
+        case E: (l==l').
+        * move: E; move/eqP => l_eq_l'.
+          rewrite -l_eq_l'.
+          by [do 2! (rewrite get_set_heap_eq)].
+        * move: E; move/negP/idP; rewrite eqtype.eq_sym => l_neq_l'.
+          do 2! rewrite (get_set_heap_neq _ _ _ _ l_neq_l').
+          apply: (other_eq l' l'_notin_diff_locs).
+  Qed.
+
+  Lemma Invariant_heap_eq_ideal':
+    Invariant Attestation_locs_ideal Comp_locs full_heap_eq'.
+  Proof.
+    split.
+    - by [apply INV'_full_heap_eq'].
+    - by [].
+  Qed.
+
+  #[export] Hint Extern 10 (Invariant Attestation_locs_ideal Comp_locs full_heap_eq') =>
+    eapply Invariant_heap_eq_ideal'
+    : typeclass_instances ssprove_invariant.
+
+  Lemma get_pre_cond_full_heap:
+    ∀ (ℓ : tag_ordType (I:=choice_type_ordType) (λ _ : choice_type, nat_ordType))
+      (L: {fset Location}),
+      attest_loc_long \notin L ->
+      sign_loc \notin L ->
+      ℓ \in L -> get_pre_cond ℓ full_heap_eq'.
+  Proof.
+    move => ℓ L hL1 hL2 ℓ_in_L.
+    rewrite /get_pre_cond => s₀ s₁ h_full_heap_eq.
+    apply INV'_full_heap_eq.
+    (*TODO*)
+  Admitted.
+
+  #[export] Hint Extern 10 (get_pre_cond _ full_heap_eq) =>
+    apply get_pre_cond_full_heap
+    : ssprove_invariant.
+
+
+  Lemma put_pre_cond_full_heap:
+    ∀ (ℓ : tag_ordType (I:=choice_type_ordType) (λ _ : choice_type, nat_ordType))
+      (v : Value ℓ.π1)
+      (L: {fset Location}),
+      ℓ \in L -> put_pre_cond ℓ v full_heap_eq.
+  Proof.
+  Admitted.
+
+  #[export] Hint Extern 10 (put_pre_cond _ _ full_heap_eq) =>
+    apply put_pre_cond_full_heap
+    : ssprove_invariant.
+
   Ltac sync_sig_att :=
     lazymatch goal with
     | |- ⊢ ⦃ _ ⦄ _ ≈ ?c ⦃ _ ⦄ =>
@@ -823,7 +941,7 @@ Module HeapHash.
 
   Import FunctionalExtensionality.
   Lemma post_eq:
-    forall {t} {pre: precond} {l r: raw_code t} {post post' : t * heap -> t * heap -> Prop},
+    forall {t} {pre: precond} {l r: raw_code t} {post post' : postcond t t},
       (forall a b, post a b = post' a b) ->
       ⊢ ⦃ pre ⦄ l ≈ r ⦃ post ⦄ = ⊢ ⦃ pre ⦄ l ≈ r ⦃ post' ⦄.
   Proof.
@@ -833,6 +951,10 @@ Module HeapHash.
     apply post_eq_post'.
   Qed.
 
+  Lemma put_bind:
+    forall (t : Choice.type) (l : Location) (v : l) (c : raw_code t),
+      putr l v c = bind (putr l v (ret tt)) (fun (x:unit_choiceType) => c).
+  Proof. by[]. Qed.
 
   Lemma sig_ideal_vs_att_ideal :
     Att_ideal_locp ≈₀ Aux_Prim_ideal.
@@ -863,27 +985,30 @@ Module HeapHash.
     - ssprove_swap_lhs 0.
       sync_sig_att => state.
       ssprove_swap_lhs 0.
+      (* have cp : command unit_choiceType := (cmd_put pk_loc (nsnd KeyGen)). *)
+      (* have out := ('signature × 'message). *)
+      (* have out := tgt (attest, ('challenge, 'signature × 'message)). *)
+      (* have post : postcond out out := (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀,s₁)). *)
+      (* move Epost': (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀, s₁)) => post. *)
+      (* Unset Printing Notations. *)
+      rewrite put_bind.
+      rewrite [in X in ⊢ ⦃ _ ⦄ _ ≈ X ⦃ _ ⦄ ]put_bind.
+      (* The below fails because the post condition is [b₀ = b₁ /\ pre (s₀, s₁)]
+         instead of [pre (s₀, s₁) /\ b₀ = b₁].
+       *)
+      Fail eapply (@rsame_head_cmd_alt
+                     unit_choiceType
+                     (tgt (attest, ('challenge, 'signature × 'message)))
+                     _
+                     _
+                     (cmd_put pk_loc (nsnd KeyGen))
+                     full_heap_eq post).
+      eapply (rsame_head_alt_pre _ _ (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀, s₁))).
+      + eapply (rpost_weaken_rule _ (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀,s₁))). (* Yet another way of rewriting the post condition. *)
+        * eapply (@r_reflexivity_alt _ (fset [:: pk_loc]) full_heap_eq).
+          ** ssprove_valid.
+          ** admit. (* TODO see admitted lemmas above. *)
   Admitted.
-(* WIP
-      sync_sig_att.
-      eapply (rsame_head_cmd_alt (cmd_put pk_loc (nsnd KeyGen)) full_heap_eq (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀,s₁))).
-      eapply (cmd_put_preserve_pre ℓ full_heap_eq)
-                                 
-      sync_sig_att.
-      do 2! (ssprove_swap_lhs 0; sync_sig_att).
-      (*
-      Definition attest_loc_long  : Location := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
-      Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
-      *)
-      ssprove_sync_eq => sig.
-      ssprove_sync_eq.
-      by [apply r_ret].
-    - case x => a b.
-      ssprove_swap_lhs 0; ssprove_sync_eq => state.
-      ssprove_sync_eq => sig.
-      by [apply r_ret].
-  Qed.
-*)
 
 
   
