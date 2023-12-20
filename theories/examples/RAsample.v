@@ -182,16 +182,13 @@ Module Protocol
   Proof.
   eapply eq_rel_perf_ind_eq.
   simplify_eq_rel x.  
-  all: ssprove_code_simpl.
-  all: simplify_linking.
+  all: ssprove_code_simpl; simplify_linking.
   ssprove_sync_eq => pk_loc.
   ssprove_sync_eq => i_chal.
-  ssprove_swap_rhs 0.
   ssprove_sync_eq => state_loc.
-  ssprove_swap_rhs 0.
-  ssprove_swap_rhs 1.
   ssprove_sync_eq.
   ssprove_sync_eq.
+
   Admitted.
   
     
