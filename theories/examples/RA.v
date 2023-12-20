@@ -504,7 +504,7 @@ Module HeapHash.
     ].
     Next Obligation.
       ssprove_valid; rewrite /Attestation_locs_ideal/Attestation_locs_real in_fsetU; apply /orP.
-      1,3,7: right; auto_in_fset.
+      1,6,7: right; auto_in_fset.
       all: left; auto_in_fset.
     Defined.
 
