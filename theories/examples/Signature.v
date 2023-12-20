@@ -145,23 +145,18 @@ Module Type SignaturePrimitives
   Definition Prim_real : package Prim_locs_real [interface] Prim_interface
   := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
-    {
+    { 
       pk ← get pk_loc  ;;
       ret pk
     } ;
-
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
       let (sk,pk) := KeyGen in
-      (*
-      '(sk,pk) ← KeyGen ;;
-      *)
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let sig := Sign sk msg in
       ret sig
     };
-
     #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
     {
       pk ← get pk_loc  ;;
@@ -177,13 +172,9 @@ Module Type SignaturePrimitives
       pk ← get pk_loc ;;
       ret pk
     };
-
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
-    let (sk,pk) := KeyGen in
-    (*
-    '(sk,pk) ← KeyGen ;;
-    *)
+      let (sk,pk) := KeyGen in
       #put pk_loc := pk ;;
       #put sk_loc := sk ;;
       let sig := Sign sk msg in
@@ -192,7 +183,6 @@ Module Type SignaturePrimitives
       #put sign_loc := S' ;;
       ret sig
     };
-
     #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
     {
       S ← get sign_loc ;;

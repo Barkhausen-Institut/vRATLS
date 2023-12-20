@@ -479,7 +479,6 @@ Module HeapHash.
 
       #def #[attest] (chal : 'challenge) : ('signature × 'message)
       {
-        A ← get attest_loc_long ;;
         state ← get state_loc ;;
         let (sk,pk) := KeyGen in
         (*
@@ -489,6 +488,7 @@ Module HeapHash.
         #put sk_loc := sk ;;
         let msg := Hash state chal in
         let att := Sign sk msg in
+        A ← get attest_loc_long ;;
         #put attest_loc_long := setm A (att, state, chal) tt ;;
         ret (att, msg)
       };
