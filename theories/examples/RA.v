@@ -824,21 +824,35 @@ Module HeapHash.
       auto_in_fset.
   Qed.
 
-  Lemma INV'_full_heap_eq':
-    INV' Attestation_locs_ideal Comp_locs full_heap_eq'.
+  Lemma INV'_full_heap_eq'_get : forall s1 s2,
+      full_heap_eq' (s1, s2) ->
+      ∀ l : tag_ordType (I:=choice_type_ordType) (λ _ : choice_type, nat_ordType),
+        l \notin Attestation_locs_ideal ->
+        l \notin Comp_locs ->
+        get_heap s1 l = get_heap s2 l.
   Proof.
-    split.
-    - rewrite /full_heap_eq;
-        case => attest_loc_eq other_eq l notin_att_locs notin_comp_locs.
-      case in_att_locs: (l \in Attestation_locs_ideal).
-      + move: in_att_locs; move/idP => in_att_locs.
-        move: notin_att_locs; move/negP => //=.
-      + case in_comp_locs: (l \in Comp_locs).
-        * move: in_comp_locs; move/idP => in_comp_locs.
-          move: notin_comp_locs; move/negP => //=.
-        * clear in_att_locs; clear in_comp_locs.
-          apply (other_eq _ (not_in_diff _ notin_att_locs notin_comp_locs)).
-    - rewrite /full_heap_eq';
+    move => s1 s2.
+    rewrite /full_heap_eq;
+      case => attest_loc_eq other_eq l notin_att_locs notin_comp_locs.
+    case in_att_locs: (l \in Attestation_locs_ideal).
+    + move: in_att_locs; move/idP => in_att_locs.
+      move: notin_att_locs; move/negP => //=.
+    + case in_comp_locs: (l \in Comp_locs).
+      * move: in_comp_locs; move/idP => in_comp_locs.
+        move: notin_comp_locs; move/negP => //=.
+      * clear in_att_locs; clear in_comp_locs.
+        apply (other_eq _ (not_in_diff _ notin_att_locs notin_comp_locs)).
+  Qed.
+
+  Lemma INV'_full_heap_eq'_get_set : forall s1 s2,
+      full_heap_eq' (s1, s2) ->
+      ∀ (l : tag_ordType (I:=choice_type_ordType) (λ _ : choice_type, nat_ordType)) (v : Value l.π1),
+        l \notin Attestation_locs_ideal ->
+        l \notin Comp_locs ->
+        full_heap_eq' (set_heap s1 l v, set_heap s2 l v).
+  Proof.
+    move => s1 s2.
+    rewrite /full_heap_eq';
         case => attest_loc_eq other_eq l v notin_att_locs notin_comp_locs.
       repeat split.
       + case in_att_locs: (l \in Attestation_locs_ideal).
@@ -871,6 +885,14 @@ Module HeapHash.
           apply: (other_eq l' l'_notin_diff_locs).
   Qed.
 
+  Lemma INV'_full_heap_eq':
+    INV' Attestation_locs_ideal Comp_locs full_heap_eq'.
+  Proof.
+    split.
+    - apply INV'_full_heap_eq'_get.
+    - apply INV'_full_heap_eq'_get_set.
+  Qed.
+
   Lemma Invariant_heap_eq_ideal':
     Invariant Attestation_locs_ideal Comp_locs full_heap_eq'.
   Proof.
@@ -886,15 +908,16 @@ Module HeapHash.
   Lemma get_pre_cond_full_heap:
     ∀ (ℓ : tag_ordType (I:=choice_type_ordType) (λ _ : choice_type, nat_ordType))
       (L: {fset Location}),
-      attest_loc_long \notin L ->
-      sign_loc \notin L ->
-      ℓ \in L -> get_pre_cond ℓ full_heap_eq'.
+      (fdisjoint (fset [:: attest_loc_long; sign_loc]) L) ->
+      ℓ \in L ->
+      get_pre_cond ℓ full_heap_eq'.
   Proof.
-    move => ℓ L hL1 hL2 ℓ_in_L.
+    move => ℓ L h_disjoint l_in_L.
     rewrite /get_pre_cond => s₀ s₁ h_full_heap_eq.
-    apply INV'_full_heap_eq.
-    (*TODO*)
-  Admitted.
+    apply h_full_heap_eq.
+    move: h_disjoint; rewrite fdisjointC; move/fdisjointP; move => h_disjoint.
+    apply (h_disjoint ℓ l_in_L).
+  Qed.
 
   #[export] Hint Extern 10 (get_pre_cond _ full_heap_eq) =>
     apply get_pre_cond_full_heap
@@ -905,9 +928,43 @@ Module HeapHash.
     ∀ (ℓ : tag_ordType (I:=choice_type_ordType) (λ _ : choice_type, nat_ordType))
       (v : Value ℓ.π1)
       (L: {fset Location}),
-      ℓ \in L -> put_pre_cond ℓ v full_heap_eq.
+      (fdisjoint (fset [:: attest_loc_long; sign_loc]) L) ->
+      ℓ \in L -> put_pre_cond ℓ v full_heap_eq'.
   Proof.
-  Admitted.
+    move => ℓ v L h_disjoint l_in_L.
+    rewrite /put_pre_cond/full_heap_eq' => s₀ s₁ h_full_heap_eq.
+    have h_disjoint' := h_disjoint.
+    move: h_disjoint'; rewrite fdisjointC; move/fdisjointP; move => h_notin.
+    have l_in_L' := l_in_L.
+    move: l_in_L'; move/h_notin. move/disjoint_noteq => l_neq_att_sign.
+    have att_loc_in : attest_loc_long \in fset [:: attest_loc_long; sign_loc].
+    1:{ auto_in_fset. }
+    have sign_loc_in : sign_loc \in fset [:: attest_loc_long; sign_loc].
+    1:{ auto_in_fset. }
+    case: h_full_heap_eq => full_heap_left full_heap_right.
+    split.
+    - have l_neq_att_loc := l_neq_att_sign attest_loc_long att_loc_in.
+      rewrite eqtype.eq_sym in l_neq_att_loc.
+      rewrite (get_set_heap_neq _ _ _ _ l_neq_att_loc).
+
+      have l_neq_sign_loc := l_neq_att_sign sign_loc sign_loc_in.
+      rewrite eqtype.eq_sym in l_neq_sign_loc.
+      rewrite (get_set_heap_neq _ _ _ _ l_neq_sign_loc).
+
+      apply full_heap_left.
+    - move => l l_notin_att_sign.
+      case E: (ℓ == l).
+      + move/eqP in E.
+        by [rewrite -E; repeat rewrite get_set_heap_eq].
+      + move/eqP in E.
+        (* Why is the below so hard?! *)
+        have X: ℓ <> l /\ (true = true) := conj E erefl.
+        move/predD1P in X.
+        rewrite Bool.andb_true_r eqtype.eq_sym in X.
+
+        repeat rewrite (get_set_heap_neq _ _ _ _ X).
+        apply: (full_heap_right _ l_notin_att_sign).
+  Qed.
 
   #[export] Hint Extern 10 (put_pre_cond _ _ full_heap_eq) =>
     apply put_pre_cond_full_heap
@@ -919,11 +976,11 @@ Module HeapHash.
         lazymatch c with
 (*        | x ← sample ?op ;; _ => eapply (rsame_head_cmd_alt (cmd_sample op)); [ eapply cmd_sample_preserve_pre |  ] *)
         | #put ?ℓ := ?v ;;  _ => eapply (rsame_head_cmd_alt (cmd_put ℓ v));
-                                 [ eapply (cmd_put_preserve_pre ℓ full_heap_eq)
+                                 [ eapply (cmd_put_preserve_pre ℓ full_heap_eq')
                                  | intros [] ]
         | x ← get ?ℓ ;;     _ => eapply (rsame_head_cmd_alt (cmd_get ℓ));
-                                 [ eapply (cmd_get_preserve_pre ℓ full_heap_eq);
-                                   rewrite /get_pre_cond/full_heap_eq => s0 s1;
+                                 [ eapply (cmd_get_preserve_pre ℓ full_heap_eq');
+                                   rewrite /get_pre_cond/full_heap_eq' => s0 s1;
                                    repeat (case; intro); intros; move => //=
                                  |  ]
 (*        | x ← cmd ?c ;;     _ => eapply (rsame_head_cmd_alt c) *)
@@ -959,11 +1016,11 @@ Module HeapHash.
   Lemma sig_ideal_vs_att_ideal :
     Att_ideal_locp ≈₀ Aux_Prim_ideal.
   Proof.
-    eapply eq_rel_perf_ind with (full_heap_eq).
-    1: { apply: Invariant_heap_eq_ideal. }
+    eapply eq_rel_perf_ind with (full_heap_eq').
+    1: { apply: Invariant_heap_eq_ideal'. }
     simplify_eq_rel x.
     all: ssprove_code_simpl;
-      rewrite -/full_heap_eq;
+      rewrite -/full_heap_eq';
       (** approach 1:
        [ under @post_eq => [a b] do [ case: a => b₀ s₀; case: b => b₁ s₁; rewrite -/(full_heap_eq (s₀,s₁))]. ]
        *)
@@ -977,10 +1034,11 @@ Module HeapHash.
          So we do it the slightly more inconvenient way and have to state what we want.
        *)
       rewrite (@post_eq _ _ _ _ _
-                 (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀,s₁))).
-      2:{ case => b₀ s₀; case  => b₁ s₁. by [rewrite -/(full_heap_eq (s₀,s₁))]. }
+                 (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq' (s₀,s₁))).
+      2:{ case => b₀ s₀; case  => b₁ s₁. by [rewrite -/(full_heap_eq' (s₀,s₁))]. }
     - Fail ssprove_sync.
       sync_sig_att.
+      (* FIXME something broke in the automation here! *)
       move => a; by [apply r_ret].
     - ssprove_swap_lhs 0.
       sync_sig_att => state.
@@ -1007,7 +1065,7 @@ Module HeapHash.
       + eapply (rpost_weaken_rule _ (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀,s₁))). (* Yet another way of rewriting the post condition. *)
         * eapply (@r_reflexivity_alt _ (fset [:: pk_loc]) full_heap_eq).
           ** ssprove_valid.
-          ** admit. (* TODO see admitted lemmas above. *)
+          ** spprove_invariant. (* TODO see admitted lemmas above. *)
   Admitted.
 
 
