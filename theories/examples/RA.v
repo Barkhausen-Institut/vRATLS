@@ -919,8 +919,8 @@ Module HeapHash.
     apply (h_disjoint ℓ l_in_L).
   Qed.
 
-  #[export] Hint Extern 10 (get_pre_cond _ full_heap_eq) =>
-    apply get_pre_cond_full_heap
+  #[export] Hint Extern 10 (get_pre_cond _ full_heap_eq') =>
+    eapply get_pre_cond_full_heap
     : ssprove_invariant.
 
 
@@ -966,9 +966,33 @@ Module HeapHash.
         apply: (full_heap_right _ l_notin_att_sign).
   Qed.
 
-  #[export] Hint Extern 10 (put_pre_cond _ _ full_heap_eq) =>
-    apply put_pre_cond_full_heap
+  #[export] Hint Extern 10 (put_pre_cond _ _ full_heap_eq') =>
+    eapply put_pre_cond_full_heap
     : ssprove_invariant.
+
+  Lemma l_in_lSet {l:Location}: l \in (fset [:: l]).
+  Proof.
+    auto_in_fset.
+  Qed.
+
+  Lemma get_eq_loc {l: Location} {t} {c1 c2: Value l.π1 -> raw_code t} :
+    l \notin fset [:: attest_loc_long; sign_loc] ->
+    (forall x:Value l.π1,
+        ⊢ ⦃ full_heap_eq' ⦄
+          c1 x ≈ c2 x
+          ⦃ λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq' (s₀, s₁) ⦄) ->
+    ⊢ ⦃ full_heap_eq' ⦄
+    x1 ← get l ;; c1 x1 ≈ x2 ← get l ;; c2 x2
+  ⦃ λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq' (s₀, s₁) ⦄.
+  Proof.
+    move => l_notin.
+    eapply (rsame_head_cmd_alt (cmd_get l)).
+    eapply (cmd_get_preserve_pre l full_heap_eq').
+    ssprove_invariant.
+    2: { apply (@l_in_lSet l). }
+    rewrite -fset1E fdisjoints1.
+    exact: l_notin.
+  Qed.
 
   Ltac sync_sig_att :=
     lazymatch goal with
@@ -978,11 +1002,8 @@ Module HeapHash.
         | #put ?ℓ := ?v ;;  _ => eapply (rsame_head_cmd_alt (cmd_put ℓ v));
                                  [ eapply (cmd_put_preserve_pre ℓ full_heap_eq')
                                  | intros [] ]
-        | x ← get ?ℓ ;;     _ => eapply (rsame_head_cmd_alt (cmd_get ℓ));
-                                 [ eapply (cmd_get_preserve_pre ℓ full_heap_eq');
-                                   rewrite /get_pre_cond/full_heap_eq' => s0 s1;
-                                   repeat (case; intro); intros; move => //=
-                                 |  ]
+                                   (* TODO look for the hypothesis in the context. *)
+        | x ← get ?ℓ ;;  _ => eapply (@get_eq_loc ℓ)
 (*        | x ← cmd ?c ;;     _ => eapply (rsame_head_cmd_alt c) *)
 (*        | assertD ?b        _ => eapply (r_assertD_same A b) *)
         | _ => fail "No head found"
@@ -1037,18 +1058,10 @@ Module HeapHash.
                  (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq' (s₀,s₁))).
       2:{ case => b₀ s₀; case  => b₁ s₁. by [rewrite -/(full_heap_eq' (s₀,s₁))]. }
     - Fail ssprove_sync.
-      sync_sig_att.
-      (* FIXME something broke in the automation here! *)
+      sync_sig_att. 1: { auto_in_fset. }
       move => a; by [apply r_ret].
-    - ssprove_swap_lhs 0.
-      sync_sig_att => state.
-      ssprove_swap_lhs 0.
-      (* have cp : command unit_choiceType := (cmd_put pk_loc (nsnd KeyGen)). *)
-      (* have out := ('signature × 'message). *)
-      (* have out := tgt (attest, ('challenge, 'signature × 'message)). *)
-      (* have post : postcond out out := (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀,s₁)). *)
-      (* move Epost': (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀, s₁)) => post. *)
-      (* Unset Printing Notations. *)
+    - sync_sig_att. 1: { auto_in_fset. }
+      move => state.
       rewrite put_bind.
       rewrite [in X in ⊢ ⦃ _ ⦄ _ ≈ X ⦃ _ ⦄ ]put_bind.
       (* The below fails because the post condition is [b₀ = b₁ /\ pre (s₀, s₁)]
@@ -1061,11 +1074,49 @@ Module HeapHash.
                      _
                      (cmd_put pk_loc (nsnd KeyGen))
                      full_heap_eq post).
-      eapply (rsame_head_alt_pre _ _ (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀, s₁))).
-      + eapply (rpost_weaken_rule _ (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq (s₀,s₁))). (* Yet another way of rewriting the post condition. *)
-        * eapply (@r_reflexivity_alt _ (fset [:: pk_loc]) full_heap_eq).
+      eapply (rsame_head_alt_pre _ _ (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq' (s₀, s₁))).
+      + eapply (rpost_weaken_rule _ (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq' (s₀,s₁))). (* Yet another way of rewriting the post condition. *)
+        * eapply (@r_reflexivity_alt _ (fset [:: pk_loc]) full_heap_eq').
           ** ssprove_valid.
-          ** spprove_invariant. (* TODO see admitted lemmas above. *)
+          ** move => l l_in_pk_loc; ssprove_invariant.
+             rewrite -fset1E fdisjoints1; auto_in_fset.
+          ** move => l l_in_pk_loc; ssprove_invariant.
+             rewrite -fset1E fdisjoints1; auto_in_fset.
+        * case => b0 s0; case => b1 s1.
+          case => b_eq fh_eq; exact: (conj fh_eq b_eq).
+      + (* TODO automation for puts is needed *)
+        move => _.
+        (*
+        rewrite (@post_eq _ _ _ _ _
+                   (λ '(b₀, s₀) '(b₁, s₁), full_heap_eq' (s₀,s₁) /\ b₀ = b₁)).
+        2:{ case => b0 s0; case => b1 s1.
+            rewrite [LHS]and_comm.
+        }
+        Sadly this fails for some strange setoid rewrite reason.
+         *)
+        eapply (rpost_weaken_rule _ (λ '(b₀, s₀) '(b₁, s₁), full_heap_eq' (s₀,s₁) /\ b₀ = b₁)).
+        2: {case => b0 s0; case => b1 s1.
+            case => b_eq fh_eq; exact: (conj fh_eq b_eq).
+        }
+
+        (* It is not clear to me why this still fails.
+           Why do I need to take such a long way? *)
+        Fail eapply (rsame_head_cmd_alt (cmd_put sk_loc (nfst KeyGen))).
+
+        rewrite put_bind.
+        rewrite [in X in ⊢ ⦃ _ ⦄ _ ≈ X ⦃ _ ⦄ ]put_bind.
+
+        eapply rsame_head_alt_pre.
+        1: { eapply (cmd_put_preserve_pre sk_loc _ full_heap_eq').
+             ssprove_invariant; [ | apply (@l_in_lSet sk_loc) ].
+             rewrite -fset1E fdisjoints1; auto_in_fset.
+        }
+        move => _.
+        (* put done *)
+
+
+        (* TODO here I'm getting to the core of the lemma. *)
+
   Admitted.
 
 
