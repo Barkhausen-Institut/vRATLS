@@ -185,9 +185,18 @@ Module Protocol
   all: ssprove_code_simpl; simplify_linking.
   ssprove_sync_eq => pk_loc.
   ssprove_sync_eq => i_chal.
+  ssprove_swap_seq_lhs [:: 3; 2 ; 1]%N.
+  ssprove_contract_get_lhs.
+  ssprove_swap_seq_rhs [:: 5; 4; 3; 2 ; 1]%N.
+  ssprove_contract_get_rhs.
   ssprove_sync_eq => state_loc.
   ssprove_sync_eq.
-  ssprove_sync_eq.
+  ssprove_sync_eq. 
+  
+  
+
+
+    
 
   Admitted.
   
