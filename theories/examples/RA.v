@@ -1371,30 +1371,19 @@ Module HeapHash.
         * move/eqP/negPf: E; rewrite eqtype.eq_sym => E; rewrite ifF //=.
           rewrite setmC.
           ** f_equal. exact: IH.
-          ** TODO: 
-            Search injective.
-             move: inj_f.
-             Unset Printing Notations.
-             Check finv_bij.
-             Print finv.
-             apply finv_bij.
-             rewrite /injective in inj_f. *)
-        rewrite (inj_f x' k) //=.
-
-
-
-      (* this does the step that I need. *)
-      rewrite -/(setm_def (T:=T) ((x', y) :: m) k v).
-      (* have xxx: forall x, (f x.1, x.2) = ((fun p : prod T S => pair (f (fst p))) x). 
-      replace (f x.1, x.2) with (fun p : prod T S => pair (f (fst p))).
-      rewrite -/(seq.map (fun p : prod T S => pair (f (fst p))) (setm_def (T:=T) ((x', y) :: m) k v) ).
-      (* Sadly, I cannot unfold this anymore :( *)
-      Search mkfmap.
-      Print getm_def.
-
-
-    have xxx : x = f k. (* I can have this by bijectivity. *)
-*)
+          ** rewrite /injective in inj_f.
+             have neq_inj a b (inj_f': injective f) (a_neq_b: a != b) : f a != f b.
+             1: {
+               case H: (f a == f b) => //=.
+               move/eqP/(inj_f' a b):H => a_eq_b.
+               rewrite a_eq_b in a_neq_b.
+               move: a_neq_b.
+               TODO rewrite the "false in the goal with the inequality."
+               
+               (* Unset Printing Notations. *)
+               Search (?x != ?y) false.
+               Print eq_xor_neq.
+             }
 
     Admitted.
 
