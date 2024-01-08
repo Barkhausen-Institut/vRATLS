@@ -1353,10 +1353,7 @@ Module HeapHash.
                           apply: (lt_antisym _ _ _).
                + apply: Ord.ltxx.
         }
- (*
-        have setm_def_seq (A:ordType) B (a:A) (b:B) (s: seq.seq (A * B)) :
-          (a,b) :: s = setm_def (T:=A) s a b.
- *)
+
         rewrite (setm_def_seq_cons_eq' _ _ _ _ y).
         move => //=.
         rewrite ifF /=.
@@ -1372,20 +1369,17 @@ Module HeapHash.
           rewrite setmC.
           ** f_equal. exact: IH.
           ** rewrite /injective in inj_f.
+             (* TODO lift/move into lemma *)
              have neq_inj a b (inj_f': injective f) (a_neq_b: a != b) : f a != f b.
              1: {
                case H: (f a == f b) => //=.
                move/eqP/(inj_f' a b):H => a_eq_b.
                rewrite a_eq_b in a_neq_b.
-               move: a_neq_b.
-               TODO rewrite the "false in the goal with the inequality."
-               
-               (* Unset Printing Notations. *)
-               Search (?x != ?y) false.
-               Print eq_xor_neq.
+               move/negPf: a_neq_b => b_neq_b; rewrite -b_neq_b //=.
              }
-
-    Admitted.
+             move/eqP/eqP: E; rewrite eqtype.eq_sym => x'_neq_k.
+             exact: (neq_inj x' k inj_f x'_neq_k).
+    Qed.
 
   Lemma preserve_mem_full_heap_eq:
     forall {sign_loc_val: Value sign_loc.π1} {att_loc_val: Value attest_loc_long.π1} state x y,
@@ -1463,8 +1457,12 @@ Module HeapHash.
       do 2! rewrite get_set_heap_eq.
       rewrite -att_loc_sign_loc_eq.
 
-      (* This is now really the lemma that I need to proof! *)
       apply: fmap_kmap_setm.
+      move => [[sig1 state1] chal1] [[sig2 state2] chal2] //=.
+      move => h.
+      have Hash_inj: injective Hash.
+      1 : { admit. }
+      f_equal.
   Admitted.
 
 
