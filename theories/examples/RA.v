@@ -75,9 +75,9 @@ Module HeapHash.
     Parameter Challenge_pos : Positive #|Challenge|.
     #[local] Existing Instance Challenge_pos.
     Definition chChallenge := 'fin #|Challenge|.
-     
 
   End RemoteAttestationParams.
+
 
   Module Type RemoteAttestationAlgorithms
     (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
@@ -94,7 +94,7 @@ Module HeapHash.
     Notation " 'challenge " := chChallenge   (in custom pack_type at level 2).
     Notation " 'challenge " := chChallenge   (at level 2): package_scope.
     Notation " 'attest "    := Attestation    (in custom pack_type at level 2).
-    
+
     Definition state_loc   : Location := ('state    ; 4%N).
     Definition attest_loc  : Location := ('set (Signature × chMessage) ; 2%N).
 
@@ -105,6 +105,8 @@ Module HeapHash.
     Definition attest_f     : nat := 49.
 
     Parameter Hash : chState -> chChallenge -> chMessage.
+
+    Parameter Collision_Resistence: injective (uncurry Hash).
 
   End RemoteAttestationAlgorithms.
 
@@ -814,6 +816,12 @@ Module HeapHash.
         hash_eq (get_heap s0 attest_loc_long) (get_heap s1 sign_loc) /\
           (forall {l:Location}, l \notin (fset [:: attest_loc_long ; sign_loc]) → get_heap s0 l = get_heap s1 l).
 
+  Lemma att_loc_in : attest_loc_long \in fset [:: attest_loc_long; sign_loc].
+  Proof. auto_in_fset. Qed.
+
+  Lemma sign_loc_in : sign_loc \in fset [:: attest_loc_long; sign_loc].
+  Proof. auto_in_fset. Qed.
+
   (* TODO generalize *)
   Lemma not_in_diff: forall l,
       l \notin Attestation_locs_ideal ->
@@ -952,10 +960,6 @@ Module HeapHash.
     move: h_disjoint'; rewrite fdisjointC; move/fdisjointP; move => h_notin.
     have l_in_L' := l_in_L.
     move: l_in_L'; move/h_notin. move/disjoint_noteq => l_neq_att_sign.
-    have att_loc_in : attest_loc_long \in fset [:: attest_loc_long; sign_loc].
-    1:{ auto_in_fset. }
-    have sign_loc_in : sign_loc \in fset [:: attest_loc_long; sign_loc].
-    1:{ auto_in_fset. }
     case: h_full_heap_eq => full_heap_left full_heap_right.
     split.
     - have l_neq_att_loc := l_neq_att_sign attest_loc_long att_loc_in.
@@ -985,20 +989,6 @@ Module HeapHash.
     eapply put_pre_cond_full_heap
     : ssprove_invariant.
 
-  Locate ">->".
-  Locate morphism_1.
-  Print Coq.ssr.ssrfun.
-
-  Print fmap.
-
-  (*
-    May it is just better to do this via fset using [domm] on the map.
-    The problem is the way back.
-   *)
-
-  Definition fmap_kmap {S} {T T':ordType} (f: T->T') (m:{fmap T -> S}) : {fmap T' -> S} :=
-    mkfmap (map (pair_fmap f) m).
-
   Lemma size_length_eq: forall A (l: seq.seq A),
       size l = length l.
   Proof.
@@ -1010,19 +1000,6 @@ Module HeapHash.
   Proof.
     repeat rewrite size_length_eq; apply: map_length.
   Qed.
-
-  Check mapm2E.
-
-  (*
-  Lemma mapm2E' (T T':ordType) S S' (f : T -> T') (g : S -> S') (m:{fmap T -> S}) (x:T) :
-    injective f ->
-    mapm2 f g m (f x) = omap g (m x).
-  Proof.
-    rewrite /mapm2 => f_inj; rewrite mkfmapE /getm.
-    case: m=> [/= m _]; elim: m=> [|[x' y] m IH] //=.
-    by rewrite (inj_eq f_inj) [in RHS]fun_if IH.
-  Qed.
-   *)
 
   Lemma fmap_kmap_setm {S} {T T': ordType}:
     forall (f: T -> T') (k:T) (v:S) (m: {fmap T -> S}),
@@ -1379,7 +1356,24 @@ Module HeapHash.
              }
              move/eqP/eqP: E; rewrite eqtype.eq_sym => x'_neq_k.
              exact: (neq_inj x' k inj_f x'_neq_k).
-    Qed.
+  Qed.
+
+  Definition prod_dist (A B C : Type) (n: A*B*C) : (A*(B*C)) :=
+    let (m,c) := n in let (a,b) := m in (a,(b,c)).
+
+  Lemma pair_dist_eq {A B C : Type} {a0 a1: A} {b0 b1: B} {c0 c1: C}:
+    (a0,(b0,c0)) = (a1,(b1,c1)) ->
+    (a0,b0,c0) = (a1,b1,c1).
+  Proof.
+    move/pair_equal_spec; case => a0_eq_a1.
+    move/pair_equal_spec => [b0_eq_b1 c0_eq_c1].
+    Search pair eq.
+    have x := conj a0_eq_a1 b0_eq_b1.
+    rewrite -pair_equal_spec in x.
+    have y := conj x c0_eq_c1.
+    rewrite -pair_equal_spec in y.
+    exact: y.
+  Qed.
 
   Lemma preserve_mem_full_heap_eq:
     forall {sign_loc_val: Value sign_loc.π1} {att_loc_val: Value attest_loc_long.π1} state x y,
@@ -1460,11 +1454,18 @@ Module HeapHash.
       apply: fmap_kmap_setm.
       move => [[sig1 state1] chal1] [[sig2 state2] chal2] //=.
       move => h.
-      have Hash_inj: injective Hash.
-      1 : { admit. }
-      f_equal.
-  Admitted.
-
+      have Hash_inj_pair := Collision_Resistence (state1,chal1) (state2,chal2).
+      move/pair_equal_spec:h => [sig1_eq_sig2 hash1_eq_hash2].
+      apply: pair_dist_eq.
+      apply/pair_equal_spec; split.
+      + exact: sig1_eq_sig2.
+      + exact: (Hash_inj_pair hash1_eq_hash2).
+    - move => l l_notin.
+      rewrite (get_set_heap_neq _ _ _ _ (disjoint_noteq l_notin att_loc_in)).
+      rewrite (get_set_heap_neq _ _ _ _ (disjoint_noteq l_notin sign_loc_in)).
+      move:h; rewrite /full_heap_eq'/(_ ⋊ _); repeat case; move => _ other_heap_eq _ _.
+      exact: (other_heap_eq l l_notin).
+  Qed.
 
   Lemma l_in_lSet {l:Location}: l \in (fset [:: l]).
   Proof.
@@ -1637,40 +1638,32 @@ Module HeapHash.
 
         (* normally: [ssprove_invariant] TODO *)
         rewrite /preserve_update_mem/remember_pre/update_heaps.
+        apply: preserve_mem_full_heap_eq.
+    - by [].
+    - case: x => a b.
+      ssprove_swap_lhs 0.
+      
+      sync_sig_att.
+      1: { auto_in_fset. }
+      move => x.
 
-          preserve_update_mem
-            [:: hpv_r sign_loc
-               (setm
-                  (T:=prod_ordType
-                        [ordType of 'I_(2 ^ Signature.n)%Nrec]
-                        [ordType of 'I_(2 ^ Signature.n)%Nrec])
-                  sign_loc_val
-                  (Sign (nfst KeyGen) (Hash state x), Hash state x)
-                  tt);
-             hpv_l attest_loc_long
-               (setm
-                  (T:=prod_ordType
-                        (prod_ordType
-                           [ordType of 'I_(2 ^ Signature.n)%Nrec]
-                           [ordType of 'I_(2 ^ Signature.n)%Nrec])
-                        [ordType of 'I_#|Challenge|])
-                  att_loc_val
-                  (Sign (nfst KeyGen) (Hash state x), state, x)
-                  tt)
-            ]
-              [:: hpv_r sign_loc sign_loc_val; hpv_l attest_loc_long att_loc_val]
-              full_heap_eq'
+      rewrite -(reshape_pair_id full_heap_eq').
+      eapply r_get_remember_lhs => att_loc_val.
+      eapply r_get_remember_rhs => sign_loc_val.
 
-
-        ssprove_invariant.
-        
-
-        (* TODO here I'm getting to the core of the lemma. *)
-
+      eapply r_ret => s0 s1 pre.
+      split.
+      + move:pre; rewrite /full_heap_eq'/(_ ⋊ _); repeat case; rewrite /rem_lhs; case => [heq other_eq att_loc_val_eq].
+        rewrite /rem_rhs => sign_loc_val_eq.
+        Search domm.
+        repeat rewrite mem_domm.
+        rewrite -att_loc_val_eq -sign_loc_val_eq.
+        rewrite /hash_eq in heq.
+        admit.
+    - by [].
   Admitted.
 
 
-  
   Lemma sig_ideal_vs_att_ideal_old :
     Att_ideal_locp ≈₀ Aux_Prim_ideal.
   Proof.
