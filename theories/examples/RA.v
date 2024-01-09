@@ -660,7 +660,7 @@ Module HeapHash.
   (*
   ch_Message (from sign_loc) = Hash(State, Challenge) (from att_long_loc)
   *)
-
+(*
     Lemma disjoint_noteq:
       forall {T:ordType} {l0} {L0: {fset T}}, l0 \notin L0 -> forall {l0'}, l0' \in L0 -> l0 != l0'.
     Proof.

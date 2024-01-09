@@ -97,6 +97,25 @@ That still does not explain the weird error that we see when using the union of 
 
   Parameter Ver_sig : ∀ (pk : PubKey) (sig : Signature) (m : chMessage), 'bool.
 
+  (* Lemma to show the goal of protocol file *)
+
+  Check setm.
+
+  Parameter Signature_prop:
+    ∀ (A:ordType) (l: {fmap (Signature * A * A ) -> (Signature * A * A )}) 
+      (s : A) (pk : PubKey)  (chal : A) (h  : chMessage),
+    Ver_sig pk (Sign pk h) h = ((Sign pk h, s, chal) \in domm l).
+
+
+  (*
+  Ver_sig pk_loc (Sign (nfst KeyGen) (Hash state_loc chal)) (Hash state_loc2 chal) =
+    ((Sign (nfst KeyGen) (Hash state_loc chal), state_loc2, chal)
+   \in domm
+         (T:=prod_ordType (prod_ordType [ordType of 'I_pos_n] [ordType of 'I_pos_n])
+               [ordType of 'I_#|Challenge|]) (S:=Datatypes.unit) attest_loc2)
+               *)
+
+
 End SignatureAlgorithms.
 
 Module Type SignaturePrimitives
