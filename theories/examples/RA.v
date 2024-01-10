@@ -61,6 +61,8 @@ Obligation Tactic := idtac.
 #[local] Open Scope package_scope.
 
 Require Import examples.Signature.
+Require Import extructurespp.ord.
+Require Import extructurespp.fmap.
 
 Module HeapHash.
 
@@ -1110,228 +1112,7 @@ Module HeapHash.
 
         (* TODO move into own lemmas *)
 
-        have neq_ltgt (A:ordType) (a b: A):
-          (a == b) = false -> (a < b)%ord || (b < a)%ord
-          by [case: (Ord.ltgtP a b)].
-
-        have setm_def_seq_cons (A:ordType) B (a0 a1:A) (b0 b1:B) (s: seq.seq (A * B)) :
-          (a0 < a1)%ord ->
-          ((a0,b0) :: ((a1,b1) :: s)) = setm_def (T:=A) ((a1,b1) :: s) a0 b0.
-        1: { clear.
-             rewrite /setm_def //= => h.
-             rewrite ifT //=.
-        }
-
-        have setm_def_seq_nil (A:ordType) B (a:A) (b:B) :
-          (a,b) :: nil = setm_def (T:=A) (nil) a b.
-        1: { clear. by []. }
-
-        have setm_def_seq_cons_eq (A:ordType) B (a0 a1:A) (b0 b1:B) (s: seq.seq (A * B)) :
-          a0 == a1 ->
-          (a0,b0) :: s = setm_def (T:=A) ((a1,b1) :: s) a0 b0.
-        1: {clear.
-            rewrite /setm_def //= => h.
-            rewrite ifF.
-            - by [rewrite ifT].
-            - move:h; move/eqP => h; rewrite h.
-              apply: Ord.ltxx.
-        }
-
-        have setm_def_seq_cons_eq' (A:ordType) B (a:A) (b0 b1:B) (s: seq.seq (A * B)) :
-          (a,b0) :: s = setm_def (T:=A) ((a,b1) :: s) a b0.
-        1: { apply: (setm_def_seq_cons_eq A B a a b0 b1 s (eqtype.eq_refl a)). }
-
-        have getm_def_setm_defxy (A:ordType) B (a0 a1:A) (b0 b1:B) (s: seq.seq (A * B)):
-          getm_def (T:=A) (setm_def (T:=A) ((a0, b0) :: s) a1 b1) a1 = Some b1.
-        1:{
-          elim: ((a0,b0) :: s) => [| [a0' b0'] s' iH] //=.
-          - by [rewrite ifT].
-          - rewrite /setm_def /= -/(setm_def s a1 b1).
-            case H: (a1 == a0').
-            + move/eqP: H => H; rewrite H.
-              rewrite ifF //=.
-              * repeat rewrite ifT //=.
-              * apply: Ord.ltxx.
-          + have a1_neq_a0 := H.
-            move/neq_ltgt/orP:H.
-            case => [a1_lt_a0|a0_lt_a1].
-            * rewrite ifT //= ifT //=.
-            * rewrite ifF.
-              ** rewrite /getm_def /= -/(getm_def _ a1) -/(setm_def s' a1 b1).
-                 rewrite ifF /=.
-                 *** apply: iH.
-                 *** by [].
-              ** by [move/eqP: a0_lt_a1; case: (Ord.ltgtP a1 a0')].
-        }
-
-        have getm_def_setm_defxx (A:ordType) B (a:A) (b:B) (s: seq.seq (A * B)):
-          getm_def (T:=A) (setm_def (T:=A) s a b) a = Some b.
-        1:{
-          case: s => [|[a' b'] s'].
-          - by [rewrite -setm_def_seq_nil /= ifT].
-          - case H: (a == a').
-            + by [move/eqP:H => H; rewrite H -setm_def_seq_cons_eq' /= ifT].
-            + by [apply: getm_def_setm_defxy].
-        }
-
-        have ord_lt_false (A:ordType) (a a': A) : (a' < a)%ord = true -> (a < a')%ord = false.
-        1: {
-          (* TODO there must be a simpler version of thios proof!
-
-             see below:
-             move => h.
-             rewrite /Ord.lt.
-             apply/negP/negP/nandP.
-             left.
-             rewrite Ord.ltNge in h; exact: h.
-           *)
-          clear.
-          move => h2.
-          move/idP: h2 => h2.
-          rewrite Ord.lt_neqAle in h2.
-          move/andP: h2; case => a_neq_a' a_lt_a'.
-          case: Ord.ltgtP => //=.
-          move => h.
-          rewrite Ord.leq_eqVlt in a_lt_a'.
-          move/orP: a_lt_a'. case.
-          - move/eqP => a_eq_a' => //=. rewrite a_eq_a' in a_neq_a'. move/eqP: a_neq_a' => //=.
-          - move => a'_lt_a //=.
-            have bla := a'_lt_a.
-            move/eqP/eqP: bla => bla; rewrite -bla.
-
-            apply Ord.ltW in h.
-            apply Ord.ltW in a'_lt_a.
-            have c:= conj h a'_lt_a.
-            move/andP: c => c.
-            have d := (Ord.anti_leq c).
-            rewrite d.
-            by [apply Ord.ltxx].
-        }
-
-        have  getm_def_setm_defE (A:ordType) B (a x:A) (b:B) (s: seq.seq (A * B)):
-          (x == a = false) ->
-          getm_def (T:=A) (setm_def (T:=A) s a b) x = getm_def (T:=A) s x.
-        1:{
-          move => a_neq_x.
-          elim: s => [| [a' b'] s' iH].
-          - rewrite /getm_def /= ifF //=.
-          - move => //=.
-            case x_neq_a': (x == a').
-            + have a_neq_x' := a_neq_x.
-              move/eqP: x_neq_a' => x_neq_a'; rewrite x_neq_a' in a_neq_x'.
-              move/neq_ltgt/orP: a_neq_x'; case => [a'_lt_a|a_lt_a'].
-              * move/eqP/eqP: a'_lt_a => a'_lt_a.
-                rewrite ifF //=.
-                ** rewrite ifF //=.
-                   *** rewrite ifT //=.
-                       by [apply/eqP].
-                   *** by [rewrite x_neq_a' eqtype.eq_sym in a_neq_x].
-                ** (* a != a' and a' < a *)
-                  apply (ord_lt_false _ _ _ a'_lt_a).
-              * rewrite ifT //= ifF.
-                ** by [rewrite x_neq_a' ifT].
-                ** exact: a_neq_x.
-            + have a_neq_x' := a_neq_x.
-              move/neq_ltgt/orP: a_neq_x'; case => [x_lt_a|a_lt_x].
-              * rewrite eqtype.eq_sym in x_neq_a'.
-                have x_neq_a'' := x_neq_a'.
-                move/neq_ltgt/orP: x_neq_a''; case => [a'_lt_x|x_lt_a'].
-                ** have a'_lt_a := Ord.lt_trans a'_lt_x x_lt_a.
-                   have a'_lt_a' := a'_lt_a.
-                   move: a'_lt_a'; rewrite /Ord.lt; move/andP => [a'_leq_a a'_neq_a].
-                   move: a'_lt_x; rewrite /Ord.lt; move/andP => [a'_leq_x a'_neq_x].
-                   move: x_lt_a; rewrite /Ord.lt; move/andP => [x_leq_a x_neq_a].
-                   have t:= (Ord.leq_trans a'_leq_x x_leq_a).
-                   rewrite ifF //=.
-                   *** rewrite ifF //=.
-                       **** rewrite ifF.
-                            ***** by [exact: iH].
-                            ***** apply/eqP/eqP; rewrite eqtype.eq_sym; exact: a'_neq_x.
-                       **** apply/eqP/eqP; rewrite eqtype.eq_sym; exact: a'_neq_a.
-                   *** rewrite eqtype.eq_sym.
-                       apply/negP/negP/nandP.
-                       left.
-                       rewrite Ord.ltNge in a'_lt_a. exact: a'_lt_a.
-                ** case a_lt_a': (a < a')%ord => //=.
-                   *** by [rewrite ifF //= ifF //= eqtype.eq_sym].
-                   *** move: a_lt_a'; rewrite /Ord.lt; move/nandP; case.
-                       **** rewrite -Ord.ltNge /Ord.lt; move/andP => [a'_leq_a a'_neq_a].
-                            rewrite ifF //=.
-                            ***** rewrite ifF.
-                            ****** exact: iH.
-                            ****** rewrite eqtype.eq_sym; exact: x_neq_a'.
-                            ***** apply/negP/negP; rewrite eqtype.eq_sym; exact: a'_neq_a.
-                       **** move/negbNE => a_eq_a'. rewrite ifT //=.
-                            by [rewrite ifF].
-              * case a_lt_a': (a < a')%ord => //=. (* TODO same as above: refactor! *)
-                   ** by [rewrite ifF //= ifF //= eqtype.eq_sym].
-                   ** move: a_lt_a'; rewrite /Ord.lt; move/nandP; case.
-                       *** rewrite -Ord.ltNge /Ord.lt; move/andP => [a'_leq_a a'_neq_a].
-                            rewrite ifF //=.
-                            **** rewrite ifF.
-                            ***** exact: iH.
-                            ***** exact: x_neq_a'.
-                            **** apply/negP/negP; rewrite eqtype.eq_sym; exact: a'_neq_a.
-                       *** move/negbNE => a_eq_a'. rewrite ifT //=.
-                            by [rewrite ifF].
-        }
-
-        have lt_antisym (A:ordType) (a b:A) : (a < b)%ord = true -> (b < a)%ord = false.
-        1:{
-          clear.
-          move/idP => a_lt_b.
-          rewrite /Ord.lt; apply/nandP; left.
-          rewrite -Ord.ltNge; exact: a_lt_b.
-        }
-
-        have setm_def_seq_consE (A:ordType) B (a:A) (b0 b1:B) (s: seq.seq (A * B)) :
-          mkfmap (setm_def (T:=A) s a b0) = mkfmap (setm_def (T:=A) ((a,b1) :: s) a b0).
-        1: {
-             rewrite -eq_fmap.
-             rewrite /eqfun => x.
-             repeat rewrite mkfmapE.
-             case: s => [| [k' v'] s'].
-             - rewrite /setm_def [RHS]//=.
-               rewrite ifF.
-               + by [rewrite ifT].
-               + apply: Ord.ltxx.
-             - rewrite /setm_def //=. rewrite -/(setm_def s' a b0).
-               rewrite [in RHS]ifF.
-               + rewrite [in RHS]ifT => [|//=].
-                 case H: (a == k').
-                 * move: H; move/eqP => H.
-                   rewrite ifF.
-                   ** case P: (x == a).
-                      *** move: P; move/eqP => P; rewrite P.
-                          rewrite /getm_def //=.
-                          repeat rewrite ifT //=.
-                      *** rewrite /getm_def //=.
-                          rewrite ifF //=.
-                          rewrite -/(getm_def s' x).
-                          rewrite ifF //=.
-                          rewrite H in P.
-                          rewrite ifF //=.
-                   ** rewrite H; apply Ord.ltxx.
-                 * move: H; move/neq_ltgt/orP.
-                   case => [a_lt_k|k_lt_a].
-                   ** rewrite ifT //=.
-                   ** rewrite ifF.
-                      *** rewrite /getm_def //=.
-                          case I: (x == a).
-                          **** rewrite ifF //=.
-                          ***** rewrite -/(getm_def (setm_def _ _ _)).
-                                move/eqP:I => I; rewrite I.
-                                apply: getm_def_setm_defxx.
-                          ***** move/eqP: I => I; rewrite I.
-                                move/eqP: k_lt_a; case: (Ord.ltgtP a k') => //=.
-                          **** repeat rewrite -/(getm_def _ x).
-                               by [rewrite getm_def_setm_defE].
-                      *** move: k_lt_a; move/eqP/eqP.
-                          apply: (lt_antisym _ _ _).
-               + apply: Ord.ltxx.
-        }
-
-        rewrite (setm_def_seq_cons_eq' _ _ _ _ y).
+        rewrite (@setm_def_seq_cons_eq' _ _ _ _ y).
         move => //=.
         rewrite ifF /=.
         * rewrite ifT //= ifF /=.
@@ -1367,7 +1148,6 @@ Module HeapHash.
   Proof.
     move/pair_equal_spec; case => a0_eq_a1.
     move/pair_equal_spec => [b0_eq_b1 c0_eq_c1].
-    Search pair eq.
     have x := conj a0_eq_a1 b0_eq_b1.
     rewrite -pair_equal_spec in x.
     have y := conj x c0_eq_c1.
@@ -1640,12 +1420,12 @@ Module HeapHash.
         rewrite /preserve_update_mem/remember_pre/update_heaps.
         apply: preserve_mem_full_heap_eq.
     - by [].
-    - case: x => a b.
+    - case: x => chal sig.
       ssprove_swap_lhs 0.
-      
+
       sync_sig_att.
       1: { auto_in_fset. }
-      move => x.
+      move => state.
 
       rewrite -(reshape_pair_id full_heap_eq').
       eapply r_get_remember_lhs => att_loc_val.
@@ -1655,15 +1435,30 @@ Module HeapHash.
       split.
       + move:pre; rewrite /full_heap_eq'/(_ ⋊ _); repeat case; rewrite /rem_lhs; case => [heq other_eq att_loc_val_eq].
         rewrite /rem_rhs => sign_loc_val_eq.
-        Search domm.
         repeat rewrite mem_domm.
-        rewrite -att_loc_val_eq -sign_loc_val_eq.
-        rewrite /hash_eq in heq.
+        (* rewrite -att_loc_val_eq -sign_loc_val_eq. *)
+        move: heq; rewrite /hash_eq/fmap_kmap'/mapm2.
+        rewrite att_loc_val_eq sign_loc_val_eq.
+        rewrite -eq_fmap /eqfun => heq.
+        have heq' := (heq (sig, Hash state chal)).
+        move: heq'; rewrite mkfmapE /=; move => heq'.
+
+        (*
+        have xxx:
+          injective f ->
+          getm_def [seq (f p.1, p.2) | p <- s] (f x) = getm_def [seq (p.1, p.2) | p <- s] x.
+
+        have yyy:
+          getm_def [seq (p.1, p.2) | p <- s] x = getm_def s x.
+         *)
+
         admit.
+      + admit.
     - by [].
   Admitted.
 
 
+  (* TODO *)
   Lemma sig_ideal_vs_att_ideal_old :
     Att_ideal_locp ≈₀ Aux_Prim_ideal.
   Proof.
