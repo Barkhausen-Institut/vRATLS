@@ -61,6 +61,8 @@ Obligation Tactic := idtac.
 #[local] Open Scope package_scope.
 
 Require Import examples.Signature.
+Require Import extructurespp.ord.
+Require Import extructurespp.fmap.
 
 Module HeapHash.
 
@@ -75,9 +77,9 @@ Module HeapHash.
     Parameter Challenge_pos : Positive #|Challenge|.
     #[local] Existing Instance Challenge_pos.
     Definition chChallenge := 'fin #|Challenge|.
-     
 
   End RemoteAttestationParams.
+
 
   Module Type RemoteAttestationAlgorithms
     (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
@@ -94,7 +96,7 @@ Module HeapHash.
     Notation " 'challenge " := chChallenge   (in custom pack_type at level 2).
     Notation " 'challenge " := chChallenge   (at level 2): package_scope.
     Notation " 'attest "    := Attestation    (in custom pack_type at level 2).
-    
+
     Definition state_loc   : Location := ('state    ; 4%N).
     Definition attest_loc  : Location := ('set (Signature × chMessage) ; 2%N).
 
@@ -105,6 +107,8 @@ Module HeapHash.
     Definition attest_f     : nat := 49.
 
     Parameter Hash : chState -> chChallenge -> chMessage.
+
+    Parameter Collision_Resistence: injective (uncurry Hash).
 
   End RemoteAttestationAlgorithms.
 
@@ -564,7 +568,7 @@ Module HeapHash.
     Qed.
   
     Definition Comp_locs := fset [:: pk_loc; sk_loc ; state_loc ; sign_loc ].
-  
+
     (* You need to redefine [Aux] to match the import interface of [Aux] to
        the export interface of [Prim_ideal]  *)
     Definition Aux_ideal : package Aux_locs Prim_interface Att_interface :=
@@ -574,7 +578,7 @@ Module HeapHash.
         pk ← get pk_loc ;;
         ret pk
       };
-  
+
       #def #[attest] ( chal : 'challenge ) : ('signature × 'message)
       {
         #import {sig #[sign] : 'message  → 'signature } as sign ;;
@@ -583,7 +587,7 @@ Module HeapHash.
         att ← sign msg ;;
         ret (att, msg)
       };
-  
+
       #def #[verify_att] ('(chal, att) : 'challenge × 'signature) : 'bool
       {
         #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
@@ -593,7 +597,7 @@ Module HeapHash.
         ret b
       }
     ].
-  
+
     Definition Prim_real_locp := {locpackage Prim_real}.
     Definition Prim_ideal_locp := {locpackage Prim_ideal}.
     Definition Att_real_locp := {locpackage Att_real}.
@@ -633,14 +637,29 @@ Module HeapHash.
     Definition attest_set := 'set (Signature × chState × chChallenge).
     Definition sign_set := 'set ('signature × 'message).
 
+    (* Normally, this would be located in a Functor.
+       This is just [fmap] on a tuple.
+     *)
+    Definition pair_fmap {S T T':Type} (f: T -> T') : (T * S) -> (T' * S) :=
+      λ '(t,s), (f t,s).
+
+    Lemma second_id : forall S T T' (f: T -> T') (t:T * S), snd (pair_fmap f t) = snd t.
+    Proof.
+      by [move => S T T' f; case => a b].
+    Qed.
+
     Require Import extructures.fmap.
 
+    Definition fmap_kmap' {S} {T T':ordType} (f: T->T') (m:{fmap T -> S}) : {fmap T' -> S} :=
+      mapm2 f id m.
+
     Definition hash_eq (a_loc : Value attest_loc_long.π1) (s_loc : Value sign_loc.π1) : Prop :=
-      (map (fun t =>
-              match t with
-              | ( (sig, state, challenge), x ) => ( (sig, Hash state challenge), x )
-              end)
-         (FMap.fmval a_loc)) = s_loc.
+      (fmap_kmap'
+         (fun t =>
+            match t with
+            | (sig, state, challenge) => (sig, Hash state challenge)
+            end)
+         a_loc) = s_loc.
 
     Definition full_heap_eq : precond  :=
       λ '(s0, s1),
@@ -799,6 +818,12 @@ Module HeapHash.
         hash_eq (get_heap s0 attest_loc_long) (get_heap s1 sign_loc) /\
           (forall {l:Location}, l \notin (fset [:: attest_loc_long ; sign_loc]) → get_heap s0 l = get_heap s1 l).
 
+  Lemma att_loc_in : attest_loc_long \in fset [:: attest_loc_long; sign_loc].
+  Proof. auto_in_fset. Qed.
+
+  Lemma sign_loc_in : sign_loc \in fset [:: attest_loc_long; sign_loc].
+  Proof. auto_in_fset. Qed.
+
   (* TODO generalize *)
   Lemma not_in_diff: forall l,
       l \notin Attestation_locs_ideal ->
@@ -937,10 +962,6 @@ Module HeapHash.
     move: h_disjoint'; rewrite fdisjointC; move/fdisjointP; move => h_notin.
     have l_in_L' := l_in_L.
     move: l_in_L'; move/h_notin. move/disjoint_noteq => l_neq_att_sign.
-    have att_loc_in : attest_loc_long \in fset [:: attest_loc_long; sign_loc].
-    1:{ auto_in_fset. }
-    have sign_loc_in : sign_loc \in fset [:: attest_loc_long; sign_loc].
-    1:{ auto_in_fset. }
     case: h_full_heap_eq => full_heap_left full_heap_right.
     split.
     - have l_neq_att_loc := l_neq_att_sign attest_loc_long att_loc_in.
@@ -969,6 +990,262 @@ Module HeapHash.
   #[export] Hint Extern 10 (put_pre_cond _ _ full_heap_eq') =>
     eapply put_pre_cond_full_heap
     : ssprove_invariant.
+
+  Lemma size_length_eq: forall A (l: seq.seq A),
+      size l = length l.
+  Proof.
+    by [].
+  Qed.
+
+  Lemma map_size T T' (f: T->T') (l: seq.seq T):
+      size (map f l) = size l.
+  Proof.
+    repeat rewrite size_length_eq; apply: map_length.
+  Qed.
+
+  Lemma fmap_kmap_setm {S} {T T': ordType}:
+    forall (f: T -> T') (k:T) (v:S) (m: {fmap T -> S}),
+      (* k \notin domm m -> *)
+      injective f -> (* if this is bijective then I would not end up in omap! *)
+      fmap_kmap' f (setm m k v) = setm (fmap_kmap' f m) (f k) v.
+  Proof.
+    Print fmap_kmap'.
+    move => f k v m inj_f.
+    rewrite /fmap_kmap'.
+    Fail rewrite [X in _ = setm _ X]mapm2E.
+    (* TODO *)
+    Check eq_fmap.
+    (* rewrite -eq_fmap. *)
+    Locate "=1".
+    Print eqfun.
+
+   (** * Approach 1:
+
+    elim/fmap_ind H: (setm m k v) => [|m0 iH k0 v0 k0_notin].
+    - admit.
+    - rewrite -iH. f_equal.
+
+      Using the
+        [iH : mapm2 (T:=T) (T':=T') f id m0 = setm (T:=T') (mapm2 (T:=T) (T':=T') f id m) (f k) v]
+      works here but the [iH] looks strange and so does the goal then:
+        [setm (T:=T) m0 k0 v0 = m0]
+      I can only prove this if I would have that
+        [m0 k0 = v0].
+      But that is certainly not the case:
+        [k0_notin : k0 \notin domm (T:=T) (S:=S) m0].
+      *)
+
+    (** * Approach 2:
+
+    move: k v.
+    elim/fmap_ind H: m => [|m0 iH k0 v0 k0_notin].
+    - by [].
+    - move => k v.
+
+      The induction hypothesis looks good:
+       [iH : ∀ (k : T) (v : S),
+         mapm2 (T:=T) (T':=T') f id (setm (T:=T) m0 k v) = setm (T:=T') (mapm2 (T:=T) (T':=T') f id m0) (f k) v]
+      but I did not really gain anything towards my goal:
+       [mapm2 (T:=T) (T':=T') f id (setm (T:=T) (setm (T:=T) m0 k0 v0) k v) =
+          setm (T:=T') (mapm2 (T:=T) (T':=T') f id (setm (T:=T) m0 k0 v0)) (f k) v]
+      I just added another [setm].
+      I could say now that [case: k0 == k].
+      But even that would not buy me anything because
+        [k0_notin : k0 \notin domm (T:=T) (S:=S) m0]
+      only talks about [m0] so I would have to cover both cases.
+     *)
+
+
+    (** * Possible inductions via [seq]: *)
+
+    rewrite /mapm2.
+
+    (** * Approach 3:
+
+    elim: (FMap.fmval m).
+    2 goals (ID 30990)
+
+    S : Type
+    T, T' : ordType
+    f : T -> T'
+    k : T
+    v : S
+    m : {fmap T -> S}
+    inj_f : injective f
+    ============================
+    mkfmap (T:=T') [seq (f p.1, p.2) | p <- setm (T:=T) m k v] =
+    setm (T:=T') (mkfmap (T:=T') [seq (f p.1, p.2) | p <- [::]]) (f k) v
+
+  goal 2 (ID 30991) is:
+   ∀ (a : T * S) (l : seq.seq (T * S)),
+     mkfmap (T:=T') [seq (f p.1, p.2) | p <- setm (T:=T) m k v] =
+     setm (T:=T') (mkfmap (T:=T') [seq (f p.1, p.2) | p <- l]) (f k) v ->
+     mkfmap (T:=T') [seq (f p.1, p.2) | p <- setm (T:=T) m k v] =
+     setm (T:=T') (mkfmap (T:=T') [seq (f p.1, p.2) | p <- a :: l]) (f k) v
+
+     This does not work either because it covers only the RHS of the equality.
+     The LHS has [FMap.fmval (setm (T:=T) m k v)].
+
+     *)
+
+    (** * Approach 4:
+        I get around the problem of approach 3 using the path
+        of the proof for [mapm2E] which basically throws away the ordering proof by destructuring the map [m].
+        Then, I can just do the induction on the sequence [m] and it works on both sides of the equality.
+     *)
+
+    case: m => [/= m _].
+    move: k v.
+    elim: m => [k v |[x' y] m IH k v].
+    - by [].
+    - (* Unset Printing Notations. *)
+
+      rewrite [in RHS]/seq.map.
+      move => //=.
+      rewrite -/(setm_def (T:=T) ((x', y) :: m) k v).
+      rewrite -[in RHS]/(seq.map _ m).
+      case E: (x' == k).
+      + move: E; move/eqP => E.
+        rewrite E.
+        rewrite setmxx.
+        rewrite -IH.
+
+        (* TODO move into own lemmas *)
+
+        rewrite (@setm_def_seq_cons_eq' _ _ _ _ y).
+        move => //=.
+        rewrite ifF /=.
+        * rewrite ifT //= ifF /=.
+          ** rewrite ifT //=.
+          ** apply: Ord.ltxx.
+        * apply: Ord.ltxx.
+      + move: E; move/eqP => E.
+        move => //=.
+        case k_lt_x': (k < x')%ord.
+        * by [].
+        * move/eqP/negPf: E; rewrite eqtype.eq_sym => E; rewrite ifF //=.
+          rewrite setmC.
+          ** f_equal. exact: IH.
+          ** rewrite /injective in inj_f.
+             (* TODO lift/move into lemma *)
+             have neq_inj a b (inj_f': injective f) (a_neq_b: a != b) : f a != f b.
+             1: {
+               case H: (f a == f b) => //=.
+               move/eqP/(inj_f' a b):H => a_eq_b.
+               rewrite a_eq_b in a_neq_b.
+               move/negPf: a_neq_b => b_neq_b; rewrite -b_neq_b //=.
+             }
+             move/eqP/eqP: E; rewrite eqtype.eq_sym => x'_neq_k.
+             exact: (neq_inj x' k inj_f x'_neq_k).
+  Qed.
+
+  Definition prod_dist (A B C : Type) (n: A*B*C) : (A*(B*C)) :=
+    let (m,c) := n in let (a,b) := m in (a,(b,c)).
+
+  Lemma pair_dist_eq {A B C : Type} {a0 a1: A} {b0 b1: B} {c0 c1: C}:
+    (a0,(b0,c0)) = (a1,(b1,c1)) ->
+    (a0,b0,c0) = (a1,b1,c1).
+  Proof.
+    move/pair_equal_spec; case => a0_eq_a1.
+    move/pair_equal_spec => [b0_eq_b1 c0_eq_c1].
+    have x := conj a0_eq_a1 b0_eq_b1.
+    rewrite -pair_equal_spec in x.
+    have y := conj x c0_eq_c1.
+    rewrite -pair_equal_spec in y.
+    exact: y.
+  Qed.
+
+  Lemma preserve_mem_full_heap_eq:
+    forall {sign_loc_val: Value sign_loc.π1} {att_loc_val: Value attest_loc_long.π1} state x y,
+      preserve_update_mem
+        [::
+           hpv_r sign_loc
+             (setm sign_loc_val (y, Hash state x) tt);
+           hpv_l attest_loc_long
+             (setm att_loc_val (y, state, x) tt)
+        ]
+        [:: hpv_r sign_loc sign_loc_val; hpv_l attest_loc_long att_loc_val]
+        full_heap_eq'.
+    move => sign_loc_val att_loc_val state x y.
+    rewrite /preserve_update_mem/remember_pre => s0 s1 h.
+    rewrite /full_heap_eq' //=.
+    split.
+    - move: h; rewrite /full_heap_eq'/(_ ⋊ _); repeat case; move => hasheq heq att_loc_mem sign_loc_mem.
+      do 2! rewrite get_set_heap_eq.
+      rewrite /hash_eq.
+      (* At this point, we are at the core of the whole proof.
+         we need to reason now about the map function.
+         [hasheq] is my precondition which says:
+         The values stored at [attest_loc_long] and [sign_loc] are [hash_eq] equal.
+         Now I need to show that this property is preserved when adding new values.
+         The proof is by induction on the values of [att_loc_val] and [sign_loc].
+         This becomes clear when unfolding [map].
+       *)
+      Fail elim: (setm att_loc_val (y,state, x) tt).
+      (* The challenge is to cancel the empty map case because the map
+         is obviously not empty!
+       *)
+
+      (*
+      TODO: I need to find a way to rewrite the LHS into
+      [ [:: (y, state,x , tt); att_loc_val] ].
+      If I managed to do that then I can unfold [map] and simplify.
+
+      This is not possible because the sequence is ordered.
+      Hence it is not clear at which position [(y,state,x,tt) is located. ]
+       *)
+
+      (* Preserved. *)
+      move: att_loc_mem.
+      elim/fmap_ind H: att_loc_val => [|m iH key value].
+      + move => att_loc_mem //=.
+        (* Now I have to show that [sign_loc_val] is also empty. *)
+        rewrite /rem_lhs in att_loc_mem.
+        move: hasheq; rewrite /hash_eq att_loc_mem //= => hasheq.
+        rewrite /rem_rhs in sign_loc_mem; rewrite sign_loc_mem in hasheq.
+        by [rewrite -hasheq].
+      + move => key_notin att_loc_mem.
+        move: m iH H key_notin att_loc_mem  => initial_set iH H key_notin att_loc_mem.
+
+        rewrite /rem_lhs in iH.
+        rewrite /rem_lhs in att_loc_mem.
+
+        (*
+          At this point I'm stuck.
+          I will never be able to use the [iH] because of [att_loc_mem].
+
+          Another question is then:
+          Can I even use the induction over fmap then?!
+         *)
+
+        Restart.
+
+    move => sign_loc_val att_loc_val state x y.
+    rewrite /preserve_update_mem/remember_pre => s0 s1 h.
+    rewrite /full_heap_eq' //=.
+    split.
+    - move: h; rewrite /full_heap_eq'/(_ ⋊ _); repeat case; move => hasheq heq att_loc_mem sign_loc_mem.
+      rewrite /rem_lhs in att_loc_mem.
+      move: hasheq; rewrite /hash_eq att_loc_mem //= => att_loc_sign_loc_eq.
+      rewrite /rem_rhs in sign_loc_mem; rewrite sign_loc_mem in att_loc_sign_loc_eq.
+      do 2! rewrite get_set_heap_eq.
+      rewrite -att_loc_sign_loc_eq.
+
+      apply: fmap_kmap_setm.
+      move => [[sig1 state1] chal1] [[sig2 state2] chal2] //=.
+      move => h.
+      have Hash_inj_pair := Collision_Resistence (state1,chal1) (state2,chal2).
+      move/pair_equal_spec:h => [sig1_eq_sig2 hash1_eq_hash2].
+      apply: pair_dist_eq.
+      apply/pair_equal_spec; split.
+      + exact: sig1_eq_sig2.
+      + exact: (Hash_inj_pair hash1_eq_hash2).
+    - move => l l_notin.
+      rewrite (get_set_heap_neq _ _ _ _ (disjoint_noteq l_notin att_loc_in)).
+      rewrite (get_set_heap_neq _ _ _ _ (disjoint_noteq l_notin sign_loc_in)).
+      move:h; rewrite /full_heap_eq'/(_ ⋊ _); repeat case; move => _ other_heap_eq _ _.
+      exact: (other_heap_eq l l_notin).
+  Qed.
 
   Lemma l_in_lSet {l:Location}: l \in (fset [:: l]).
   Proof.
@@ -1027,6 +1304,11 @@ Module HeapHash.
     f_equal.
     do 2! apply functional_extensionality => ?.
     apply post_eq_post'.
+  Qed.
+
+  Lemma reshape_pair_id {T T0 T1 : Type} (f : T * T0 -> T1) : (fun '(pair x y) => f (pair x y)) = f.
+  Proof.
+    apply functional_extensionality; by [case].
   Qed.
 
   Lemma put_bind:
@@ -1114,13 +1396,69 @@ Module HeapHash.
         move => _.
         (* put done *)
 
+        (* gets *)
+        Fail eapply r_get_remember_lhs.
+        (* I have to reshape the precondition into:
+           [λ '(s0, s1), full_heap_eq' (s0, s1)]
+         *)
+        rewrite -(reshape_pair_id full_heap_eq').
+        eapply r_get_remember_lhs => att_loc_val.
+        eapply r_get_remember_rhs => sign_loc_val.
+        (* gets done *)
 
-        (* TODO here I'm getting to the core of the lemma. *)
+        (* puts *)
+        eapply r_put_lhs.
+        eapply r_put_rhs.
+        (* puts done *)
 
+        ssprove_restore_mem.
+        2: { eapply r_ret => s0 s1 set_vals.
+             exact: (conj set_vals erefl).
+        }
+
+        (* normally: [ssprove_invariant] TODO *)
+        rewrite /preserve_update_mem/remember_pre/update_heaps.
+        apply: preserve_mem_full_heap_eq.
+    - by [].
+    - case: x => chal sig.
+      ssprove_swap_lhs 0.
+
+      sync_sig_att.
+      1: { auto_in_fset. }
+      move => state.
+
+      rewrite -(reshape_pair_id full_heap_eq').
+      eapply r_get_remember_lhs => att_loc_val.
+      eapply r_get_remember_rhs => sign_loc_val.
+
+      eapply r_ret => s0 s1 pre.
+      split.
+      + move:pre; rewrite /full_heap_eq'/(_ ⋊ _); repeat case; rewrite /rem_lhs; case => [heq other_eq att_loc_val_eq].
+        rewrite /rem_rhs => sign_loc_val_eq.
+        repeat rewrite mem_domm.
+        (* rewrite -att_loc_val_eq -sign_loc_val_eq. *)
+        move: heq; rewrite /hash_eq/fmap_kmap'/mapm2.
+        rewrite att_loc_val_eq sign_loc_val_eq.
+        rewrite -eq_fmap /eqfun => heq.
+        have heq' := (heq (sig, Hash state chal)).
+        move: heq'; rewrite mkfmapE /=; move => heq'.
+
+        (*
+        have xxx:
+          injective f ->
+          getm_def [seq (f p.1, p.2) | p <- s] (f x) = getm_def [seq (p.1, p.2) | p <- s] x.
+
+        have yyy:
+          getm_def [seq (p.1, p.2) | p <- s] x = getm_def s x.
+         *)
+
+        admit.
+      + admit.
+    - by [].
   Admitted.
 
 
-  
+  (* TODO *)
   Lemma sig_ideal_vs_att_ideal_old :
     Att_ideal_locp ≈₀ Aux_Prim_ideal.
   Proof.
