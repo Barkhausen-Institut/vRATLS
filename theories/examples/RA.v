@@ -1443,14 +1443,7 @@ Module HeapHash.
         have heq' := (heq (sig, Hash state chal)).
         move: heq'; rewrite mkfmapE /=; move => heq'.
 
-        (*
-        have xxx:
-          injective f ->
-          getm_def [seq (f p.1, p.2) | p <- s] (f x) = getm_def [seq (p.1, p.2) | p <- s] x.
-
-        have yyy:
-          getm_def [seq (p.1, p.2) | p <- s] x = getm_def s x.
-         *)
+        rewrite [LHS]getm_def_injx in heq'.
 
         admit.
       + admit.
