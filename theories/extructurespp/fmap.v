@@ -7,6 +7,14 @@ From Coq Require Import Utf8.
 From extructures Require Import ord fset fmap.
 Require Import extructurespp.ord.
 
+
+(*
+  TODO:
+  The conversion from [setm] to [setm_def] etc.
+  is always the same. So I guess one can state
+  the same facts also directly for [fmap]!
+ *)
+
 Section Facts.
 
   Variable A:ordType.
@@ -186,5 +194,22 @@ Section Facts.
                  apply: lt_antisym.
       + apply: Ord.ltxx.
   Qed.
+
+
+  Lemma getm_def_injx {A':ordType} {a:A} {a':A'} {f: A -> A'} {s: seq.seq (A * B)} {s': seq.seq (A' * B)} :
+    injective f ->
+    getm_def [seq (f p.1, p.2) | p <- s] (f a) = getm_def [seq (p.1, p.2) | p <- s'] a'.
+  Proof.
+
+  Admitted.
+
+  Lemma getm_def_seq_map_id {a:A} {s: seq.seq (A * B)} :
+    getm_def [seq (p.1, p.2) | p <- s] a = getm_def s a.
+  Proof.
+    (*
+      TODO Should be trivial by [seq.map id].
+     *)
+  Admitted.
+
 
 End Facts.
