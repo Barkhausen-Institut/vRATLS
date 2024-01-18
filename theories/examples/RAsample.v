@@ -69,27 +69,18 @@ Module Protocol
     (π4 : HeapHash.RemoteAttestationAlgorithms π1 π2 π3)
     (π5 : SignaturePrimitives π1 π2 π3)
     (π6 : HeapHash.RemoteAttestationHash π1 π2 π3 π4 π5)
-    (π7 : SignatureProt π1 π2 π3 π5).
+    (π7 : SignatureProt π1 π2 π3 π5)
+    (π8 : HeapHash.RemoteAttestationHash π1 π2 π3 π4 π5).
 
-  Import π1 π2 π3 π4 π5 π6 π7.
-
-  Definition chal_loc   : Location := ('challenge ; 5%N).
-  Definition RA_locs := fset [:: state_loc ; chal_loc ; pk_loc].
-  Definition RA   : nat := 46. 
-
-  Parameter Hash' : chState -> chChallenge -> chMessage.
+  Import π1 π2 π3 π4 π5 π6 π7 π8.
 
   Definition i_chal := #|Challenge|.
-
-  Definition RA_locs_real := fset [:: pk_loc ; sk_loc ; chal_loc ; state_loc ; sign_loc ].
-  Definition RA_locs_ideal :=  RA_locs_real :|: fset [:: attest_loc_long].
-
   Definition att : nat := 50.
 
   Definition RA_prot_interface := 
     [interface #val #[att] : 'unit → 'pubkey × ('attest × 'bool) ].
 
-  Definition Att_prot : package RA_locs_real 
+  Definition Att_prot : package Attestation_locs_real 
      Att_interface RA_prot_interface
   := [package
     #def  #[att] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
@@ -106,38 +97,26 @@ Module Protocol
       ret (pk, ( att, bool ))
     } 
   ].
-
-  Equations Att_prot_real : package RA_locs_real [interface] RA_prot_interface :=
+                            
+  Equations Att_prot_real : package Attestation_locs_real [interface] RA_prot_interface :=
     Att_prot_real := {package Att_prot ∘ Att_real }.
   Next Obligation.
     ssprove_valid. 
-    - rewrite /RA_locs_real.
+    - rewrite /Attestation_locs_real.
       rewrite !fset_cons.
-      apply fsetUS.
-      apply fsetUS.
-      apply fsetUS.
-      apply fsetUS.
-      apply fsetUS.
+      repeat apply fsetUS.
       apply fsubsetxx.
-    - rewrite/ Attestation_locs_real/RA_locs_real.
-      rewrite fset_cons.
-      rewrite [X in fsubset _ X]fset_cons.
-      apply fsetUS.
-      rewrite fset_cons.
-      rewrite [X in fsubset _ X]fset_cons.
-      apply fsetUS.
+    - rewrite/ Attestation_locs_real/Attestation_locs_real.
       rewrite !fset_cons.
-      apply fsubsetU ; apply /orP ; right.
-      apply fsetUS.
-      apply fsubsetU ; apply /orP ; right.
+      repeat apply fsetUS.
       apply fsubsetxx.
     Defined.
 
-  Equations Att_prot_ideal : package RA_locs_ideal [interface] RA_prot_interface :=
+  Equations Att_prot_ideal : package Attestation_locs_ideal [interface] RA_prot_interface :=
     Att_prot_ideal := {package Att_prot ∘ Att_ideal }.
   Next Obligation.
     ssprove_valid.
-    - rewrite /RA_locs_ideal/RA_locs_real.
+    - rewrite /Attestation_locs_real/Attestation_locs_ideal/Attestation_locs_real.
       rewrite -fset_cat.
       rewrite fset_cons.
       rewrite [X in fsubset _ X]fset_cons.
@@ -148,58 +127,84 @@ Module Protocol
       rewrite fset_cons.
       rewrite [X in fsubset X _]fset_cons.
       apply fsetUS.
-      rewrite fset_cons.
-      rewrite [X in fsubset X _]fset_cons.
-      apply fsetUS.
       rewrite !fset_cons -fset0E.
-      apply fsetUS.
       apply fsub0set.
-    - rewrite/ Attestation_locs_ideal/Attestation_locs_real/RA_locs_ideal/RA_locs_real.      
+    - rewrite/ Attestation_locs_ideal/Attestation_locs_real.      
       rewrite -!fset_cat.
-      rewrite fset_cons.
-      rewrite [X in fsubset _ X]fset_cons.
-      apply fsetUS.
-      rewrite fset_cons.
-      rewrite [X in fsubset _ X]fset_cons.
-      apply fsetUS.
       rewrite !fset_cons.
-      apply fsubsetU ; apply /orP ; right.
-      apply fsetUS.
-      apply fsubsetU ; apply /orP ; right.
+      repeat apply fsetUS.
       apply fsubsetxx.
-    Defined.
+    Defined.  
 
-(*
-  Check fsetUS.
-  Locate ":|:".
-  Unset Printing Notations.
-  Check fset_cons.
-  Search fsetU.
-*)
-    
+  (*
+    Check fsetUS.
+    Locate ":|:".
+    Unset Printing Notations.
+    Check fset_cons.
+    Search fsetU.
+  *)
+
+  Import FunctionalExtensionality.
+
+  Lemma reshape_pair_id {T T0 T1 : Type} (f : T * T0 -> T1) : (fun '(pair x y) => f (pair x y)) = f.
+  Proof.
+    apply functional_extensionality; by [case].
+  Qed.
+
+  Parameter Signature_prop_here:
+    ∀ (l: {fmap (Signature * chState * chChallenge ) -> 'unit}) 
+      (s : chState) (pk : PubKey) (sk : SecKey) (chal : chChallenge) (h  : chMessage),
+    Ver_sig pk (Sign sk h) h = ((Sign sk h, s, chal) \in domm l).
+
   Lemma ra_prot_indist: 
     Att_prot_real ≈₀ Att_prot_ideal.
   Proof.
-  eapply eq_rel_perf_ind_eq.
-  simplify_eq_rel x.  
-  all: ssprove_code_simpl; simplify_linking.
-  ssprove_sync_eq => pk_loc.
-  ssprove_sync_eq => i_chal.
-  ssprove_swap_seq_lhs [:: 3; 2 ; 1]%N.
-  ssprove_contract_get_lhs.
-  ssprove_swap_seq_rhs [:: 5; 4; 3; 2 ; 1]%N.
-  ssprove_contract_get_rhs.
-  ssprove_sync_eq => state_loc.
-  ssprove_sync_eq.
-  ssprove_sync_eq. 
-  
-  
-
+  eapply (eq_rel_perf_ind_ignore (fset [:: attest_loc_long])).
+  - rewrite /Attestation_locs_real/Attestation_locs_ideal/Attestation_locs_real.
+    apply fsubsetU.
+    apply/orP.
+    right.
+    auto_in_fset.
+    rewrite fsetUC.
+    rewrite -!fset_cat.
+    rewrite fset_cons.
+    rewrite [X in fsubset _ X]fset_cons.
+    apply fsetUS.
+    rewrite !fset_cons -fset0E.
+    apply fsub0set.
+  - simplify_eq_rel x.   (* [x] becomes the argument to the procedure. *)
+    ssprove_code_simpl.
+    ssprove_code_simpl_more.
+    ssprove_code_simpl; simplify_linking.
+    ssprove_sync => a.
+    ssprove_sync => chal.
+    ssprove_swap_seq_rhs [:: 5; 4; 3 ; 2 ; 1 ]%N.
+    ssprove_contract_get_rhs.
+    ssprove_swap_seq_lhs [::  3 ; 2 ; 1 ]%N.
+    ssprove_contract_get_lhs.
+    ssprove_sync => state_loc.
+    repeat ssprove_sync.
+    (* rewrite (reshape_pair_id (heap_ignore (fset [:: attest_loc_long])) ). *)  
+    eapply r_get_remember_lhs => pk_loc.
+    (*ssprove_restore_pre.*)
+    eapply r_get_remember_rhs => attest_loc.
+    eapply r_put_rhs.
+    ssprove_restore_mem.
+    -- ssprove_invariant.
+    -- eapply r_get_remember_rhs => attest_loc2.
+    eapply r_ret => s0 s1 pre //=.
+    split.
+    --- repeat f_equal.
+    eapply Signature_prop_here. 
+    ---move: pre.
+       by case.
+    Qed.
 
     
-
-  Admitted.
-  
+    (* 
+    Definition set_rhs ℓ v (pre : precond) : precond :=
+       λ '(s₀, s₁), ∃ s₁', pre (s₀, s₁') ∧ s₁ = set_heap s₁' ℓ v.
+    *)        
     
 End Protocol.
 

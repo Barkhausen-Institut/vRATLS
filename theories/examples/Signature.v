@@ -101,10 +101,15 @@ That still does not explain the weird error that we see when using the union of 
 
   Check setm.
 
+(* TODO:
+fmap (Signature * A * A ) -> (Signature * A * A )
+triggert endless loop
+*)
+
   Parameter Signature_prop:
-    ∀ (A:ordType) (l: {fmap (Signature * A * A ) -> (Signature * A * A )}) 
-      (s : A) (pk : PubKey)  (chal : A) (h  : chMessage),
-    Ver_sig pk (Sign pk h) h = ((Sign pk h, s, chal) \in domm l).
+    ∀ (A:ordType) (l: {fmap (Signature * A * A ) -> 'unit}) 
+      (s : A) (pk : PubKey) (sk : SecKey) (chal : A) (h  : chMessage),
+    Ver_sig pk (Sign sk h) h = ((Sign sk h, s, chal) \in domm l).
 
 
   (*
@@ -142,11 +147,10 @@ Module Type SignaturePrimitives
   Definition sk_loc      : Location := (SecKey    ; 1%N).
   Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
 
+  Definition init        : nat := 1.  (* routine for key initialization *)
   Definition get_pk      : nat := 42. (* routine to get the public key *)
   Definition sign        : nat := 44. (* routine to sign a message *)
   Definition verify_sig  : nat := 45. (* routine to verify the signature *)
-  Definition sign_f      : nat := 46. (* routine to sign a message *)
-  Definition verify_sig_f: nat := 47. (* routine to verify the signature *)
 
   (* The signature scheme requires a heap location to store the seen signatures. *)
   Definition Prim_locs_real := fset [:: pk_loc ; sk_loc].
@@ -208,13 +212,75 @@ Module Type SignaturePrimitives
       ret ( (sig,msg) \in domm S)
     }
   ].
-  (*
-  Next Obligation.
-    ssprove_valid; rewrite /Prim_locs_ideal/Prim_locs_real in_fsetU; apply /orP.
-    2,3,6: left;auto_in_fset.
-    all: right; auto_in_fset.
-  Defined.
-  *)
+
+  (************************************)
+  (****** Key Gen moved to Init *******)
+  (************************************)
+
+  Definition Prim_interface_init := [interface
+    #val #[init] : 'unit → 'unit ;
+    #val #[get_pk] : 'unit → 'pubkey ;
+    #val #[sign] : 'message → 'signature ;
+    #val #[verify_sig] : ('signature × 'message) → 'bool
+  ].
+
+  Definition Prim_real_init : package Prim_locs_real [interface] Prim_interface_init
+  := [package
+    #def  #[init] (_ : 'unit) : 'unit
+    { 
+      let (sk,pk) := KeyGen in
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+      ret tt
+    } ;
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    { 
+      pk ← get pk_loc  ;;
+      ret pk
+    } ;
+    #def #[sign] ( 'msg : 'message ) : 'signature
+    {
+      sk ← get sk_loc ;;
+      let sig := Sign sk msg in
+      ret sig
+    };
+    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
+    {
+      pk ← get pk_loc  ;;
+      let bool := Ver_sig pk sig msg in
+      ret bool
+    }
+  ].
+
+  Equations Prim_ideal_init : package Prim_locs_ideal [interface] Prim_interface_init :=
+    Prim_ideal_init := [package
+    #def  #[init] (_ : 'unit) : 'unit
+    { 
+      let (sk,pk) := KeyGen in
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+      ret tt
+    } ;
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    { 
+      pk ← get pk_loc  ;;
+      ret pk
+    } ;
+    #def #[sign] ( 'msg : 'message ) : 'signature
+    {
+      sk ← get sk_loc ;;
+      let sig := Sign sk msg in
+      S ← get sign_loc ;;
+      let S' := setm S (sig, msg) tt in
+      #put sign_loc := S' ;;
+      ret sig
+    };
+    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
+    {
+      S ← get sign_loc ;;
+      ret ( (sig,msg) \in domm S)
+    }
+  ].
 
 End SignaturePrimitives.
 
@@ -271,7 +337,50 @@ Module Type SignatureProt
       } 
     ].
 
+    (* here with init *)
+    Definition Sig_real_init : package Signature_locs_real 
+    Prim_interface_init Sig_interface
+    := [package
+      #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
+      {
+        #import {sig #[init] : 'unit → 'unit } as init ;;
+        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+        #import {sig #[sign] : 'message → 'signature  } as sign ;;
+        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
+  
+        (* Protocol *)
+        _ ← init tt ;;
+        pk ← get_pk tt ;;
+        sig ← sign msg ;;
+        bool ← verify_sig (sig, msg) ;;
+        ret (pk, ( sig, bool ))
+      } 
+    ].
+  
+    Equations Sig_ideal_init : package Signature_locs_ideal Prim_interface_init 
+      Sig_interface :=
+    Sig_ideal_init := [package
+      #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
+      {
+        #import {sig #[init] : 'unit → 'unit } as init ;;
+        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+        #import {sig #[sign] : 'message → 'signature  } as sign ;;
+        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
+
+        (* Protocol *)
+        _ ← init tt ;;
+        pk ← get_pk tt ;;
+        sig ← sign msg ;;
+        bool ← verify_sig (sig, msg) ;;
+        ret (pk, ( sig, bool ))
+      } 
+    ].
+
 End SignatureProt.
+
+(***********************************************************)
+(*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++*)
+(***********************************************************)
 
 Module Type ExistentialUnforgeability
   (π1 : SignatureParams)
@@ -284,7 +393,101 @@ Module Type ExistentialUnforgeability
   Import Alg.
   Import Prim.
 
+  Definition oracle : nat := 70. 
+
+  Definition Ex_unforge_loc := fset [:: pk_loc ; sk_loc ; sign_loc].
+
+  (*
+    #val #[oracle    ] : 'unit → (fmap (Signature * Message) -> 'unit) ;
+  *)
+
+  Definition i_msg := #|chMessage|.        
+
+  Definition ExUfg_interface := [interface
+    #val #[init] : 'unit → 'unit ;
+    #val #[get_pk] : 'unit → 'pubkey ;    
+    #val #[oracle] : 'message → 'signature ;
+    #val #[verify_sig] : ('signature × 'message) → 'bool
+  ].
+
+  Definition Ex_Ufg : package Ex_unforge_loc [interface] Prim_interface_init
+  := [package
+    #def  #[init] (_ : 'unit) : 'unit
+    { 
+      let (sk,pk) := KeyGen in
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+      ret tt
+    } ;
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    { 
+      pk ← get pk_loc  ;;
+      ret pk
+    } ;
+    #def  #[sign] (msg : 'message) : 'signature
+    (* this should be 'unit -> unit, and we can sample the message but then we need to redefine the type. Also, sampling isn't really accurate *)
+    { 
+      sk ← get sk_loc ;;
+      let sig := Sign sk msg in
+      S ← get sign_loc ;;
+      let S' := setm S (sig, msg) tt in
+      #put sign_loc := S' ;;
+      ret sig
+    };
+    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
+    {
+      pk ← get pk_loc  ;;
+      let bool1 := Ver_sig pk sig msg in
+      S ← get sign_loc ;;
+      let bool2 := ( (sig,msg) \in domm S ) in
+      ret (andb bool1 bool2)
+      (*ret bool2*)
+    }
+  ].
+
+  Lemma exquivalence_of_definitions: 
+    Prim_ideal_init ≈₀ Ex_Ufg.
+  Proof.
+  eapply eq_rel_perf_ind_eq.
+  simplify_eq_rel m.
+  all: ssprove_code_simpl.
+  - ssprove_sync_eq.
+    eapply rpost_weaken_rule. 
+    1: eapply rreflexivity_rule.
+    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
+    intuition auto. 
+  - eapply rpost_weaken_rule. 
+    1: eapply rreflexivity_rule.
+    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
+    intuition auto.
+  - ssprove_sync_eq => sk.
+    ssprove_sync_eq => sign_loc.
+    eapply rpost_weaken_rule. 
+    1: eapply rreflexivity_rule.
+    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
+    intuition auto.
+  - simplify_linking.
+    destruct m.
+    ssprove_sync_eq => sign_loc.
+    eapply rpost_weaken_rule. 
+    1: eapply rreflexivity_rule.
+    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
+    intuition auto.
+    Qed.
+    
+
+  
+
+
+
+
+
+
+
+
+
    (* Beginning of EU-CMA Definintion*)
+   (*
    Definition sign_oracle_loc    : Location := ('set ('signature × 'message); 1%N).
  
    Definition Oracle_locs := fset [:: sk_loc ; sign_oracle_loc ].
@@ -300,7 +503,7 @@ Module Type ExistentialUnforgeability
        ret sig
      }.
 
-  (*
+  
   Variable A : PubKey -> 
       OracleComp Message Signature (Message * Signature).
  
@@ -313,7 +516,7 @@ Module Type ExistentialUnforgeability
   Definition UF_CMA_Advantage :=
     Pr[UF_CMA_G].
   *)
-  
+  (*
   Definition sign_oracle : nat := 48.
   Definition ex_unforge : nat := 48.
 
@@ -337,7 +540,7 @@ Module Type ExistentialUnforgeability
   ].
 
   Definition UF_locs := fset [:: sk_loc ; sign_oracle_loc ; pk_loc].
-
+*)
   (* 
   This is not meant to compile yet.
   I've started to collect Ideas of how to prove ex-unforge in SSProve
@@ -374,57 +577,4 @@ Theorem Sig_unforge LA A:
 End ExistentialUnforgeability.
 
 
-
-
-
-
-  (* 
-  Currently not needed
-  Semi-old version, 50:50 prims and protocol 
-  *)
-
-
-  (*
-
-  Definition Sig_real2 : package Signature_locs_real Prim_interface Sig_interface
-  := [package
-    #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
-    {
-      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-      #import {sig #[sign] : 'message → 'signature  } as sign ;;
-      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
-
-      (* Protocol *)
-      pk ← get_pk tt ;;
-      sig ← sign msg ;;
-      bool ← verify_sig (sig, msg) ;;
-      ret (pk, ( sig, bool ))
-    } 
-  ].
-
-  Equations Sig_ideal2 : package Signature_locs_ideal Prim_interface_f Sig_interface :=
-  Sig_ideal2 := [package
-    #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
-    {
-      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-      #import {sig #[sign_f] : 'message → 'signature  } as sign ;;
-      #import {sig #[verify_sig_f] : ('signature × 'message) → 'bool } as verify_sig ;;
-      (* Protocol *)
-      pk ← get_pk tt ;;
-      sig ← sign msg ;;
-      S ← get sign_loc ;;
-      let S' := setm S (sig, msg) tt in
-      #put sign_loc := S' ;;   
-      let bool := ( (sig,msg) \in domm S) in
-      ret (pk, ( sig, bool ))
-    } 
-  ].
-
-*)
- (* 
- Next Obligation.
- ssprove_valid; rewrite /Signature_locs_ideal/Signature_locs_real in_fsetU; apply /orP.
-    all: right; auto_in_fset.
-  Defined.  
-  *)
 
