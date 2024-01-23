@@ -1436,19 +1436,58 @@ Module HeapHash.
       + move:pre; rewrite /full_heap_eq'/(_ ⋊ _); repeat case; rewrite /rem_lhs; case => [heq other_eq att_loc_val_eq].
         rewrite /rem_rhs => sign_loc_val_eq.
         repeat rewrite mem_domm.
-        (* rewrite -att_loc_val_eq -sign_loc_val_eq. *)
         move: heq; rewrite /hash_eq/fmap_kmap'/mapm2.
         rewrite att_loc_val_eq sign_loc_val_eq.
         rewrite -eq_fmap /eqfun => heq.
         have heq' := (heq (sig, Hash state chal)).
-        move: heq'; rewrite mkfmapE /=; move => heq'.
+        move: heq'; rewrite mkfmapE /=; move => heq'; rewrite -heq'.
+        apply esym.
 
-        rewrite [LHS]getm_def_injx in heq'.
+        (* Turn the [seq.map] part into a function in order to apply the lemma. *)
+        pose f (y:Type) (p: ((('signature * 'state) * 'challenge) * y)) : (('signature * 'message) * y) :=
+          (let (s, challenge) := p.1 in
+           let (sig0, state0) := s in
+           (sig0, Hash state0 challenge)
+          ,p.2).
 
-        admit.
-      + admit.
+        have fold_f (y:Type) (p: ((('signature * 'state) * 'challenge) * y)) :
+          (let (s, challenge) := p.1 in
+           let (sig0, state0) := s in
+           (sig0, Hash state0 challenge)
+             ,p.2) = f _ p by [].
+        have fold_f' (y:Type) :
+          (fun (p: ((('signature * 'state) * 'challenge) * y)) =>
+             (let (s, challenge) := p.1 in
+              let (sig0, state0) := s in
+              (sig0, Hash state0 challenge)
+                ,p.2)) =1 f _ by [].
+        rewrite (eq_map (fold_f' _)).
+
+        pose f' (p': (('signature * 'state) * 'challenge)) : ('signature * 'message) :=
+          let (s, challenge) := p' in
+          let (sig0, state0) := s in
+          (sig0, Hash state0 challenge).
+
+        have f_fst (y:Type) (p: ((('signature * 'state) * 'challenge) * y)) : f _ p = (f' p.1, p.2)
+          by [rewrite /f/f'].
+        have f_fst' : f _ =1 fun p => (f' p.1, p.2) by rewrite /eqfun => x; apply f_fst.
+
+        rewrite (eq_map (f_fst' _)).
+        (* Done *)
+
+        have inj_f' : injective f'.
+        1: { clear. rewrite /f'/injective.
+             do 2! case; move => sig1 state1 chal1.
+             do 2! case; move => sig2 state2 chal2.
+             move/pair_equal_spec; case => si_eq Hash_eq.
+             apply pair_dist_eq; apply pair_equal_spec; split; move => //=.
+             by [apply Collision_Resistence].
+        }
+
+        by [rewrite -/(f' (sig, state, chal)) (getm_def_injx' _ _ inj_f')].
+      + by [move:pre; rewrite /(_ ⋊_); do 2! case].
     - by [].
-  Admitted.
+  Qed.
 
 
   (* TODO *)

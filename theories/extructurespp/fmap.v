@@ -4,6 +4,8 @@ From mathcomp Require Import all_ssreflect ssrnat ssreflect
 Set Warnings "notation-overridden,ambiguous-paths".
 
 From Coq Require Import Utf8.
+From Coq Require Import Unicode.Utf8.
+
 From extructures Require Import ord fset fmap.
 Require Import extructurespp.ord.
 
@@ -196,20 +198,42 @@ Section Facts.
   Qed.
 
 
-  Lemma getm_def_injx {A':ordType} {a:A} {a':A'} {f: A -> A'} {s: seq.seq (A * B)} {s': seq.seq (A' * B)} :
+  Lemma getm_def_injx {A':ordType} {a:A} {f: A -> A'} {s: seq.seq (A * B)} :
     injective f ->
-    getm_def [seq (f p.1, p.2) | p <- s] (f a) = getm_def [seq (p.1, p.2) | p <- s'] a'.
+    getm_def [seq (f p.1, p.2) | p <- s] (f a) = getm_def s a.
   Proof.
+    move => inj_f.
+    elim: s => [| ab s' iH].
+    - by [].
+    - rewrite /seq.map -/(seq.map _ s') /getm_def -/(getm_def s' a) -/(getm_def _ (f a)) /=.
+      case e: (f a == f ab.1).
+      + move/eqP/inj_f/eqP:e => e; by [rewrite ifT].
+      + move: e; rewrite (inj_eq inj_f) => e; by [rewrite ifF].
+  Qed.
 
-  Admitted.
+  Lemma getm_def_injx' {A':ordType} {a:A} {f: A -> A'} {s: {fmap A → B}} :
+    injective f ->
+    getm_def [seq (f p.1, p.2) | p <- s] (f a) = s a.
+  Proof. apply getm_def_injx. Qed.
+
+
+  Lemma getm_injx' {A':ordType} {a:A} {f: A -> A'} {s: {fmap A → B}} :
+    injective f ->
+    (mkfmap [seq (f p.1, p.2) | p <- s]) (f a) = s a.
+  Proof.
+    rewrite mkfmapE; apply getm_def_injx'.
+  Qed.
 
   Lemma getm_def_seq_map_id {a:A} {s: seq.seq (A * B)} :
     getm_def [seq (p.1, p.2) | p <- s] a = getm_def s a.
   Proof.
-    (*
-      TODO Should be trivial by [seq.map id].
-     *)
-  Admitted.
-
+    pose pair_id (X Y : Type) (x: prod X Y) := (x.1,x.2).
+    have pair_id_eq_id (X Y : Type) (x: prod X Y) : pair_id X Y x = id x
+      by [rewrite /id/pair_id; apply esym; apply surjective_pairing].
+    have pair_id_eq_id' (X Y : Type) : pair_id X Y =1 id.
+      by [rewrite /eqfun => x; apply pair_id_eq_id].
+    have eid := pair_id_eq_id' A B.
+    by [rewrite (eq_map eid) map_id].
+  Qed.
 
 End Facts.
