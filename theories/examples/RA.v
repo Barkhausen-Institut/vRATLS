@@ -1490,66 +1490,6 @@ Module HeapHash.
   Qed.
 
 
-  (* TODO *)
-  Lemma sig_ideal_vs_att_ideal_old :
-    Att_ideal_locp ≈₀ Aux_Prim_ideal.
-  Proof.
-    eapply eq_rel_perf_ind_eq.
-    simplify_eq_rel x.
-    all: ssprove_code_simpl.
-    - ssprove_sync_eq => pk_loc.
-      by [apply r_ret].
-    - ssprove_swap_lhs 0; ssprove_sync_eq => state.
-      do 2! (ssprove_swap_lhs 0; ssprove_sync_eq).
-      (*
-      Definition attest_loc_long  : Location := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
-      Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
-      *)
-      ssprove_sync_eq => sig.
-      ssprove_sync_eq.
-      by [apply r_ret].
-    - case x => a b.
-      ssprove_swap_lhs 0; ssprove_sync_eq => state.
-      ssprove_sync_eq => sig.
-      by [apply r_ret].
-  Qed.
-
-  (*
-  Lemma sig_ideal_vs_att_ideal :
-     Att_ideal_locp ≈₀ Aux_Prim_ideal. 
-  Proof.
-    apply eq_rel_perf_ind_ignore with (fset [:: attest_loc_long] ). 
-    1: { 
-    apply: fsubset_trans.
-    - by apply fsubsetUl.
-    - rewrite -fset1E / Comp_locs / Attestation_locs_ideal / Attestation_locs_real.
-
-      rewrite -fset1E / locpackage Att_ideal.
-    (*
-    We have:
-    "fsubset (fset [:: attest_loc_long] :|: ?s2)
-       (locs Att_ideal_locp :|: Comp_locs)"
-    where
-    )
-      Definition Att_ideal_locp := {locpackage Att_ideal}.
-    where Att_ideal uses
-      Definition Attestation_locs_ideal 
-          := Attestation_locs_real :|: fset [:: attest_loc_long ].
-    where:
-      Definition attest_loc_long  : Location 
-          := ('set (Signature × chMessage × chState × chChallenge) ; 2%N).
-      Definition Attestation_locs_real 
-          := fset [:: pk_loc ; sk_loc; state_loc ].
-    ------------------------------------------------------------------
-    => it is a subset
-    *)
-    }
-    
-    - rewrite -fset1E / Comp_locs /attest_loc_long. rewrite !fset_cons.
-      rewrite fsub1set.
-  Qed.
-  *)
-
   Theorem RA_unforg LA A :
       ValidPackage LA Att_interface A_export A →
       fdisjoint LA (Prim_real_locp).(locs) →
@@ -1590,9 +1530,40 @@ Module HeapHash.
        Both advantages need to be on the same interface!
      *)
     2: { simpl; exact: H5. }
-    2: { rewrite /Comp_locs.
-         rewrite /Aux_locs in H3. exact H3.
-         (* rewrite fdisjointUr; apply/andP; split; assumption.*) }
+    2: {
+      (* TODO There should be a tactic for discharging such [fdisjoint] goals! *)
+      rewrite /Comp_locs.
+      rewrite /Aux_locs in H3.
+      rewrite /Prim_locs_ideal in H2.
+      (* This feels like a silly construction. Is there a better way to arrive at this [Prop]? *)
+      rewrite /is_true in H3; rewrite /is_true in H2.
+      have prim_aux : true && true by [].
+      rewrite -[X in X && _]H3  -[X in _ && X]H2 in prim_aux.
+
+      move: prim_aux; rewrite -fdisjointUr -fset_cat /=.
+
+      (* TODO move below into extructurespp and extend. *)
+      have fset_swap12 (O:ordType) (x y:O) s (x_neq_y: x ≠ y) : fset (x :: (y :: s)) = fset (y :: (x :: s)).
+      1:{ clear. rewrite -eq_fset /(_ =i _) => x0.
+          repeat rewrite fset_cons.
+          repeat rewrite in_fsetU1.
+          do 2! rewrite Bool.orb_assoc.
+          by rewrite (@Bool.orb_comm (x0==x) (x0==y)).
+      }
+
+      have rem_pk_loc_dup: fset [:: pk_loc; state_loc; pk_loc; sk_loc; sign_loc] = fset [:: pk_loc; sk_loc; state_loc; sign_loc].
+      1:{
+        rewrite -eq_fset /(_ =i _) => x0.
+        rewrite [in LHS]fset_cons [in RHS]fset_cons.
+        rewrite [in LHS]in_fsetU1 [in RHS]in_fsetU1.
+        rewrite [in LHS]fset_swap12 //=.
+        rewrite [in LHS]fset_cons [in LHS]in_fsetU1 [in LHS]Bool.orb_assoc.
+        rewrite [in LHS]Bool.orb_diag.
+        f_equal.
+        rewrite [in LHS]fset_swap12 //=.
+      }
+      by rewrite rem_pk_loc_dup.
+    }
     rewrite GRing.addr0.
     rewrite /Aux_Prim_ideal.
     by [rewrite (* -Advantage_link *) Advantage_sym].
