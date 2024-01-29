@@ -67,6 +67,45 @@ Module Type ExistentialUnforgeability
   Import Alg.
   Import Prim.
 
+  
+  Parameter Signature_prop:
+    ∀ (l: {fmap (Signature  * chMessage ) -> 'unit}) 
+      (s : Signature) (pk : PubKey) (m  : chMessage),
+      Ver_sig pk s m = ((s,m) \in domm l).  
+
+  Lemma ext_unforge:
+      Prim_real ≈₀ Prim_ideal.
+  Proof.
+  eapply (eq_rel_perf_ind_ignore (fset [:: sign_loc])).
+  - rewrite /Prim_locs_real/Prim_locs_ideal.
+    apply fsubsetU.
+    apply/orP.
+    right.
+    rewrite !fset_cons.
+    apply fsubsetU ; apply /orP ; right.
+    apply fsubsetU ; apply /orP ; right.    
+    apply fsetUS.
+    apply fsubsetxx.
+  - simplify_eq_rel x.
+    -- ssprove_sync => pk. 
+       eapply r_ret.
+       intuition eauto.
+    -- repeat ssprove_sync.
+       eapply r_get_remember_rhs => sign_loc.
+       eapply r_put_rhs.
+       ssprove_restore_mem.
+       --- ssprove_invariant.
+       ---  eapply r_ret => s0 s1 pre //=.
+    -- case x => s m.
+       eapply r_get_remember_lhs => pk.
+       eapply r_get_remember_rhs => S.
+       eapply r_ret => s0 s1 pre //=.
+       split.
+       ---- eapply Signature_prop.
+       ---- move: pre.
+            rewrite /inv_conj.
+    Qed.
+
   Definition oracle : nat := 70. 
 
   Definition Ex_unforge_loc := fset [:: pk_loc ; sk_loc ; sign_loc].
@@ -118,13 +157,15 @@ Module Type ExistentialUnforgeability
       ret (andb bool1 bool2)
       (*ret bool2*)
     }
-  ].  
+  ].
+  
+  Locate "∘".
     
   Definition ɛ_indist A :=
     AdvantageE Prim_real_init Prim_ideal_init A.
 
   Definition AdvantageS (G₀ : raw_package) (A : raw_package) : R :=
-    `| Pr (A ∘ G₀) true |.     
+    `| Pr (A ∘ G₀) true |.
 
   Definition ɛ_unforge A :=
     AdvantageS Ex_Ufg A. 
@@ -140,9 +181,46 @@ Module Type ExistentialUnforgeability
     fdisjoint LA Ex_unforge_loc →
     ( (ɛ_unforge A) <= (ɛ_indist A))%R.
   Proof.
+  intros loc H0 H1 a b c.
+  rewrite /ɛ_unforge/ɛ_indist.
+  Search ( _ <= _ ).
+  eapply le_trans.
   Admitted.
+
+  Lemma exquivalence_of_definitions: 
+    Prim_real_init ≈₀ Ex_Ufg.
+  Proof.
+  eapply eq_rel_perf_ind_eq.
+  simplify_eq_rel m.
+  all: ssprove_code_simpl.
+  - ssprove_sync_eq.
+    eapply rpost_weaken_rule. 
+    1: eapply rreflexivity_rule.
+    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
+    intuition auto. 
+  - eapply rpost_weaken_rule. 
+    1: eapply rreflexivity_rule.
+    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
+    intuition auto.
+  - ssprove_sync_eq => sk. admit. 
+  (*
+    ssprove_sync_eq => sign_loc.
+    eapply rpost_weaken_rule. 
+    1: eapply rreflexivity_rule.
+    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
+    intuition auto.*)
+  - simplify_linking.
+    destruct m.
+    ssprove_sync_eq => sign_loc. 
+
+    eapply rpost_weaken_rule. 
+    1: eapply rreflexivity_rule.
+    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
+    intuition auto.
+  Qed.
     
-(*
+
+
 Lemma exquivalence_of_definitions: 
     Prim_ideal_init ≈₀ Ex_Ufg.
   Proof.

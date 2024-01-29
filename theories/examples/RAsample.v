@@ -154,7 +154,7 @@ Module Protocol
   Parameter Signature_prop_here:
     ∀ (l: {fmap (Signature * chState * chChallenge ) -> 'unit}) 
       (s : chState) (pk : PubKey) (sk : SecKey) (chal : chChallenge) (h  : chMessage),
-    Ver_sig pk (Sign sk h) h = ((Sign sk h, s, chal) \in domm l).
+      Ver_sig pk (Sign sk h) h = ((Sign sk h, s, chal) \in domm l).
 
   Lemma ra_prot_indist: 
     Att_prot_real ≈₀ Att_prot_ideal.
