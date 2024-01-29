@@ -41,6 +41,8 @@ Import Num.Def.
 Import Num.Theory.
 Import Order.POrderTheory.
 
+Require Import examples.Signature.
+
 Import PackageNotation.
 
 Obligation Tactic := idtac.
@@ -127,13 +129,16 @@ Module Type ExistentialUnforgeability
   Definition ɛ_unforge A :=
     AdvantageS Ex_Ufg A. 
 
+  (* TODO: *)
+  (* Explain difference in definitions *)
+
   Theorem commitment_hiding :
     ∀ LA A, 
     ValidPackage LA Prim_interface_init A_export A →
     fdisjoint LA Prim_locs_real →
     fdisjoint LA Prim_locs_ideal →
     fdisjoint LA Ex_unforge_loc →
-    ( (ɛ_unforge A) <= (ɛ_indist A) )%R.
+    ( (ɛ_unforge A) <= (ɛ_indist A))%R.
   Proof.
   Admitted.
     
@@ -170,4 +175,4 @@ Lemma exquivalence_of_definitions:
   *)
 
 
-End ExistentialUnforgeability.*)
+End ExistentialUnforgeability.
