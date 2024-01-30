@@ -144,14 +144,8 @@ Module Protocol
     Search fsetU.
   *)
 
-  Import FunctionalExtensionality.
-
-  Lemma reshape_pair_id {T T0 T1 : Type} (f : T * T0 -> T1) : (fun '(pair x y) => f (pair x y)) = f.
-  Proof.
-    apply functional_extensionality; by [case].
-  Qed.
-
-  Parameter Signature_prop_here:
+  (* This prop is different from the RA prop, because it has much more inputs *)
+  Parameter RA_prop:
     ∀ (l: {fmap (Signature * chState * chChallenge ) -> 'unit}) 
       (s : chState) (pk : PubKey) (sk : SecKey) (chal : chChallenge) (h  : chMessage),
       Ver_sig pk (Sign sk h) h = ((Sign sk h, s, chal) \in domm l).
@@ -195,16 +189,10 @@ Module Protocol
     eapply r_ret => s0 s1 pre //=.
     split.
     --- repeat f_equal.
-    eapply Signature_prop_here. 
+    eapply RA_prop. 
     ---move: pre.
        by case.
-    Qed.
-
-    
-    (* 
-    Definition set_rhs ℓ v (pre : precond) : precond :=
-       λ '(s₀, s₁), ∃ s₁', pre (s₀, s₁') ∧ s₁ = set_heap s₁' ℓ v.
-    *)        
+    Qed.       
     
 End Protocol.
 

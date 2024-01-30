@@ -65,13 +65,16 @@ Module Type ExistentialUnforgeability
   Import π1.
   Import π2.
   Import Alg.
-  Import Prim.
+  Import Prim.  
 
-  
-  Parameter Signature_prop:
-    ∀ (l: {fmap (Signature  * chMessage ) -> 'unit}) 
-      (s : Signature) (pk : PubKey) (m  : chMessage),
-      Ver_sig pk s m = ((s,m) \in domm l).  
+  (* 
+  Why is this Lemma sufficient? 
+  According to "The Joy of Crypto", we show that the real and fake primitives are
+  indistinguishable, which then implies " By asking for the libraries to be 
+  indistinguishable, we are reallyasking that the attacker cannot find any such 
+  message-signature pair (forgery)." Hence, we prove the scheme to be strong
+  unforgeable.
+  *)    
 
   Lemma ext_unforge:
       Prim_real ≈₀ Prim_ideal.
@@ -102,155 +105,7 @@ Module Type ExistentialUnforgeability
        eapply r_ret => s0 s1 pre //=.
        split.
        ---- eapply Signature_prop.
-       ---- move: pre.
-            rewrite /inv_conj.
+       ---- by [move: pre; rewrite /inv_conj; repeat case].
     Qed.
-
-  Definition oracle : nat := 70. 
-
-  Definition Ex_unforge_loc := fset [:: pk_loc ; sk_loc ; sign_loc].
-
-  (*
-    #val #[oracle    ] : 'unit → (fmap (Signature * Message) -> 'unit) ;
-  *)
-
-  Definition i_msg := #|chMessage|.        
-
-  Definition ExUfg_interface := [interface
-    #val #[init] : 'unit → 'unit ;
-    #val #[get_pk] : 'unit → 'pubkey ;    
-    #val #[oracle] : 'message → 'signature ;
-    #val #[verify_sig] : ('signature × 'message) → 'bool
-  ].
-
-  Definition Ex_Ufg : package Ex_unforge_loc [interface] 
-    Prim_interface_init
-  := [package
-    #def  #[init] (_ : 'unit) : 'unit
-    { 
-      let (sk,pk) := KeyGen in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      ret tt
-    } ;
-    #def  #[get_pk] (_ : 'unit) : 'pubkey
-    { 
-      pk ← get pk_loc  ;;
-      ret pk
-    } ;
-    #def  #[sign] (msg : 'message) : 'signature
-    (* this should be 'unit -> unit, and we can sample the message but then we need to redefine the type. Also, sampling isn't really accurate *)
-    { 
-      sk ← get sk_loc ;;
-      let sig := Sign sk msg in
-      S ← get sign_loc ;;
-      let S' := setm S (sig, msg) tt in
-      #put sign_loc := S' ;;
-      ret sig
-    };
-    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
-    {
-      pk ← get pk_loc  ;;
-      let bool1 := Ver_sig pk sig msg in
-      S ← get sign_loc ;;
-      let bool2 := ( (sig,msg) \in domm S ) in
-      ret (andb bool1 bool2)
-      (*ret bool2*)
-    }
-  ].
-  
-  Locate "∘".
-    
-  Definition ɛ_indist A :=
-    AdvantageE Prim_real_init Prim_ideal_init A.
-
-  Definition AdvantageS (G₀ : raw_package) (A : raw_package) : R :=
-    `| Pr (A ∘ G₀) true |.
-
-  Definition ɛ_unforge A :=
-    AdvantageS Ex_Ufg A. 
-
-  (* TODO: *)
-  (* Explain difference in definitions *)
-
-  Theorem commitment_hiding :
-    ∀ LA A, 
-    ValidPackage LA Prim_interface_init A_export A →
-    fdisjoint LA Prim_locs_real →
-    fdisjoint LA Prim_locs_ideal →
-    fdisjoint LA Ex_unforge_loc →
-    ( (ɛ_unforge A) <= (ɛ_indist A))%R.
-  Proof.
-  intros loc H0 H1 a b c.
-  rewrite /ɛ_unforge/ɛ_indist.
-  Search ( _ <= _ ).
-  eapply le_trans.
-  Admitted.
-
-  Lemma exquivalence_of_definitions: 
-    Prim_real_init ≈₀ Ex_Ufg.
-  Proof.
-  eapply eq_rel_perf_ind_eq.
-  simplify_eq_rel m.
-  all: ssprove_code_simpl.
-  - ssprove_sync_eq.
-    eapply rpost_weaken_rule. 
-    1: eapply rreflexivity_rule.
-    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
-    intuition auto. 
-  - eapply rpost_weaken_rule. 
-    1: eapply rreflexivity_rule.
-    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
-    intuition auto.
-  - ssprove_sync_eq => sk. admit. 
-  (*
-    ssprove_sync_eq => sign_loc.
-    eapply rpost_weaken_rule. 
-    1: eapply rreflexivity_rule.
-    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
-    intuition auto.*)
-  - simplify_linking.
-    destruct m.
-    ssprove_sync_eq => sign_loc. 
-
-    eapply rpost_weaken_rule. 
-    1: eapply rreflexivity_rule.
-    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
-    intuition auto.
-  Qed.
-    
-
-
-Lemma exquivalence_of_definitions: 
-    Prim_ideal_init ≈₀ Ex_Ufg.
-  Proof.
-  eapply eq_rel_perf_ind_eq.
-  simplify_eq_rel m.
-  all: ssprove_code_simpl.
-  - ssprove_sync_eq.
-    eapply rpost_weaken_rule. 
-    1: eapply rreflexivity_rule.
-    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
-    intuition auto. 
-  - eapply rpost_weaken_rule. 
-    1: eapply rreflexivity_rule.
-    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
-    intuition auto.
-  - ssprove_sync_eq => sk.
-    ssprove_sync_eq => sign_loc.
-    eapply rpost_weaken_rule. 
-    1: eapply rreflexivity_rule.
-    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
-    intuition auto.
-  - simplify_linking.
-    destruct m.
-    ssprove_sync_eq => sign_loc.
-    eapply rpost_weaken_rule. 
-    1: eapply rreflexivity_rule.
-    move => [a1 h1] [a2 h2] [Heqa Heqh]. 
-    intuition auto.
-  Qed.
-  *)
-
 
 End ExistentialUnforgeability.

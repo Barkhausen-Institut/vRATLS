@@ -106,20 +106,11 @@ fmap (Signature * A * A ) -> (Signature * A * A )
 triggert endless loop
 *)
 
+  (* Final proposition for a signature scheme to be indistinguishable *)
   Parameter Signature_prop:
-    ∀ (A:ordType) (l: {fmap (Signature * A * A ) -> 'unit}) 
-      (s : A) (pk : PubKey) (sk : SecKey) (chal : A) (h  : chMessage),
-    Ver_sig pk (Sign sk h) h = ((Sign sk h, s, chal) \in domm l).
-
-
-  (*
-  Ver_sig pk_loc (Sign (nfst KeyGen) (Hash state_loc chal)) (Hash state_loc2 chal) =
-    ((Sign (nfst KeyGen) (Hash state_loc chal), state_loc2, chal)
-   \in domm
-         (T:=prod_ordType (prod_ordType [ordType of 'I_pos_n] [ordType of 'I_pos_n])
-               [ordType of 'I_#|Challenge|]) (S:=Datatypes.unit) attest_loc2)
-               *)
-
+    ∀ (l: {fmap (Signature  * chMessage ) -> 'unit}) 
+      (s : Signature) (pk : PubKey) (m  : chMessage),
+      Ver_sig pk s m = ((s,m) \in domm l).
 
 End SignatureAlgorithms.
 
