@@ -72,39 +72,72 @@ Module Type SignatureConstraints.
   Definition chMessage : choice_type := 'fin (mkpos pos_n).
 End SignatureConstraints.
 
-(** |  SIGNATURE  |
-    |   SCHEME    | **)
+(** |     KEY      |
+    |  GENERATION  | **)
 
-Module Type SignatureAlgorithms (π1 : SignatureParams) (π2 : SignatureConstraints).
+Module Type KeyGeneration 
+    (π1 : SignatureParams) 
+    (π2 : SignatureConstraints).
 
   Import π1 π2.
-  
-  (* currently not used *)
-  Parameter KeyGen_monadic : ∀ {L : {fset Location}},
-     code L [interface] (SecKey × PubKey).
+
+   (* currently not used *)
+  Parameter KeyGenM: ∀ {L : {fset Location}},
+   code L [interface] (SecKey × PubKey).
 
   Parameter KeyGen : (SecKey × PubKey).
 
-(*
-The following holds:
-[KeyGen] is just some Coq function. That is, it returns some Coq type. It also states that it is pure.
-[KeyGen_monadic] is a function in the monad of SSProve. That is, it may alter the state. As a result, it cannot be left unspecified when doing a proof!
-We need to specify an implementation in RA and then the weird cast error should disappear.
-That still does not explain the weird error that we see when using the union of sets for locations. Maybe this does not go well with a monadic function used in the code.
-*)
+  (*
+  The following holds:
+  [KeyGen] is just some Coq function. That is, it returns some Coq type. It also states that it is pure.
+  [KeyGen_monadic] is a function in the monad of SSProve. That is, it may alter the state. As a result, 
+  it cannot be left unspecified when doing a proof!
+  We need to specify an implementation in RA and then the weird cast error should disappear.
+  That still does not explain the weird error that we see when using the union of sets for locations. 
+  Maybe this does not go well with a monadic function used in the code.
+  *)
+
+  Notation " 'pubkey "    := PubKey      (in custom pack_type at level 2).
+  Notation " 'pubkey "    := PubKey      (at level 2): package_scope.
+  Notation " 'seckey "    := SecKey      (in custom pack_type at level 2).
+  Notation " 'seckey "    := SecKey      (at level 2): package_scope.
+
+  Definition pk_loc      : Location := (PubKey    ; 0%N).
+  Definition sk_loc      : Location := (SecKey    ; 1%N).
+
+  Definition key_gen : nat := 1.  (* Routine for initial key generation. *)
+  Definition Key_locs := fset [:: pk_loc ; sk_loc]. (* Heap location for the keys. *)
+
+  Definition KeyGen_interface := [interface #val #[key_gen] : 'unit → ('seckey ×'pubkey)].
+
+  Definition Key_Gen : package Key_locs [interface] KeyGen_interface
+  := [package
+    #def  #[key_gen] (_ : 'unit) : ('seckey ×'pubkey)
+    { 
+      let (sk,pk) := KeyGen in
+      #put pk_loc := pk ;;
+      #put sk_loc := sk ;;
+      ret (sk, pk)
+    } 
+  ].
+  
+End KeyGeneration.
+
+(** |  SIGNATURE  |
+    |   SCHEME    | **)
+
+Module Type SignatureAlgorithms 
+    (π1 : SignatureParams) 
+    (π2 : SignatureConstraints) 
+    (π3 : KeyGeneration π1 π2).
+
+  Import π1 π2 π3.
 
   Parameter Sign : ∀ (sk : SecKey) (m : chMessage), Signature.
 
   Parameter Ver_sig : ∀ (pk : PubKey) (sig : Signature) (m : chMessage), 'bool.
 
-  (* Lemma to show the goal of protocol file *)
-
-  Check setm.
-
-(* TODO:
-fmap (Signature * A * A ) -> (Signature * A * A )
-triggert endless loop
-*)
+  (* TODO: fmap (Signature * A * A ) -> (Signature * A * A )  triggert endless loop  *)
 
   (* Final proposition for a signature scheme to be indistinguishable *)
   Parameter Signature_prop:
@@ -117,38 +150,25 @@ End SignatureAlgorithms.
 Module Type SignaturePrimitives
   (π1 : SignatureParams)
   (π2 : SignatureConstraints)
-  (Alg : SignatureAlgorithms π1 π2).
+  (KG : KeyGeneration π1 π2)
+  (Alg : SignatureAlgorithms π1 π2 KG).  
 
-  Import π1.
-  Import π2.
-  Import Alg.
+  Import π1 π2 KG Alg.
 
-  (* #[local] Open Scope package_scope. *)
-
-  Notation " 'pubkey "    := PubKey      (in custom pack_type at level 2).
-  Notation " 'pubkey "    := PubKey      (at level 2): package_scope.
-  Notation " 'seckey "    := SecKey      (in custom pack_type at level 2).
-  Notation " 'seckey "    := SecKey      (at level 2): package_scope.
   Notation " 'signature " := Signature   (in custom pack_type at level 2).
   Notation " 'signature " := Signature   (at level 2): package_scope.
   Notation " 'message "   := chMessage     (in custom pack_type at level 2).
   Notation " 'message "   := chMessage     (at level 2): package_scope.
 
-  Definition pk_loc      : Location := (PubKey    ; 0%N).
-  Definition sk_loc      : Location := (SecKey    ; 1%N).
   Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
 
-  Definition init        : nat := 1.  (* routine for key initialization *)
   Definition get_pk      : nat := 42. (* routine to get the public key *)
   Definition sign        : nat := 44. (* routine to sign a message *)
   Definition verify_sig  : nat := 45. (* routine to verify the signature *)
 
   (* The signature scheme requires a heap location to store the seen signatures. *)
   Definition Prim_locs_real := fset [:: pk_loc ; sk_loc].
-  Definition Prim_locs_ideal := fset [:: pk_loc ; sk_loc ; sign_loc].
-  (*
-  Definition Prim_locs_ideal := Prim_locs_real :|: fset [:: sign_loc ].
-  *) 
+  Definition Prim_locs_ideal := Prim_locs_real :|: fset [:: sign_loc ]. 
 
   Definition Prim_interface := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
@@ -203,170 +223,10 @@ Module Type SignaturePrimitives
       ret ( (sig,msg) \in domm S)
     }
   ].
-
-  (************************************)
-  (****** Key Gen moved to Init *******)
-  (************************************)
-
-  Definition Prim_interface_init := [interface
-    #val #[init] : 'unit → 'unit ;
-    #val #[get_pk] : 'unit → 'pubkey ;
-    #val #[sign] : 'message → 'signature ;
-    #val #[verify_sig] : ('signature × 'message) → 'bool
-  ].
-
-  Definition Prim_real_init : package Prim_locs_real [interface] 
-    Prim_interface_init
-  := [package
-    #def  #[init] (_ : 'unit) : 'unit
-    { 
-      let (sk,pk) := KeyGen in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      ret tt
-    } ;
-    #def  #[get_pk] (_ : 'unit) : 'pubkey
-    { 
-      pk ← get pk_loc  ;;
-      ret pk
-    } ;
-    #def #[sign] ( 'msg : 'message ) : 'signature
-    {
-      sk ← get sk_loc ;;
-      let sig := Sign sk msg in
-      ret sig
-    };
-    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
-    {
-      pk ← get pk_loc  ;;
-      let bool := Ver_sig pk sig msg in
-      ret bool
-    }
-  ].
-
-  Equations Prim_ideal_init : package Prim_locs_ideal [interface] 
-    Prim_interface_init :=
-    Prim_ideal_init := [package
-    #def  #[init] (_ : 'unit) : 'unit
-    { 
-      let (sk,pk) := KeyGen in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      ret tt
-    } ;
-    #def  #[get_pk] (_ : 'unit) : 'pubkey
-    { 
-      pk ← get pk_loc  ;;
-      ret pk
-    } ;
-    #def #[sign] ( 'msg : 'message ) : 'signature
-    {
-      sk ← get sk_loc ;;
-      let sig := Sign sk msg in
-      S ← get sign_loc ;;
-      let S' := setm S (sig, msg) tt in
-      #put sign_loc := S' ;;
-      ret sig
-    };
-    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
-    {
-      S ← get sign_loc ;;
-      ret ( (sig,msg) \in domm S)
-    }
-  ].
+  Next Obligation.
+    ssprove_valid; rewrite /Prim_locs_ideal/Prim_locs_real in_fsetU; apply /orP.
+    1,4,5: right;auto_in_fset.
+    all: left; auto_in_fset.
+  Defined.
 
 End SignaturePrimitives.
-
-Module Type SignatureProt
-  (π1 : SignatureParams)
-  (π2 : SignatureConstraints)
-  (Alg : SignatureAlgorithms π1 π2)
-  (Prim : SignaturePrimitives π1 π2 Alg).
-
-  Import π1.
-  Import π2.
-  Import Alg.
-  Import Prim.
-  (* NEW VERSION *)
-
-  Definition Signature_locs_real := Prim_locs_real.
-  Definition Signature_locs_ideal := Prim_locs_ideal.
-
-  Definition Sig_interface := 
-    [interface #val #[sign] : 'message → 'pubkey × ('signature × 'bool) ].
-
-(* pure definition relying on primitives *)
-
-  Definition Sig_real : package Signature_locs_real 
-    Prim_interface Sig_interface
-    := [package
-      #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
-      {
-        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-        #import {sig #[sign] : 'message → 'signature  } as sign ;;
-        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
-  
-        (* Protocol *)
-        pk ← get_pk tt ;;
-        sig ← sign msg ;;
-        bool ← verify_sig (sig, msg) ;;
-        ret (pk, ( sig, bool ))
-      } 
-    ].
-  
-    Equations Sig_ideal : package Signature_locs_ideal Prim_interface 
-      Sig_interface :=
-    Sig_ideal := [package
-      #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
-      {
-        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-        #import {sig #[sign] : 'message → 'signature  } as sign ;;
-        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
-        (* Protocol *)
-        pk ← get_pk tt ;;
-        sig ← sign msg ;;
-        bool ← verify_sig (sig, msg) ;;
-        ret (pk, ( sig, bool ))
-      } 
-    ].
-
-    (* here with init *)
-    Definition Sig_real_init : package Signature_locs_real 
-    Prim_interface_init Sig_interface
-    := [package
-      #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
-      {
-        #import {sig #[init] : 'unit → 'unit } as init ;;
-        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-        #import {sig #[sign] : 'message → 'signature  } as sign ;;
-        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
-  
-        (* Protocol *)
-        _ ← init tt ;;
-        pk ← get_pk tt ;;
-        sig ← sign msg ;;
-        bool ← verify_sig (sig, msg) ;;
-        ret (pk, ( sig, bool ))
-      } 
-    ].
-  
-    Equations Sig_ideal_init : package Signature_locs_ideal Prim_interface_init 
-      Sig_interface :=
-    Sig_ideal_init := [package
-      #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
-      {
-        #import {sig #[init] : 'unit → 'unit } as init ;;
-        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-        #import {sig #[sign] : 'message → 'signature  } as sign ;;
-        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
-
-        (* Protocol *)
-        _ ← init tt ;;
-        pk ← get_pk tt ;;
-        sig ← sign msg ;;
-        bool ← verify_sig (sig, msg) ;;
-        ret (pk, ( sig, bool ))
-      } 
-    ].
-
-End SignatureProt.

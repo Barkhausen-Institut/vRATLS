@@ -1,21 +1,3 @@
-(*
-Introduction:
-Here we will look at the remote attestation that is using a TPM for secure hardware 
-cryptography. It is like the version used on the RATLS paper.
-
-(** REMOTE ATTESTATION
-    VERIFIER                             PROVER
-Generates a chal-
-  lenge 'chal'
-                   -----chal----->    
-                                       Attestation
-                                       (using TPM) 
-                   <-----res------
-Validity check
-  of proof
-  *)
-
-*)
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
@@ -60,19 +42,21 @@ Obligation Tactic := idtac.
 #[local] Open Scope package_scope.
 
 Require Import examples.Signature.
+Require Import examples.Sig_Prot.
 Require Import examples.RA.
 
 Module Protocol
     (π1 : SignatureParams)
-    (π2 : HeapHash.RemoteAttestationParams)
-    (π3 : SignatureAlgorithms π1 π2)
-    (π4 : HeapHash.RemoteAttestationAlgorithms π1 π2 π3)
-    (π5 : SignaturePrimitives π1 π2 π3)
-    (π6 : HeapHash.RemoteAttestationHash π1 π2 π3 π4 π5)
-    (π7 : SignatureProt π1 π2 π3 π5)
-    (π8 : HeapHash.RemoteAttestationHash π1 π2 π3 π4 π5).
+    (π2 : SignatureConstraints)
+    (RAP : RemoteAttestationParams π2)
+    (KG : KeyGeneration π1 π2)
+    (Alg : SignatureAlgorithms π1 π2 KG)
+    (RAA : RemoteAttestationAlgorithms π1 π2 RAP KG Alg)
+    (SP : SignaturePrimitives π1 π2 KG Alg)
+    (RAH : RemoteAttestationHash π1 π2 RAP KG Alg RAA SP)
+    (SProt : SignatureProt π1 π2 KG Alg SP).
 
-  Import π1 π2 π3 π4 π5 π6 π7 π8.
+  Import π1 π2 RAP KG Alg RAA SP RAH SProt.
 
   Definition i_chal := #|Challenge|.
   Definition att : nat := 50.

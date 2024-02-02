@@ -56,18 +56,54 @@ Notation " 'set t " := (chSet t) (at level 2): package_scope.
 
 Definition tt := Datatypes.tt.
 
-Module Type ExistentialUnforgeability
+Module Type SignatureProt
   (π1 : SignatureParams)
   (π2 : SignatureConstraints)
-  (Alg : SignatureAlgorithms π1 π2)
-  (Prim : SignaturePrimitives π1 π2 Alg).
+  (KG : KeyGeneration π1 π2)
+  (Alg : SignatureAlgorithms π1 π2 KG)
+  (Prim : SignaturePrimitives π1 π2 KG Alg).
 
-  Import π1.
-  Import π2.
-  Import Alg.
-  Import Prim.  
+  Import π1 π2 KG Alg Prim.
 
-  (* 
+  Definition Signature_locs_real := Prim_locs_real.
+  Definition Signature_locs_ideal := Prim_locs_ideal.
+
+  Definition Sig_interface := [interface #val #[sign] : 'message → 'pubkey × ('signature × 'bool) ].
+
+  Definition Sig_real : package Signature_locs_real 
+    Prim_interface Sig_interface
+    := [package
+      #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
+      {
+        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+        #import {sig #[sign] : 'message → 'signature  } as sign ;;
+        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
+  
+        (* Protocol *)
+        pk ← get_pk tt ;;
+        sig ← sign msg ;;
+        bool ← verify_sig (sig, msg) ;;
+        ret (pk, ( sig, bool ))
+      } 
+    ].
+  
+  Equations Sig_ideal : package Signature_locs_ideal Prim_interface 
+      Sig_interface :=
+    Sig_ideal := [package
+      #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
+      {
+        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+        #import {sig #[sign] : 'message → 'signature  } as sign ;;
+        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
+        (* Protocol *)
+        pk ← get_pk tt ;;
+        sig ← sign msg ;;
+        bool ← verify_sig (sig, msg) ;;
+        ret (pk, ( sig, bool ))
+      } 
+    ].
+
+     (* 
   Why is this Lemma sufficient? 
   According to "The Joy of Crypto", we show that the real and fake primitives are
   indistinguishable, which then implies " By asking for the libraries to be 
@@ -77,35 +113,35 @@ Module Type ExistentialUnforgeability
   *)    
 
   Lemma ext_unforge:
-      Prim_real ≈₀ Prim_ideal.
+  Prim_real ≈₀ Prim_ideal.
   Proof.
-  eapply (eq_rel_perf_ind_ignore (fset [:: sign_loc])).
-  - rewrite /Prim_locs_real/Prim_locs_ideal.
+    eapply (eq_rel_perf_ind_ignore (fset [:: sign_loc])).
+    - rewrite /Prim_locs_real/Prim_locs_ideal.
     apply fsubsetU.
     apply/orP.
     right.
     rewrite !fset_cons.
     apply fsubsetU ; apply /orP ; right.
-    apply fsubsetU ; apply /orP ; right.    
     apply fsetUS.
     apply fsubsetxx.
-  - simplify_eq_rel x.
+    - simplify_eq_rel x.
     -- ssprove_sync => pk. 
-       eapply r_ret.
-       intuition eauto.
+      eapply r_ret.
+      intuition eauto.
     -- repeat ssprove_sync.
-       eapply r_get_remember_rhs => sign_loc.
-       eapply r_put_rhs.
-       ssprove_restore_mem.
-       --- ssprove_invariant.
-       ---  eapply r_ret => s0 s1 pre //=.
+      eapply r_get_remember_rhs => sign_loc.
+      eapply r_put_rhs.
+      ssprove_restore_mem.
+      --- ssprove_invariant.
+      ---  eapply r_ret => s0 s1 pre //=.
     -- case x => s m.
-       eapply r_get_remember_lhs => pk.
-       eapply r_get_remember_rhs => S.
-       eapply r_ret => s0 s1 pre //=.
-       split.
-       ---- eapply Signature_prop.
-       ---- by [move: pre; rewrite /inv_conj; repeat case].
-    Qed.
+      eapply r_get_remember_lhs => pk.
+      eapply r_get_remember_rhs => S.
+      eapply r_ret => s0 s1 pre //=.
+      split.
+      ---- eapply Signature_prop.
+      ---- by [move: pre; rewrite /inv_conj; repeat case].
+  Qed.
+    
+End SignatureProt.
 
-End ExistentialUnforgeability.
