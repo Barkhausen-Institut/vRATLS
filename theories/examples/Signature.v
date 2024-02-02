@@ -176,7 +176,111 @@ Module Type SignaturePrimitives
     #val #[verify_sig] : ('signature × 'message) → 'bool
   ].
 
-  Definition Prim_real : package Prim_locs_real [interface] Prim_interface
+  Definition Prim_real : package Prim_locs_real KeyGen_interface Prim_interface
+  := [package
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    { 
+      #import {sig #[key_gen] : 'unit → ('seckey ×'pubkey) } as key_gen ;;
+      '(sk,pk) ← key_gen tt ;;
+      pk ← get pk_loc  ;;
+      ret pk
+    } ;
+    #def #[sign] ( 'msg : 'message ) : 'signature
+    {
+      sk ← get sk_loc  ;;
+      let sig := Sign sk msg in
+      ret sig
+    };
+    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
+    {
+      pk ← get pk_loc  ;;
+      let bool := Ver_sig pk sig msg in
+      ret bool
+    }
+  ].
+
+  Equations Prim_ideal : package Prim_locs_ideal KeyGen_interface Prim_interface :=
+  Prim_ideal := [package
+    #def  #[get_pk] (_ : 'unit) : 'pubkey
+    {
+      #import {sig #[key_gen] : 'unit → ('seckey ×'pubkey) } as key_gen ;;
+      '(sk,pk) ← key_gen tt ;;
+      pk ← get pk_loc  ;;
+      ret pk
+    };
+    #def #[sign] ( 'msg : 'message ) : 'signature
+    {
+      sk ← get sk_loc  ;;
+      let sig := Sign sk msg in
+      S ← get sign_loc ;;
+      let S' := setm S (sig, msg) tt in
+      #put sign_loc := S' ;;
+      ret sig
+    };
+    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
+    {
+      S ← get sign_loc ;;
+      ret ( (sig,msg) \in domm S)
+    }
+  ].
+  Next Obligation.
+    ssprove_valid; rewrite /Prim_locs_ideal/Prim_locs_real in_fsetU; apply /orP.
+    1,3,4: right;auto_in_fset.
+    all: left; auto_in_fset.
+  Defined.
+
+  Lemma ext_unforge:
+  Prim_real ∘ Key_Gen ≈₀ Prim_ideal ∘ Key_Gen.
+  Proof.
+    eapply (eq_rel_perf_ind_ignore (fset [:: sign_loc])).
+    Check (_ :|: _).
+    - rewrite /Prim_locs_real/Prim_locs_ideal/Key_locs/Prim_locs_real.
+    apply fsubsetU.
+    apply/orP.
+    right.
+    rewrite !fset_cons.
+    apply fsubsetU ; apply /orP ; right.
+    apply fsetUS.
+    apply fsubsetxx.
+    - simplify_eq_rel x.
+    -- ssprove_sync => pk. 
+      eapply r_ret.
+      intuition eauto.
+    -- repeat ssprove_sync.
+      eapply r_get_remember_rhs => sign_loc.
+      eapply r_put_rhs.
+      ssprove_restore_mem.
+      --- ssprove_invariant.
+      ---  eapply r_ret => s0 s1 pre //=.
+    -- case x => s m.
+      eapply r_get_remember_lhs => pk.
+      eapply r_get_remember_rhs => S.
+      eapply r_ret => s0 s1 pre //=.
+      split.
+      ---- eapply Signature_prop.
+      ---- by [move: pre; rewrite /inv_conj; repeat case].
+  Qed.
+
+(*
+
+Definition Prim_real : package Prim_locs_real [interface] Prim_interface
+Definition Aux : package Aux_locs Prim_interface Att_interface :=
+
+Definition KG : package Prim_locs_real [interface] KeyGen_interface
+Definition Prim_real' : package Prim_locs_real KeyGen_interface Prim_interface
+
+left in = right out
+
+Lemma sig_real_vs_att_real:
+    Att_real ≈₀ Aux ∘ Prim_real.
+  Proof.
+
+
+*)
+
+(* Old Definitions *)
+
+Definition Prim_real : package Prim_locs_real [interface] Prim_interface
   := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     { 
@@ -228,5 +332,9 @@ Module Type SignaturePrimitives
     1,4,5: right;auto_in_fset.
     all: left; auto_in_fset.
   Defined.
+
+
+
+
 
 End SignaturePrimitives.
