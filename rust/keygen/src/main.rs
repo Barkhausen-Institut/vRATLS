@@ -2,13 +2,30 @@ extern crate rand;
 use rand::Rng;
 type Nat = u64;
 
-// key generation
-fn key_gen() -> (Nat, Nat) {
-    let sk = rand::thread_rng().gen::<Nat>();
-    let pk = rand::thread_rng().gen::<Nat>();
-    (sk, pk)
+struct State {
+   sk : Option<Nat>
 }
 
+impl State { 
+    fn init() -> State {
+        let sk = Some(rand::thread_rng().gen::<Nat>());
+        State { sk }
+    }
+    // key generation
+    fn key_gen(&mut self) -> Nat {
+        let pk = rand::thread_rng().gen::<Nat>();
+        pk
+    }
+    fn apply<F>(&self, f: F) -> Nat 
+    where 
+         F: FnOnce(Nat) -> Nat, {
+            match self.sk {
+                Some(sk) => f(sk),
+                None => panic!("State not initialized"),
+            }
+    }
+}
+/*
 // apply function 
 fn apply<F>(f: F, sk: Nat) -> Nat
 where
@@ -27,4 +44,8 @@ fn main() {
     let result = apply(example_function, sk);
     println!("Result: {}", result);
 }
+*/
 
+fn main() {
+    
+}

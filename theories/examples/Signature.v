@@ -3,6 +3,7 @@ initially implemented for RA.v
 Will be extended by actual signature implementations
 *)
 
+
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
@@ -62,7 +63,19 @@ Definition tt := Datatypes.tt.
 
 Module Type SignatureParams.
 
+    (*
     Definition SecKey : choice_type := chFin(mkpos pos_n).
+    *)
+    Parameter SecKey : finType.
+    Parameter SecKey_pos : Positive #|SecKey|.
+    #[local] Existing Instance SecKey_pos.
+    Definition chSecKey := 'fin #|SecKey|.
+    Definition i_sk := #|SecKey|.
+    Lemma pos_i_sk : Positive i_sk.
+    Proof.
+    rewrite /i_sk. apply SecKey_pos.
+    Qed.
+
     Definition PubKey : choice_type := chFin(mkpos pos_n).
     Definition Signature : choice_type := chFin(mkpos pos_n).
 
@@ -83,9 +96,11 @@ Module Type KeyGeneration
 
    (* currently not used *)
   Parameter KeyGenM: ∀ {L : {fset Location}},
-   code L [interface] (SecKey × PubKey).
+   code L [interface] (chSecKey × PubKey).
 
   Parameter KeyGen : (SecKey × PubKey).
+
+  Parameter PKeyGen : chSecKey -> PubKey.
 
   (*
   The following holds:
@@ -99,28 +114,69 @@ Module Type KeyGeneration
 
   Notation " 'pubkey "    := PubKey      (in custom pack_type at level 2).
   Notation " 'pubkey "    := PubKey      (at level 2): package_scope.
+  Notation " 'seckey "    := chSecKey      (in custom pack_type at level 2).
+  Notation " 'seckey "    := chSecKey    (at level 2): package_scope.
+  (*
   Notation " 'seckey "    := SecKey      (in custom pack_type at level 2).
   Notation " 'seckey "    := SecKey      (at level 2): package_scope.
+  *)
 
-  Definition pk_loc      : Location := (PubKey    ; 0%N).
-  Definition sk_loc      : Location := (SecKey    ; 1%N).
+  Definition pk_loc      : Location := ('option 'pubkey ; 0%N).
+  Definition sk_loc      : Location := (chSecKey    ; 1%N).
 
   Definition key_gen : nat := 1.  (* Routine for initial key generation. *)
+  Definition apply : nat := 2.
   Definition Key_locs := fset [:: pk_loc ; sk_loc]. (* Heap location for the keys. *)
 
-  Definition KeyGen_interface := [interface #val #[key_gen] : 'unit → ('seckey ×'pubkey)].
+  (*
+  Notation "a --> b" := (a → b) (in custom pack_type at level 2).
+  Notation "a --> b" := (a → b) (at level 2): package_scope.
+  *)
 
-  Definition Key_Gen : package Key_locs [interface] KeyGen_interface
-  := [package
-    #def  #[key_gen] (_ : 'unit) : ('seckey ×'pubkey)
-    { 
-      let (sk,pk) := KeyGen in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      ret (sk, pk)
-    } 
+  Context (T : choice_type).
+  Notation " 't " := T (in custom pack_type at level 2).
+  Notation " 't " := T (at level 2): package_scope.
+
+  Definition Apply := ( apply, (( 'seckey → 't ), 't) ).
+
+  Definition Apply := ( apply, (( {map 'seckey → 't} ), 't) ).
+
+  Definition KeyGen_ifce := 
+    fset [:: Apply].
+
+  Definition KeyGen_ifce :=  [interface 
+    #val #[key_gen] : 'unit → 'pubkey ;
+    #val #[apply] :  {fmap 'seckey → 't } → 't
   ].
-  
+
+  Print chMap.
+  Locate chMap.
+  Print fmap_ordType.
+
+  Print option_choiceType.
+
+  Definition Key_Gen : package Key_locs [interface] KeyGen_ifce
+  := [package
+       #def  #[key_gen] (_ : 'unit) : 'pubkey
+       { 
+         pk_init ← get pk_loc ;;
+         match pk_init with
+         | None =>
+             sk ← sample uniform i_sk ;;
+             let pk := PKeyGen sk in
+             #put pk_loc := Some pk ;;
+             #put sk_loc := sk ;;
+             ret pk
+         | Some pk => ret pk
+         end
+       };
+       #def  #[apply] (f : {map 'seckey → 't }) : 't
+       {
+         sk ← get sk_loc ;;
+         ret (f sk)
+       }
+     ].
+ 
 End KeyGeneration.
 
 (** |  SIGNATURE  |
@@ -133,9 +189,10 @@ Module Type SignatureAlgorithms
 
   Import π1 π2 π3.
 
-  Parameter Sign : ∀ (sk : SecKey) (m : chMessage), Signature.
+  Parameter Sign : ∀ (m : chMessage), Signature.
 
-  Parameter Ver_sig : ∀ (pk : PubKey) (sig : Signature) (m : chMessage), 'bool.
+  Parameter Ver_sig : ∀ (pk : PubKey) (sig : Signature) (m : chMessage), 
+   'bool.
 
   (* TODO: fmap (Signature * A * A ) -> (Signature * A * A )  triggert endless loop  *)
 
@@ -167,28 +224,27 @@ Module Type SignaturePrimitives
   Definition verify_sig  : nat := 45. (* routine to verify the signature *)
 
   (* The signature scheme requires a heap location to store the seen signatures. *)
-  Definition Prim_locs_real := fset [:: pk_loc ; sk_loc].
-  Definition Prim_locs_ideal := Prim_locs_real :|: fset [:: sign_loc ]. 
+  Definition Sig_prim_locs_real := fset [:: pk_loc ; sk_loc].
+  Definition Sig_prim_locs_ideal := Sig_prim_locs_real :|: fset [:: sign_loc ]. 
 
-  Definition Prim_interface := [interface
+  Definition Prim_ifce := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
     #val #[sign] : 'message → 'signature ;
     #val #[verify_sig] : ('signature × 'message) → 'bool
   ].
 
-  Definition Prim_real : package Prim_locs_real KeyGen_interface Prim_interface
+  Definition Prim_real : package Sig_prim_locs_real KeyGen_ifce Prim_ifce
   := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     { 
-      #import {sig #[key_gen] : 'unit → ('seckey ×'pubkey) } as key_gen ;;
-      '(sk,pk) ← key_gen tt ;;
-      pk ← get pk_loc  ;;
+      #import {sig #[key_gen] : 'unit → 'pubkey } as key_gen ;;
+      pk ← key_gen tt ;;
       ret pk
     } ;
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
       sk ← get sk_loc  ;;
-      let sig := Sign sk msg in
+      let sig := Sign_encl  msg in
       ret sig
     };
     #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool

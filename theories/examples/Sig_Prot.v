@@ -68,7 +68,11 @@ Module Type SignatureProt
   Definition Signature_locs_real := Prim_locs_real.
   Definition Signature_locs_ideal := Prim_locs_ideal.
 
-  Definition Sig_interface := [interface #val #[sign] : 'message → 'pubkey × ('signature × 'bool) ].
+  Definition Sig_interface := 
+    [interface #val #[sign] : 'message → 'pubkey × ('signature × 'bool) ].
+
+  About Sig_interface.
+  Check Sig_interface.
 
   Definition Sig_real : package Signature_locs_real 
     Prim_interface Sig_interface
