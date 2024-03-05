@@ -2,8 +2,6 @@
 initially implemented for RA.v
 Will be extended by actual signature implementations
 *)
-
-
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
@@ -24,8 +22,8 @@ From Equations Require Import Equations.
 Require Equations.Prop.DepElim.
 Require Import Coq.Init.Logic.
 Require Import List.
-
 Set Equations With UIP.
+
 
 (*
   This is needed to make definitions with Equations transparent.
@@ -139,6 +137,7 @@ Module Type KeyGeneration
 
   Definition Apply := ( apply, (( 'seckey → 't ), 't) ).
 
+  
   Definition Apply := ( apply, (( {map 'seckey → 't} ), 't) ).
 
   Definition KeyGen_ifce := 
@@ -316,81 +315,5 @@ Module Type SignaturePrimitives
       ---- eapply Signature_prop.
       ---- by [move: pre; rewrite /inv_conj; repeat case].
   Qed.
-
-(*
-
-Definition Prim_real : package Prim_locs_real [interface] Prim_interface
-Definition Aux : package Aux_locs Prim_interface Att_interface :=
-
-Definition KG : package Prim_locs_real [interface] KeyGen_interface
-Definition Prim_real' : package Prim_locs_real KeyGen_interface Prim_interface
-
-left in = right out
-
-Lemma sig_real_vs_att_real:
-    Att_real ≈₀ Aux ∘ Prim_real.
-  Proof.
-
-
-*)
-
-(* Old Definitions *)
-
-Definition Prim_real : package Prim_locs_real [interface] Prim_interface
-  := [package
-    #def  #[get_pk] (_ : 'unit) : 'pubkey
-    { 
-      pk ← get pk_loc  ;;
-      ret pk
-    } ;
-    #def #[sign] ( 'msg : 'message ) : 'signature
-    {
-      let (sk,pk) := KeyGen in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      let sig := Sign sk msg in
-      ret sig
-    };
-    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
-    {
-      pk ← get pk_loc  ;;
-      let bool := Ver_sig pk sig msg in
-      ret bool
-    }
-  ].
-
-  Equations Prim_ideal : package Prim_locs_ideal [interface] Prim_interface :=
-  Prim_ideal := [package
-    #def  #[get_pk] (_ : 'unit) : 'pubkey
-    {
-      pk ← get pk_loc ;;
-      ret pk
-    };
-    #def #[sign] ( 'msg : 'message ) : 'signature
-    {
-      let (sk,pk) := KeyGen in
-      #put pk_loc := pk ;;
-      #put sk_loc := sk ;;
-      let sig := Sign sk msg in
-      S ← get sign_loc ;;
-      let S' := setm S (sig, msg) tt in
-      #put sign_loc := S' ;;
-      ret sig
-    };
-    #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
-    {
-      S ← get sign_loc ;;
-      ret ( (sig,msg) \in domm S)
-    }
-  ].
-  Next Obligation.
-    ssprove_valid; rewrite /Prim_locs_ideal/Prim_locs_real in_fsetU; apply /orP.
-    1,4,5: right;auto_in_fset.
-    all: left; auto_in_fset.
-  Defined.
-
-
-
-
 
 End SignaturePrimitives.

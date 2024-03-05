@@ -1,1 +1,1 @@
-(dirs :standard )
+(ignored_subdirs (rust))
