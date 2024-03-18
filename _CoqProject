@@ -1,4 +1,2 @@
--Q ssprove/theories ""
-
 -R _build/default/theories vRATLS
 _build/default/theories

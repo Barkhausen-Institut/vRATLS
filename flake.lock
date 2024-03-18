@@ -5,11 +5,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1705309234,
-        "narHash": "sha256-uNRRNRKmJyCRC/8y1RqBkqWBLM034y4qN7EprSdmgyA=",
+        "lastModified": 1710146030,
+        "narHash": "sha256-SZ5L6eA7HJ/nmkzGG7/ISclqe6oZdOZTNoesiInkXPQ=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "1ef2e671c3b0c19053962c07dbda38332dcebf26",
+        "rev": "b1d9ab70662946ef0850d488da1c9019f3a9752a",
         "type": "github"
       },
       "original": {
@@ -23,11 +23,11 @@
         "systems": "systems_2"
       },
       "locked": {
-        "lastModified": 1705309234,
-        "narHash": "sha256-uNRRNRKmJyCRC/8y1RqBkqWBLM034y4qN7EprSdmgyA=",
+        "lastModified": 1710146030,
+        "narHash": "sha256-SZ5L6eA7HJ/nmkzGG7/ISclqe6oZdOZTNoesiInkXPQ=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "1ef2e671c3b0c19053962c07dbda38332dcebf26",
+        "rev": "b1d9ab70662946ef0850d488da1c9019f3a9752a",
         "type": "github"
       },
       "original": {
@@ -38,11 +38,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1707744326,
-        "narHash": "sha256-32lLDzVlHt1Z90012ijgdXO1a2eFJB0ljWuSGq/rH14=",
+        "lastModified": 1710448932,
+        "narHash": "sha256-3FidI0o29ws6qyX0aGPPjC81KqrOTSP1iCgtMOnlCB0=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "dd864dc7ddbb1632129ed1172e7f2459e4986ccc",
+        "rev": "c32aa407c8edc341290dede5b842a8af9a14d986",
         "type": "github"
       },
       "original": {
@@ -53,11 +53,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1707824078,
-        "narHash": "sha256-Au3wLi2d06bU7TDvahP2jIEeKwmjAxKHqi8l2uiBkGA=",
+        "lastModified": 1710410081,
+        "narHash": "sha256-5n3OrpL8V+isTDMwlGNjDwA/57R/HH0X7NIsvFFWUUs=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "99d7b32e4cfdaf763d9335b4d9ecf4415cbdc405",
+        "rev": "1a399f214e41e079f0edba674a415816286d1fbd",
         "type": "github"
       },
       "original": {
@@ -79,16 +79,16 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1710164662,
-        "narHash": "sha256-wOd7dSnLmu1WluLESerBBJHsR2Wv7q2oeF1ycFMy4ME=",
+        "lastModified": 1710515117,
+        "narHash": "sha256-jQFZuGjGt9VxAUy4krEioaNftg5Ct4fR0BHqf+csUPQ=",
         "owner": "sertel",
         "repo": "ssprove",
-        "rev": "08d0350f9b4d3b95cfb6b90849254b74824eacc9",
+        "rev": "cbfa5f597a619290fdccb2831458e1ea2aa4cf84",
         "type": "github"
       },
       "original": {
         "owner": "sertel",
-        "ref": "mathcomp.2.1.0",
+        "ref": "nix",
         "repo": "ssprove",
         "type": "github"
       }
