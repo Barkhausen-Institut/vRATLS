@@ -4,6 +4,8 @@
     flake-utils.url    = github:numtide/flake-utils;
    # mathcomp-extra.url = github:sertel/mathcomp-extra;
     ssprove.url = github:sertel/ssprove/nix;
+    ssprove.inputs.nixpkgs.follows = "nixpkgs";
+    ssprove.inputs.flake-utils.follows = "flake-utils";
   };
   outputs = { self, nixpkgs, flake-utils
   # , mathcomp-extra
@@ -22,35 +24,17 @@
         # mathcompExtra = mathcomp-extra...
         ssp_args = {
           inherit (pkgs) stdenv which;
-          inherit coqPackages;
+          inherit coqPackages coq;
         };
-        ssprove' = builtins.trace ssprove (ssprove.mkDrv ssp_args);
-        coqPackages' = coqPackages // {
-          ssprove = ssprove';
-        };
-#        coq-version = coq.version;
-        ssprove'' = ssprove'.overrideAttrs (oldAttrs: {
-          setupHook = coq.setupHook;
-          installPhase = ''
-            runHook setupHook
-            '';
-        });
-
+        ssprove' = ssprove.mkDrv ssp_args;
       in {
         devShell = pkgs.mkShell {
           packages =
             (with ocamlPackages; [ dune_3 ])
             ++
             (with pkgs; [coq gnumake])
-#            ++
-#            (with coqPackages; [equations
-#                                mathcomp
-#                                mathcomp-analysis
-#                                mathcomp-ssreflect])
-            #++
-            #[extructures']
             ++
-            [ssprove''];
+            [ssprove'];
 
           shellHook = ''
                     alias ll="ls -lasi"
