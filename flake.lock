@@ -18,13 +18,36 @@
         "type": "github"
       }
     },
+    "mathcomp-extra": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1711114123,
+        "narHash": "sha256-eoi31QQYpRY5SmMaJubtj+j5MMEzXdwD/38CtQcGsO0=",
+        "owner": "sertel",
+        "repo": "mathcomp-extra",
+        "rev": "f4cf307b9da7843f0a2d82ca0c5a67537cb114fb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sertel",
+        "repo": "mathcomp-extra",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1710448932,
-        "narHash": "sha256-3FidI0o29ws6qyX0aGPPjC81KqrOTSP1iCgtMOnlCB0=",
+        "lastModified": 1711052119,
+        "narHash": "sha256-Y0Y1NiJzUekgcX39luV52jEnNL02fAKNqzUaN/9ZOlQ=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "c32aa407c8edc341290dede5b842a8af9a14d986",
+        "rev": "0de923affe4f251f1a53742cdf2a684e9c3232de",
         "type": "github"
       },
       "original": {
@@ -36,6 +59,7 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
+        "mathcomp-extra": "mathcomp-extra",
         "nixpkgs": "nixpkgs",
         "ssprove": "ssprove"
       }
