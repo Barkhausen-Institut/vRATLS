@@ -17,7 +17,8 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         ocamlPackages = pkgs.ocamlPackages;
-        coq = pkgs.coq_8_18;
+        mce_revision = (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.mathcomp-extra.locked.rev;
+        coq = builtins.trace mce_revision pkgs.coq_8_18;
         coqPackages = pkgs.coqPackages_8_18.overrideScope
           (self: super: {
             mathcomp = super.mathcomp.override { version = "2.1.0"; };
@@ -28,7 +29,7 @@
           inherit coqPackages coq;
         };
         ssprove' = ssprove.mkDrv ssp_args;
-        mathcomp-extra' = mathcomp-extra.mkDrv { inherit coqPackages coq; };
+        mathcomp-extra' = mathcomp-extra.mkDrv.${system} { inherit coqPackages coq; version = "0.1.0"; };
       in {
         devShell = pkgs.mkShell {
           packages =
