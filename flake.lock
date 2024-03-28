@@ -28,11 +28,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1711630169,
-        "narHash": "sha256-RSuEFcwl0WVJQOHaW7nBer/BwAf/NZaJ39vVPzg3COk=",
+        "lastModified": 1711656673,
+        "narHash": "sha256-mKwkchRGrXsRcnTKqzeKKNG2MjS+Nomzl7n6t4ezimg=",
         "owner": "sertel",
         "repo": "mathcomp-extra",
-        "rev": "774d3a609c428a225fafbefb04ddff49d6ec02c8",
+        "rev": "613e36ccdd6f75e71b18eb7c7b14dab0a1577935",
         "type": "github"
       },
       "original": {
