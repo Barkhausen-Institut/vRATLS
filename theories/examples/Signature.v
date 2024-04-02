@@ -1,7 +1,3 @@
-(* so far, this is an abstract implementation of a signature scheme 
-initially implemented for RA.v
-Will be extended by actual signature implementations
-*)
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
@@ -23,13 +19,6 @@ Require Equations.Prop.DepElim.
 Require Import Coq.Init.Logic.
 Require Import List.
 Set Equations With UIP.
-
-
-(*
-  This is needed to make definitions with Equations transparent.
-  Otherwise they are opaque and code simplifications in the
-  proofs with [ssprove_code_simpl] does not resolve properly.
- *)
 Set Equations Transparent.
 
 Set Bullet Behavior "Strict Subproofs".
@@ -39,7 +28,6 @@ Set Primitive Projections.
 Import Num.Def.
 Import Num.Theory.
 Import Order.POrderTheory.
-
 Import PackageNotation.
 
 Obligation Tactic := idtac.
@@ -60,22 +48,23 @@ Notation " 'set t " := (chSet t) (at level 2): package_scope.
 Definition tt := Datatypes.tt.
 
 Module Type SignatureParams.
-
-    (*
-    Definition SecKey : choice_type := chFin(mkpos pos_n).
-    *)
-    Parameter SecKey : finType.
-    Parameter SecKey_pos : Positive #|SecKey|.
+   
+    Parameter fSecKey : finType.
+    Parameter SecKey_pos : Positive #|fSecKey|.
     #[local] Existing Instance SecKey_pos.
-    Definition chSecKey := 'fin #|SecKey|.
-    Definition i_sk := #|SecKey|.
+    Definition SecKey := 'fin #|fSecKey|.
+    Definition i_sk := #|fSecKey|.
     Lemma pos_i_sk : Positive i_sk.
     Proof.
     rewrite /i_sk. apply SecKey_pos.
     Qed.
-
-    Definition PubKey : choice_type := chFin(mkpos pos_n).
+    
+    Definition PubKey := SecKey.
     Definition Signature : choice_type := chFin(mkpos pos_n).
+    (*
+    Definition SecKey    : choice_type := chFin(mkpos pos_n).
+    Definition PubKey    : choice_type := chFin(mkpos pos_n).
+    *)
 
 End SignatureParams.
 
@@ -92,87 +81,56 @@ Module Type KeyGeneration
 
   Import π1 π2.
 
-   (* currently not used *)
-  Parameter KeyGenM: ∀ {L : {fset Location}},
-   code L [interface] (chSecKey × PubKey).
+  Notation " 'pubkey "    := PubKey (in custom pack_type at level 2).
+  Notation " 'pubkey "    := PubKey (at level 2): package_scope.
+  Notation " 'seckey "    := SecKey (in custom pack_type at level 2).
+  Notation " 'seckey "    := SecKey (at level 2): package_scope.
 
   Parameter KeyGen : (SecKey × PubKey).
 
-  Parameter PKeyGen : chSecKey -> PubKey.
+  Definition pk_loc : Location := ('pubkey ; 0%N).
+  Definition sk_loc : Location := ('seckey ; 1%N).
+
+  Definition key_gen : nat := 2.  (* Routine for initial key generation. *)
+  Definition apply   : nat := 3.
+  Definition Key_locs := fset [:: pk_loc ; sk_loc].
 
   (*
-  The following holds:
-  [KeyGen] is just some Coq function. That is, it returns some Coq type. It also states that it is pure.
-  [KeyGen_monadic] is a function in the monad of SSProve. That is, it may alter the state. As a result, 
-  it cannot be left unspecified when doing a proof!
-  We need to specify an implementation in RA and then the weird cast error should disappear.
-  That still does not explain the weird error that we see when using the union of sets for locations. 
-  Maybe this does not go well with a monadic function used in the code.
-  *)
-
-  Notation " 'pubkey "    := PubKey      (in custom pack_type at level 2).
-  Notation " 'pubkey "    := PubKey      (at level 2): package_scope.
-  Notation " 'seckey "    := chSecKey      (in custom pack_type at level 2).
-  Notation " 'seckey "    := chSecKey    (at level 2): package_scope.
-  (*
-  Notation " 'seckey "    := SecKey      (in custom pack_type at level 2).
-  Notation " 'seckey "    := SecKey      (at level 2): package_scope.
-  *)
-
-  Definition pk_loc      : Location := ('option 'pubkey ; 0%N).
-  Definition sk_loc      : Location := (chSecKey    ; 1%N).
-
-  Definition key_gen : nat := 1.  (* Routine for initial key generation. *)
-  Definition apply : nat := 2.
-  Definition Key_locs := fset [:: pk_loc ; sk_loc]. (* Heap location for the keys. *)
-
-  (*
-  Notation "a --> b" := (a → b) (in custom pack_type at level 2).
-  Notation "a --> b" := (a → b) (at level 2): package_scope.
-  *)
-
+  "failed attempt to define apply function as enclave
+  for secret key"
+  
   Context (T : choice_type).
   Notation " 't " := T (in custom pack_type at level 2).
   Notation " 't " := T (at level 2): package_scope.
 
-  Definition Apply := ( apply, (( 'seckey → 't ), 't) ).
+  Context (L : {fset Location}).
+  Definition M L T := code L [interface] T.
+  Notation " 'm " := M (in custom pack_type at level 2).
+  Notation " 'm " := M (at level 2): package_scope.
 
-  
-  Definition Apply := ( apply, (( {map 'seckey → 't} ), 't) ).
+  Definition Apply := mkopsig apply ('m L 'seckey) ('m L T).
 
-  Definition KeyGen_ifce := 
-    fset [:: Apply].
+  Definition KeyGen_ifce T := fset (cons  
+    (*(pair key_gen (pair 'unit 'pubkey)) *)
+    
+    (pair apply (pair Apply T))
+    (*#val #[apply] : ('m L 'seckey → 'm L 't) → 't *)
+  nil).
+  *)
 
-  Definition KeyGen_ifce :=  [interface 
-    #val #[key_gen] : 'unit → 'pubkey ;
-    #val #[apply] :  {fmap 'seckey → 't } → 't
+  Definition KeyGen_ifce := [interface
+    #val #[key_gen] : 'unit → ('seckey × 'pubkey)
   ].
-
-  Print chMap.
-  Locate chMap.
-  Print fmap_ordType.
-
-  Print option_choiceType.
 
   Definition Key_Gen : package Key_locs [interface] KeyGen_ifce
   := [package
-       #def  #[key_gen] (_ : 'unit) : 'pubkey
+       #def  #[key_gen] (_ : 'unit) : ('seckey × 'pubkey)
        { 
-         pk_init ← get pk_loc ;;
-         match pk_init with
-         | None =>
-             sk ← sample uniform i_sk ;;
-             let pk := PKeyGen sk in
-             #put pk_loc := Some pk ;;
-             #put sk_loc := sk ;;
-             ret pk
-         | Some pk => ret pk
-         end
-       };
-       #def  #[apply] (f : {map 'seckey → 't }) : 't
-       {
-         sk ← get sk_loc ;;
-         ret (f sk)
+         let (sk, pk) := KeyGen in 
+         #put sk_loc := sk ;;
+         #put pk_loc := pk ;;
+         
+         ret (sk, pk)      
        }
      ].
  
@@ -188,9 +146,9 @@ Module Type SignatureAlgorithms
 
   Import π1 π2 π3.
 
-  Parameter Sign : ∀ (m : chMessage), Signature.
+  Parameter Sign : ∀ (sk : SecKey) (m : chMessage), Signature.
 
-  Parameter Ver_sig : ∀ (pk : PubKey) (sig : Signature) (m : chMessage), 
+  Parameter Ver_sig : ∀ (pk :  PubKey) (sig : Signature) (m : chMessage), 
    'bool.
 
   (* TODO: fmap (Signature * A * A ) -> (Signature * A * A )  triggert endless loop  *)
@@ -216,34 +174,36 @@ Module Type SignaturePrimitives
   Notation " 'message "   := chMessage     (in custom pack_type at level 2).
   Notation " 'message "   := chMessage     (at level 2): package_scope.
 
-  Definition sign_loc    : Location := ('set ('signature × 'message); 2%N).
+  Definition sign_loc : Location := ('set ('signature × 'message); 4%N).
 
-  Definition get_pk      : nat := 42. (* routine to get the public key *)
-  Definition sign        : nat := 44. (* routine to sign a message *)
-  Definition verify_sig  : nat := 45. (* routine to verify the signature *)
+  Definition get_pk     : nat := 5. (* routine to get the public key *)
+  Definition sign       : nat := 6. (* routine to sign a message *)
+  Definition verify_sig : nat := 7. (* routine to verify the signature *)
+  Definition init       : nat := 8. (* routine to initialize the keys *)
 
   (* The signature scheme requires a heap location to store the seen signatures. *)
-  Definition Sig_prim_locs_real := fset [:: pk_loc ; sk_loc].
-  Definition Sig_prim_locs_ideal := Sig_prim_locs_real :|: fset [:: sign_loc ]. 
+  Definition Sig_locs_real := Key_locs.
+  Definition Sig_locs_ideal := Sig_locs_real :|: fset [:: sign_loc ]. 
 
-  Definition Prim_ifce := [interface
+  Definition Sig_ifce := [interface 
     #val #[get_pk] : 'unit → 'pubkey ;
     #val #[sign] : 'message → 'signature ;
     #val #[verify_sig] : ('signature × 'message) → 'bool
   ].
 
-  Definition Prim_real : package Sig_prim_locs_real KeyGen_ifce Prim_ifce
+  Definition Sig_real : package Sig_locs_real KeyGen_ifce Sig_ifce
   := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     { 
-      #import {sig #[key_gen] : 'unit → 'pubkey } as key_gen ;;
-      pk ← key_gen tt ;;
+      #import {sig #[key_gen] : 'unit → ('seckey × 'pubkey) } as key_gen ;;
+      '(sk,pk) ← key_gen tt ;;
+      pk ← get pk_loc  ;;
       ret pk
     } ;
     #def #[sign] ( 'msg : 'message ) : 'signature
     {
       sk ← get sk_loc  ;;
-      let sig := Sign_encl  msg in
+      let sig := Sign sk msg in
       ret sig
     };
     #def #[verify_sig] ( '(sig,msg) : 'signature × 'message) : 'bool
@@ -254,11 +214,11 @@ Module Type SignaturePrimitives
     }
   ].
 
-  Equations Prim_ideal : package Prim_locs_ideal KeyGen_interface Prim_interface :=
-  Prim_ideal := [package
+  Equations Sig_ideal : package Sig_locs_ideal KeyGen_ifce Sig_ifce :=
+  Sig_ideal := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
     {
-      #import {sig #[key_gen] : 'unit → ('seckey ×'pubkey) } as key_gen ;;
+      #import {sig #[key_gen] : 'unit → ('seckey × 'pubkey) } as key_gen ;;
       '(sk,pk) ← key_gen tt ;;
       pk ← get pk_loc  ;;
       ret pk
@@ -279,32 +239,37 @@ Module Type SignaturePrimitives
     }
   ].
   Next Obligation.
-    ssprove_valid; rewrite /Prim_locs_ideal/Prim_locs_real in_fsetU; apply /orP.
+    ssprove_valid; rewrite /Sig_locs_ideal/Sig_locs_real in_fsetU; apply /orP.
     1,3,4: right;auto_in_fset.
     all: left; auto_in_fset.
   Defined.
 
   Lemma ext_unforge:
-  Prim_real ∘ Key_Gen ≈₀ Prim_ideal ∘ Key_Gen.
+  Sig_real ∘ Key_Gen ≈₀ Sig_ideal ∘ Key_Gen.
   Proof.
     eapply (eq_rel_perf_ind_ignore (fset [:: sign_loc])).
     Check (_ :|: _).
-    - rewrite /Prim_locs_real/Prim_locs_ideal/Key_locs/Prim_locs_real.
+    - rewrite /Sig_locs_real/Sig_locs_ideal/Key_locs/Sig_locs_real.
     apply fsubsetU.
     apply/orP.
     right.
     rewrite !fset_cons.
+    apply fsubsetU ; apply /orP ; left.
     apply fsubsetU ; apply /orP ; right.
     apply fsetUS.
     apply fsubsetxx.
     - simplify_eq_rel x.
-    -- ssprove_sync => pk. 
-      eapply r_ret.
-      intuition eauto.
+    -- simplify_linking.
+       ssprove_sync.
+       ssprove_sync.
+       ssprove_sync => sk_loc.
+       eapply r_ret.
+       intuition eauto.
     -- repeat ssprove_sync.
-      eapply r_get_remember_rhs => sign_loc.
-      eapply r_put_rhs.
-      ssprove_restore_mem.
+       intros.
+       eapply r_get_remember_rhs => sign_loc.
+       eapply r_put_rhs.
+       ssprove_restore_mem.
       --- ssprove_invariant.
       ---  eapply r_ret => s0 s1 pre //=.
     -- case x => s m.

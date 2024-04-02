@@ -42,7 +42,6 @@ Obligation Tactic := idtac.
 #[local] Open Scope package_scope.
 
 Require Import examples.Signature.
-Require Import examples.Sig_Prot.
 Require Import examples.RA.
 
 Module Protocol

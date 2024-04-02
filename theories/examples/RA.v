@@ -91,10 +91,11 @@ Module Type RemoteAttestationAlgorithms
   Notation " 'challenge " := chChallenge   (at level 2): package_scope.
   Notation " 'attest "    := Attestation    (in custom pack_type at level 2).
 
-  Definition state_loc   : Location := ('state    ; 4%N).
-  Definition attest_loc  : Location := ('set (Signature × chMessage) ; 2%N).
-  Definition verify_att   : nat := 46.
-  Definition attest       : nat := 48. 
+  Definition state_loc   : Location := ('state    ; 9%N).
+  Definition attest_loc  : Location := ('set (Signature × chMessage) ; 10%N).
+  Definition verify_att  : nat := 11.
+  Definition attest      : nat := 12.
+  Definition get_pk_att  : nat := 13.
 
   Parameter Hash : chState -> chChallenge -> chMessage.
   Parameter Collision_Resistence: injective (uncurry Hash).
@@ -118,28 +119,25 @@ Module Type RemoteAttestationHash
   Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc_long ].
 
   Definition Att_interface := [interface
-    #val #[get_pk] : 'unit → 'pubkey ;
+    #val #[get_pk_att] : 'unit → 'pubkey ;
     #val #[attest] : 'challenge → ('signature × 'message) ;
     #val #[verify_att] : ('challenge × 'signature) → 'bool
   ].
 
-  Definition Att_real : package Attestation_locs_real [interface]
+  Definition Att_real : package Attestation_locs_real KeyGen_ifce
     Att_interface
     := [package
-      #def  #[get_pk] (_ : 'unit) : 'pubkey
+      #def  #[get_pk_att] (_ : 'unit) : 'pubkey
       {
+        #import {sig #[key_gen] : 'unit → ('seckey × 'pubkey) } as key_gen ;;
+        '(sk,pk) ← key_gen tt ;;
         pk ← get pk_loc  ;;
         ret pk
       };
       #def #[attest] (chal : 'challenge) : ('signature × 'message)
       {
+        sk ← get sk_loc  ;;
         state ← get state_loc ;;
-        let (sk,pk) := KeyGen in
-      (*
-      '(sk,pk) ← KeyGen ;;
-      *)
-        #put pk_loc := pk ;;
-        #put sk_loc := sk ;;
         let msg := Hash state chal in
         let att := Sign sk msg in
         ret (att, msg)
@@ -154,23 +152,20 @@ Module Type RemoteAttestationHash
       }
   ].
 
-  Equations Att_ideal : package Attestation_locs_ideal [interface] Att_interface :=
+  Equations Att_ideal : package Attestation_locs_ideal KeyGen_ifce Att_interface :=
     Att_ideal := [package
-      #def  #[get_pk] (_ : 'unit) : 'pubkey
+      #def  #[get_pk_att] (_ : 'unit) : 'pubkey
       {
+        #import {sig #[key_gen] : 'unit → ('seckey × 'pubkey) } as key_gen ;;
+        '(sk,pk) ← key_gen tt ;;
         pk ← get pk_loc ;;
         ret pk
       };
 
       #def #[attest] (chal : 'challenge) : ('signature × 'message)
       {
+        sk ← get sk_loc  ;;
         state ← get state_loc ;;
-        let (sk,pk) := KeyGen in
-        (*
-        '(sk,pk) ← KeyGen ;;
-        *)
-        #put pk_loc := pk ;;
-        #put sk_loc := sk ;;
         let msg := Hash state chal in
         let att := Sign sk msg in
         A ← get attest_loc_long ;;
@@ -178,7 +173,7 @@ Module Type RemoteAttestationHash
         ret (att, msg)
       };
 
-      #def #[verify_att] ('(chal, att) : ('challenge × 'attest)) : 'bool
+      #def #[verify_att] ('(chal, att) : ('challenge × 'signature)) : 'bool
       {
         A ← get attest_loc_long ;;
         state ← get state_loc ;;
@@ -189,7 +184,7 @@ Module Type RemoteAttestationHash
     ].
     Next Obligation.
       ssprove_valid; rewrite /Attestation_locs_ideal/Attestation_locs_real in_fsetU; apply /orP.
-      1,6,7: right; auto_in_fset.
+      1,5,6: right; auto_in_fset.
       all: left; auto_in_fset.
     Defined.
 
@@ -199,11 +194,12 @@ Module Type RemoteAttestationHash
 
   (*Definition Aux_locs := fset [:: pk_loc ; sk_loc ; sign_loc ; state_loc ]. *)
 
-  Definition Aux : package Aux_locs Prim_interface Att_interface :=
+  Definition Aux : package Aux_locs Sig_ifce Att_interface :=
     [package
-      #def #[get_pk] (_ : 'unit) : 'pubkey
+      #def #[get_pk_att] (_ : 'unit) : 'pubkey
       {
-        pk ← get pk_loc ;;
+        #import {sig #[get_pk] : 'unit  → 'pubkey } as get_pk ;;
+        pk ← get_pk tt ;;
         ret pk
       };
 
@@ -227,18 +223,22 @@ Module Type RemoteAttestationHash
     ].
 
   Lemma sig_real_vs_att_real:
-    Att_real ≈₀ Aux ∘ Prim_real.
+    Att_real ∘ Key_Gen ≈₀ Aux ∘ Sig_real ∘ Key_Gen.
   Proof.
     eapply eq_rel_perf_ind_eq.
     simplify_eq_rel x.
     all: ssprove_code_simpl.
-    - eapply rpost_weaken_rule.
-      1: eapply rreflexivity_rule.
-      move => [a1 h1] [a2 h2] [Heqa Heqh].
-      intuition auto.
+    - simplify_linking.
+      ssprove_sync_eq.
+      ssprove_sync_eq.
+      ssprove_sync_eq => pk_loc.
+      eapply r_ret.
+      intuition eauto.
     - destruct x.
+      ssprove_swap_lhs 0.
       ssprove_sync_eq => state.
-      do 2! ssprove_sync_eq.
+      ssprove_sync_eq => sk_loc.
+      simplify_linking.
       by [apply r_ret].
     - case x => s s0.
       case s => s1 s2.
@@ -248,15 +248,14 @@ Module Type RemoteAttestationHash
       by [apply r_ret].
   Qed.
   
-  Definition Comp_locs := fset [:: pk_loc; sk_loc ; state_loc ; sign_loc ].
+  Definition Comp_locs := fset [:: pk_loc ; sk_loc ; state_loc ; sign_loc ].
 
-  (* You need to redefine [Aux] to match the import interface of [Aux] to
-      the export interface of [Prim_ideal]  *)
-  Definition Aux_ideal : package Aux_locs Prim_interface Att_interface :=
+  Definition Aux_ideal : package Aux_locs Sig_ifce Att_interface :=
   [package
-    #def #[get_pk] (_ : 'unit) : 'pubkey
+    #def #[get_pk_att] (_ : 'unit) : 'pubkey
     {
-      pk ← get pk_loc ;;
+      #import {sig #[get_pk] : 'unit  → 'pubkey } as get_pk ;;
+      pk ← get_pk tt ;;
       ret pk
     };
 
@@ -279,36 +278,37 @@ Module Type RemoteAttestationHash
     }
   ].
 
-  Definition Prim_real_locp := {locpackage Prim_real}.
-  Definition Prim_ideal_locp := {locpackage Prim_ideal}.
-  Definition Att_real_locp := {locpackage Att_real}.
+  Definition Sig_real_locp  := {locpackage Sig_real}.
+  Definition Sig_ideal_locp := {locpackage Sig_ideal}.
+  Definition Att_real_locp  := {locpackage Att_real}.
   Definition Att_ideal_locp := {locpackage Att_ideal}.
-
-
-  Equations Aux_Prim_ideal : package Comp_locs [interface] Att_interface :=
-    Aux_Prim_ideal := {package Aux_ideal ∘ Prim_ideal_locp}.
+  Definition Key_Gen_locp   := {locpackage Key_Gen}.
+  
+  Equations Aux_Sig_ideal : package Comp_locs KeyGen_ifce Att_interface :=
+    Aux_Sig_ideal := {package Aux ∘ Sig_ideal_locp}.
   Next Obligation.
     ssprove_valid.
-    - rewrite /Aux_locs/Comp_locs.
-      rewrite [X in fsubset _ X]fset_cons.
+    - rewrite /Aux_locs/Comp_locs/Key_locs.
       rewrite fset_cons.
-      apply fsetUS.
       rewrite [X in fsubset _ X]fset_cons.
+      apply fsetUS.
       rewrite !fset_cons.
       apply fsubsetU ; apply /orP ; right.
       apply fsetUS.
       apply fsubsetU ; apply /orP ; right.
       apply fsubsetxx.
-    - rewrite /(locs Prim_ideal_locp)/Comp_locs.
-      rewrite [X in fsubset _ X]fset_cons.
-      unfold Prim_locs_ideal.
+    - rewrite /(locs Sig_ideal_locp)/Comp_locs/Key_locs/Sig_ideal_locp/Sig_locs_ideal/Sig_locs_real/Key_locs.
       rewrite -fset_cat.
       rewrite fset_cons.
-      apply fsetUS.
       rewrite [X in fsubset _ X]fset_cons.
-      rewrite !fset_cons.
       apply fsetUS.
+      rewrite fset_cons.
+      rewrite [X in fsubset _ X]fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      rewrite [X in fsubset _ X]fset_cons.
       apply fsubsetU ; apply /orP ; right.
+      rewrite fset_cons.
       apply fsetUS.
       apply fsubsetxx.
   Defined.
@@ -984,10 +984,18 @@ Module Type RemoteAttestationHash
   Lemma put_bind:
     forall (t : Choice.type) (l : Location) (v : l) (c : raw_code t),
       putr l v c = bind (putr l v (ret tt)) (fun (x:unit_choiceType) => c).
-  Proof. by[]. Qed.
+  Proof. by[]. Qed. 
+
+
+
+  (********************************************)
+  (********************************************)
+  (********************************************)
+  (********************************************)
+  (********************************************)
 
   Lemma sig_ideal_vs_att_ideal :
-    Att_ideal_locp ≈₀ Aux_Prim_ideal.
+    Att_ideal ∘ Key_Gen ≈₀ Aux_Sig_ideal ∘ Key_Gen.
   Proof.
     eapply eq_rel_perf_ind with (full_heap_eq').
     1: { apply: Invariant_heap_eq_ideal'. }
