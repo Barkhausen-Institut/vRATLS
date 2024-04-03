@@ -125,8 +125,7 @@ Module Type RemoteAttestationHash
   ].
 
   Definition Att_real : package Attestation_locs_real KeyGen_ifce
-    Att_interface
-    := [package
+      Att_interface := [package
       #def  #[get_pk_att] (_ : 'unit) : 'pubkey
       {
         #import {sig #[key_gen] : 'unit → ('seckey × 'pubkey) } as key_gen ;;
@@ -151,6 +150,8 @@ Module Type RemoteAttestationHash
         ret bool
       }
   ].
+
+
 
   Equations Att_ideal : package Attestation_locs_ideal KeyGen_ifce Att_interface :=
     Att_ideal := [package
@@ -182,8 +183,15 @@ Module Type RemoteAttestationHash
         ret b
       }
     ].
+    (*
     Next Obligation.
       ssprove_valid; rewrite /Attestation_locs_ideal/Attestation_locs_real in_fsetU; apply /orP.
+      1,5,6: right; auto_in_fset.
+      all: left; auto_in_fset.
+    Defined.
+    *)
+    Next Obligation.
+      ssprove_valid; rewrite /Attestation_locs_ideal/Attestation_locs_real in_fsetU/Key_locs; apply /orP.
       1,5,6: right; auto_in_fset.
       all: left; auto_in_fset.
     Defined.
@@ -278,14 +286,14 @@ Module Type RemoteAttestationHash
     }
   ].
 
-  Definition Sig_real_locp  := {locpackage Sig_real}.
-  Definition Sig_ideal_locp := {locpackage Sig_ideal}.
-  Definition Att_real_locp  := {locpackage Att_real}.
-  Definition Att_ideal_locp := {locpackage Att_ideal}.
+  Definition Sig_real_locp  := {locpackage Sig_real ∘ Key_Gen}.
+  Definition Sig_ideal_locp := {locpackage Sig_ideal ∘ Key_Gen}.
+  Definition Att_real_locp  := {locpackage Att_real ∘ Key_Gen}.
+  Definition Att_ideal_locp := {locpackage Att_ideal ∘ Key_Gen}.
   Definition Key_Gen_locp   := {locpackage Key_Gen}.
   
   Equations Aux_Sig_ideal : package Comp_locs KeyGen_ifce Att_interface :=
-    Aux_Sig_ideal := {package Aux ∘ Sig_ideal_locp}.
+    Aux_Sig_ideal := {package Aux ∘ Sig_ideal}.
   Next Obligation.
     ssprove_valid.
     - rewrite /Aux_locs/Comp_locs/Key_locs.
@@ -452,7 +460,7 @@ Module Type RemoteAttestationHash
              {
                clear.
                rewrite /Attestation_locs_ideal /Attestation_locs_real in_fsetU; apply /orP.
-               right; auto_in_fset.
+               right; auto_in_fset. 
              }
              have attest_not_eq_l: attest_loc_long != l.
              { rewrite eqtype.eq_sym; apply (disjoint_noteq notin_att_locs attest_loc_in_att_locs). }
@@ -993,14 +1001,58 @@ Module Type RemoteAttestationHash
   (********************************************)
   (********************************************)
   (********************************************)
+  (*
+  Definition Comp_locs := fset [:: pk_loc ; sk_loc ; state_loc ; sign_loc ].
+  Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
+  Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc_long ].
+  *)
+
+  
+
+  Lemma concat_1 :
+    Attestation_locs_ideal :|: Key_locs = Attestation_locs_ideal.
+  Proof.
+    
+    rewrite /Attestation_locs_ideal.
+    rewrite /Attestation_locs_real/Key_locs.      
+    Search fsubset.
+    rewrite -fset_cat /cat.
+    Search ":|:".
+    Print fsubset.
+    rewrite fsetUC.
+    apply/eqP.
+    rewrite -/(fsubset (fset [:: pk_loc; sk_loc]) _).
+    rewrite fset_cons.
+    (*
+    rewrite [X in fsubset _ (_ :|: X)]fset_cons.
+    apply fsetUS.
+    
+    apply fsubsetUl.
+
+    
+    rewrite [X in Invariant X _]fset_cons.
+
+    rewrite (fsubsetUl Attestation_locs_ideal Key_locs).
+    *)
+  Admitted.
+
+  Lemma concat_2 :
+    Comp_locs :|: Key_locs = Comp_locs.
+  Proof.
+    rewrite /Comp_locs/Key_locs.
+
+  Admitted.  
 
   Lemma sig_ideal_vs_att_ideal :
     Att_ideal ∘ Key_Gen ≈₀ Aux_Sig_ideal ∘ Key_Gen.
   Proof.
     eapply eq_rel_perf_ind with (full_heap_eq').
-    1: { apply: Invariant_heap_eq_ideal'. }
+    1: { rewrite concat_1. 
+         rewrite concat_2. 
+         apply: Invariant_heap_eq_ideal'. }  
     simplify_eq_rel x.
     all: ssprove_code_simpl;
+      repeat simplify_linking;
       rewrite -/full_heap_eq';
       (** approach 1:
        [ under @post_eq => [a b] do [ case: a => b₀ s₀; case: b => b₁ s₁; rewrite -/(full_heap_eq (s₀,s₁))]. ]
@@ -1018,6 +1070,12 @@ Module Type RemoteAttestationHash
                  (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq' (s₀,s₁))).
       2:{ case => b₀ s₀; case  => b₁ s₁. by [rewrite -/(full_heap_eq' (s₀,s₁))]. }
     - Fail ssprove_sync.
+    (**
+      eapply rpost_weaken_rule.
+      -- ssprove_sync.
+         (*eapply r_reflexivity_alt.*)
+         (*eapply r_put_vs_put.*)
+      (*ssprove_sync_eq => sk_loc.  *)*)  
       sync_sig_att. 1: { auto_in_fset. }
       move => a; by [apply r_ret].
     - sync_sig_att. 1: { auto_in_fset. }
@@ -1166,15 +1224,17 @@ Module Type RemoteAttestationHash
       + by [move:pre; rewrite /(_ ⋊_); do 2! case].
     - by [].
   Qed.
+  *)
   
   Theorem RA_unforg LA A :
       ValidPackage LA Att_interface A_export A →
-      fdisjoint LA (Prim_real_locp).(locs) →
-      fdisjoint LA (Prim_ideal_locp).(locs) →
+      fdisjoint LA (Sig_real_locp).(locs) →
+      fdisjoint LA (Sig_ideal_locp).(locs) →
       fdisjoint LA Aux_locs →
       fdisjoint LA (Att_real_locp).(locs) →
       fdisjoint LA (Att_ideal_locp).(locs) →
-      (AdvantageE Att_ideal_locp Att_real_locp A <= AdvantageE Aux_Prim_ideal (Aux ∘ Prim_real_locp) A)%R.
+      (AdvantageE (Att_ideal_locp) (Att_real_locp) A 
+        <= AdvantageE (Aux_Sig_ideal ∘ Key_Gen) (Aux ∘ Sig_real_locp ) A)%R.
   Proof.
     move => va H1 H2 H3 H4 H5.
     rewrite Advantage_sym.
@@ -1184,8 +1244,8 @@ Module Type RemoteAttestationHash
     simpl in H4.
     simpl in H5.
     ssprove triangle (Att_real_locp) [::
-      Aux ∘ Prim_real_locp ;
-      Aux_ideal ∘ Prim_ideal_locp
+      Aux ∘ Sig_real_locp ;
+      Aux_ideal ∘ Sig_ideal_locp
       ] (Att_ideal_locp) A as ineq.
     eapply le_trans.
     1: { exact: ineq. }
@@ -1201,6 +1261,9 @@ Module Type RemoteAttestationHash
     rewrite [X in (_ + X <= _)%R]Advantage_sym.
 
     (* Set Typeclasses Debug Verbosity 2. *)
+
+    (*Lemma sig_ideal_vs_att_ideal :
+    Att_ideal ∘ Key_Gen ≈₀ Aux_Sig_ideal ∘ Key_Gen.*)
 
     rewrite sig_ideal_vs_att_ideal.
     (* Type class resolution failed because of the [Att_interface_f].
