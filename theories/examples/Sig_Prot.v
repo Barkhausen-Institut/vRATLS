@@ -65,17 +65,10 @@ Module Type SignatureProt
 
   Import π1 π2 KG Alg Prim.
 
-  Definition Signature_locs_real := Prim_locs_real.
-  Definition Signature_locs_ideal := Prim_locs_ideal.
-
-  Definition Sig_interface := 
+  Definition Sig_prot_ifce := 
     [interface #val #[sign] : 'message → 'pubkey × ('signature × 'bool) ].
 
-  About Sig_interface.
-  Check Sig_interface.
-
-  Definition Sig_real : package Signature_locs_real 
-    Prim_interface Sig_interface
+  Definition Sig_prot : package Sig_locs_real Sig_ifce Sig_prot_ifce
     := [package
       #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
       {
@@ -91,59 +84,77 @@ Module Type SignatureProt
       } 
     ].
   
-  Equations Sig_ideal : package Signature_locs_ideal Prim_interface 
-      Sig_interface :=
-    Sig_ideal := [package
-      #def  #[sign] (msg : 'message) : 'pubkey × ('signature × 'bool)
-      {
-        #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
-        #import {sig #[sign] : 'message → 'signature  } as sign ;;
-        #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify_sig ;;
-        (* Protocol *)
-        pk ← get_pk tt ;;
-        sig ← sign msg ;;
-        bool ← verify_sig (sig, msg) ;;
-        ret (pk, ( sig, bool ))
-      } 
-    ].
 
-     (* 
-  Why is this Lemma sufficient? 
-  According to "The Joy of Crypto", we show that the real and fake primitives are
-  indistinguishable, which then implies " By asking for the libraries to be 
-  indistinguishable, we are reallyasking that the attacker cannot find any such 
-  message-signature pair (forgery)." Hence, we prove the scheme to be strong
-  unforgeable.
-  *)    
+  Equations Sig_prot_real : package Sig_locs_real [interface] Sig_prot_ifce :=
+    Sig_prot_real := {package Sig_prot ∘ Sig_real_c }.
+  Next Obligation.
+    ssprove_valid.
+    - rewrite /Sig_locs_real/Key_locs.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      apply fsetUS.
+      apply fsubsetxx.
+    - rewrite /Key_locs/Sig_locs_real/Key_locs.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      apply fsetUS.
+      apply fsubsetxx.
+    Defined.
 
-  Lemma ext_unforge:
-  Prim_real ≈₀ Prim_ideal.
+    Equations Sig_prot_ideal : package Sig_locs_ideal [interface] Sig_prot_ifce :=
+      Sig_prot_ideal := {package Sig_prot ∘ Sig_ideal_c }.
+    Next Obligation.
+      ssprove_valid.
+      - rewrite /Key_locs/Sig_locs_ideal/Sig_locs_real/Key_locs.
+        rewrite -fset_cat /cat.
+        rewrite fset_cons.
+        rewrite [X in fsubset X _]fset_cons.
+        apply fsetUS.
+        rewrite fset_cons.
+        rewrite [X in fsubset X _]fset_cons.
+        apply fsetUS.
+        rewrite !fset_cons -fset0E.
+        apply fsub0set.
+      - rewrite /Key_locs/Sig_locs_ideal/Sig_locs_real/Key_locs.
+        rewrite -fset_cat /cat.
+        rewrite fset_cons.
+        apply fsetUS.
+        rewrite fset_cons.
+        apply fsetUS.
+        rewrite fset_cons.
+        apply fsetUS.
+        apply fsubsetxx.
+    Defined.
+
+  Lemma ext_unforge_sig_prot:
+  Sig_prot_real ≈₀ Sig_prot_ideal.
   Proof.
     eapply (eq_rel_perf_ind_ignore (fset [:: sign_loc])).
-    - rewrite /Prim_locs_real/Prim_locs_ideal.
-    apply fsubsetU.
-    apply/orP.
-    right.
-    rewrite !fset_cons.
-    apply fsubsetU ; apply /orP ; right.
-    apply fsetUS.
-    apply fsubsetxx.
-    - simplify_eq_rel x.
-    -- ssprove_sync => pk. 
-      eapply r_ret.
-      intuition eauto.
-    -- repeat ssprove_sync.
-      eapply r_get_remember_rhs => sign_loc.
+    - rewrite /Sig_locs_real/Sig_locs_ideal.
+      apply fsubsetU.
+      apply/orP.
+      right.
+      rewrite !fset_cons.
+      apply fsubsetU ; apply /orP ; right.
+      apply fsetUS.
+      apply fsubsetxx.
+    - simplify_eq_rel m.
+      simplify_linking.
+      ssprove_sync. ssprove_sync.
+      ssprove_sync => pk.
+      ssprove_sync => sk.
+      eapply r_get_remember_rhs => sig.
       eapply r_put_rhs.
       ssprove_restore_mem.
-      --- ssprove_invariant.
-      ---  eapply r_ret => s0 s1 pre //=.
-    -- case x => s m.
-      eapply r_get_remember_lhs => pk.
-      eapply r_get_remember_rhs => S.
-      eapply r_ret => s0 s1 pre //=.
-      split.
-      ---- eapply Signature_prop.
+      -- ssprove_invariant.
+      -- eapply r_get_remember_rhs => sig'.
+         eapply r_get_remember_lhs => KG_pk.
+         eapply r_ret => s0 s1 pre //=.
+         split.
+      ---- repeat f_equal.
+           apply Signature_prop.
       ---- by [move: pre; rewrite /inv_conj; repeat case].
   Qed.
     

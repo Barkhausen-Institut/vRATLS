@@ -53,9 +53,9 @@ Module Protocol
     (RAA : RemoteAttestationAlgorithms π1 π2 RAP KG Alg)
     (SP : SignaturePrimitives π1 π2 KG Alg)
     (RAH : RemoteAttestationHash π1 π2 RAP KG Alg RAA SP)
-    (SProt : SignatureProt π1 π2 KG Alg SP).
+    .
 
-  Import π1 π2 RAP KG Alg RAA SP RAH SProt.
+  Import π1 π2 RAP KG Alg RAA SP RAH.
 
   Definition i_chal := #|Challenge|.
   Definition att : nat := 50.
@@ -68,70 +68,74 @@ Module Protocol
   := [package
     #def  #[att] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
     {
-      #import {sig #[get_pk] : 'unit → 'pubkey } as get_pk ;;
+      #import {sig #[get_pk_att] : 'unit →  'pubkey } as get_pk_att ;;
       #import {sig #[attest] : 'challenge → ('signature × 'message)  } as attest ;;
       #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
   
       (* Protocol *)
-      pk ← get_pk tt ;;
+      pk ← get_pk_att tt ;;
       chal ← sample uniform i_chal ;;
       '(att, msg) ← attest chal ;;
       bool ← verify_att (chal, att) ;;
       ret (pk, ( att, bool ))
     } 
   ].
-                            
-  Equations Att_prot_real : package Attestation_locs_real [interface] RA_prot_interface :=
-    Att_prot_real := {package Att_prot ∘ Att_real }.
+
+  Equations Att_prot_real : package Attestation_locs_real 
+     [interface] RA_prot_interface :=
+    Att_prot_real := {package Att_prot ∘ Att_real_c }.
   Next Obligation.
-    ssprove_valid. 
-    - rewrite /Attestation_locs_real.
-      rewrite !fset_cons.
-      repeat apply fsetUS.
+    ssprove_valid.
+    - rewrite /Attestation_locs_real/Key_locs.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      apply fsetUS.
       apply fsubsetxx.
-    - rewrite/ Attestation_locs_real/Attestation_locs_real.
-      rewrite !fset_cons.
-      repeat apply fsetUS.
+    - rewrite /Key_locs/Attestation_locs_real/Key_locs.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      apply fsetUS.
       apply fsubsetxx.
     Defined.
 
-  Equations Att_prot_ideal : package Attestation_locs_ideal [interface] RA_prot_interface :=
-    Att_prot_ideal := {package Att_prot ∘ Att_ideal }.
-  Next Obligation.
-    ssprove_valid.
-    - rewrite /Attestation_locs_real/Attestation_locs_ideal/Attestation_locs_real.
-      rewrite -fset_cat.
-      rewrite fset_cons.
-      rewrite [X in fsubset _ X]fset_cons.
-      apply fsetUS.
-      rewrite fset_cons.
-      rewrite [X in fsubset X _]fset_cons.
-      apply fsetUS.
-      rewrite fset_cons.
-      rewrite [X in fsubset X _]fset_cons.
-      apply fsetUS.
-      rewrite !fset_cons -fset0E.
-      apply fsub0set.
-    - rewrite/ Attestation_locs_ideal/Attestation_locs_real.      
-      rewrite -!fset_cat.
-      rewrite !fset_cons.
-      repeat apply fsetUS.
-      apply fsubsetxx.
-    Defined.  
-
-  (*
-    Check fsetUS.
-    Locate ":|:".
-    Unset Printing Notations.
-    Check fset_cons.
-    Search fsetU.
-  *)
+    Equations Att_prot_ideal : package Attestation_locs_ideal [interface] RA_prot_interface :=
+      Att_prot_ideal := {package Att_prot ∘ Att_ideal_c }.
+    Next Obligation.
+      ssprove_valid.
+      - rewrite /Key_locs/Attestation_locs_ideal/Attestation_locs_real/Key_locs.
+        rewrite -fset_cat /cat.
+        rewrite fset_cons.
+        rewrite [X in fsubset X _]fset_cons.
+        apply fsetUS.
+        rewrite fset_cons.
+        rewrite [X in fsubset X _]fset_cons.
+        apply fsetUS.
+        rewrite fset_cons.
+        rewrite [X in fsubset X _]fset_cons.
+        apply fsetUS.
+        rewrite !fset_cons -fset0E.
+        apply fsub0set.
+      - rewrite /Key_locs/Attestation_locs_ideal/Attestation_locs_real/Key_locs.
+        rewrite -fset_cat /cat.
+        rewrite fset_cons.
+        apply fsetUS.
+        rewrite fset_cons.
+        apply fsetUS.
+        rewrite fset_cons.
+        apply fsetUS.
+        rewrite fset_cons.
+        apply fsetUS.
+        apply fsubsetxx.
+    Defined.
 
   (* This prop is different from the RA prop, because it has much more inputs *)
   Parameter RA_prop:
     ∀ (l: {fmap (Signature * chState * chChallenge ) -> 'unit}) 
-      (s : chState) (pk : PubKey) (sk : SecKey) (chal : chChallenge) (h  : chMessage),
-      Ver_sig pk (Sign sk h) h = ((Sign sk h, s, chal) \in domm l).
+      (s s' s'' : chState) (pk : PubKey) (sk : SecKey) (chal : chChallenge) (h  : chMessage),
+    Ver_sig pk (Sign sk (Hash s chal)) (Hash s' chal) 
+    = ((Sign sk (Hash s chal), s'', chal) \in domm l).
 
   Lemma ra_prot_indist: 
     Att_prot_real ≈₀ Att_prot_ideal.
@@ -153,28 +157,26 @@ Module Protocol
     ssprove_code_simpl.
     ssprove_code_simpl_more.
     ssprove_code_simpl; simplify_linking.
-    ssprove_sync => a.
+    ssprove_sync.
+    ssprove_sync.
+    ssprove_sync => pk.
     ssprove_sync => chal.
-    ssprove_swap_seq_rhs [:: 5; 4; 3 ; 2 ; 1 ]%N.
-    ssprove_contract_get_rhs.
-    ssprove_swap_seq_lhs [::  3 ; 2 ; 1 ]%N.
-    ssprove_contract_get_lhs.
-    ssprove_sync => state_loc.
-    repeat ssprove_sync.
-    (* rewrite (reshape_pair_id (heap_ignore (fset [:: attest_loc_long])) ). *)  
-    eapply r_get_remember_lhs => pk_loc.
-    (*ssprove_restore_pre.*)
-    eapply r_get_remember_rhs => attest_loc.
+    ssprove_sync => sk.
+    ssprove_sync => state.
+    apply r_get_remember_rhs => a.
+    apply r_get_remember_lhs => pk'.
+    apply r_get_remember_lhs => state'.
     eapply r_put_rhs.
     ssprove_restore_mem.
     -- ssprove_invariant.
-    -- eapply r_get_remember_rhs => attest_loc2.
-    eapply r_ret => s0 s1 pre //=.
-    split.
+    -- eapply r_get_remember_rhs => a'.
+       apply r_get_remember_rhs => state''.
+       eapply r_ret => s0 s1 pre //=.
+       split.
     --- repeat f_equal.
-    eapply RA_prop. 
+        eapply RA_prop. intuition eauto. 
     ---move: pre.
-       by case.
+       by repeat case.
     Qed.       
     
 End Protocol.

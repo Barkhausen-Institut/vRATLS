@@ -244,25 +244,64 @@ Module Type SignaturePrimitives
     all: left; auto_in_fset.
   Defined.
 
+  Equations Sig_real_c : package Sig_locs_real [interface] Sig_ifce :=
+    Sig_real_c := {package Sig_real ∘ Key_Gen}.
+  Next Obligation.
+    ssprove_valid.
+    - rewrite /Sig_locs_real/Key_locs.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      apply fsetUS.
+      apply fsubsetxx.
+    - rewrite /Key_locs/Sig_locs_real/Key_locs.
+    rewrite fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      apply fsetUS.
+      apply fsubsetxx.
+  Qed.
+
+  Equations Sig_ideal_c : package Sig_locs_ideal [interface] Sig_ifce :=
+    Sig_ideal_c := {package Sig_ideal ∘ Key_Gen}.
+  Next Obligation.
+    ssprove_valid.
+    - rewrite /Sig_locs_ideal/Sig_locs_real/Key_locs.
+      rewrite fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      apply fsetUS.
+      apply fsubsetxx.
+    - rewrite /Key_locs/Sig_locs_ideal/Sig_locs_real/Key_locs.
+      rewrite -fset_cat /cat.
+      rewrite fset_cons.
+      rewrite [X in fsubset X _]fset_cons.
+      apply fsetUS.
+      rewrite fset_cons.
+      rewrite [X in fsubset X _]fset_cons.
+      apply fsetUS.
+      rewrite !fset_cons -fset0E.
+      apply fsub0set.
+  Qed.
+
   Lemma ext_unforge:
-  Sig_real ∘ Key_Gen ≈₀ Sig_ideal ∘ Key_Gen.
+  Sig_real_c ≈₀ Sig_ideal_c.
   Proof.
     eapply (eq_rel_perf_ind_ignore (fset [:: sign_loc])).
     Check (_ :|: _).
-    - rewrite /Sig_locs_real/Sig_locs_ideal/Key_locs/Sig_locs_real.
-    apply fsubsetU.
-    apply/orP.
-    right.
-    rewrite !fset_cons.
-    apply fsubsetU ; apply /orP ; left.
-    apply fsubsetU ; apply /orP ; right.
-    apply fsetUS.
-    apply fsubsetxx.
+    - rewrite /Sig_locs_real/Sig_locs_ideal/Key_locs/Sig_locs_real/Key_locs.
+      apply fsubsetU.
+      apply/orP; right.
+      apply fsubsetU.
+      apply/orP; right.
+      rewrite fset_cons.
+      apply fsetUS.
+      apply fsubsetxx.
     - simplify_eq_rel x.
     -- simplify_linking.
        ssprove_sync.
        ssprove_sync.
-       ssprove_sync => sk_loc.
+       ssprove_sync => pk_loc.
        eapply r_ret.
        intuition eauto.
     -- repeat ssprove_sync.
@@ -271,7 +310,7 @@ Module Type SignaturePrimitives
        eapply r_put_rhs.
        ssprove_restore_mem.
       --- ssprove_invariant.
-      ---  eapply r_ret => s0 s1 pre //=.
+      --- eapply r_ret => s0 s1 pre //=.
     -- case x => s m.
       eapply r_get_remember_lhs => pk.
       eapply r_get_remember_rhs => S.
