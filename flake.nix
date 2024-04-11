@@ -29,9 +29,8 @@
         };
         ssprove' = ssprove.mkDrv ssp_args;
 
-        #mathcomp-extra' = mathcomp-extra.mkDrv.${system} { inherit coqPackages coq; version = "0.1.0"; };
-        mce_revision = (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.mathcomp-extra.locked.rev;
-        mathcomp-extra' = builtins.trace mce_revision (mathcomp-extra.mkDrv'.${system} { inherit mce_revision; });
+        mathcomp-extra' = mathcomp-extra.mkDrv.${system}
+          { inherit coqPackages coq; version = "0.1.0"; };
       in {
         devShell = pkgs.mkShell {
           packages =
