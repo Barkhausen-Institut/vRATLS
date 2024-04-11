@@ -9,7 +9,7 @@
  ;; was already compiled and the libraries in the .vo files do not
  ;; have the prefix SSProve.
  ;; So all we can do is map it to the empty prefix.
- (flags "-R" "../../ssprove/theories/" "")
+ ;; (flags "-R" "../../ssprove/theories/" "")
  ;; This is now fully working but rather unsatifactory because
  ;; we do not see in the code which of the imported modules belong
  ;; to SSProve.
@@ -22,5 +22,5 @@
 
  (theories )
 )
+(dirs :standard \ old_files)
 (include_subdirs qualified)
-(ignored_subdirs (old_files))
