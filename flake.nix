@@ -2,45 +2,43 @@
   inputs = {
     nixpkgs.url        = github:nixos/nixpkgs;
     flake-utils.url    = github:numtide/flake-utils;
-   # mathcomp-extra.url = github:sertel/mathcomp-extra;
-   ssprove.url = github:sertel/ssprove/mathcomp.2.1.0;
-  };
+
+    ssprove.url = github:sertel/ssprove/nix;
+    ssprove.inputs.nixpkgs.follows = "nixpkgs";
+    ssprove.inputs.flake-utils.follows = "flake-utils";
+
+    mathcomp-extra.url = github:sertel/mathcomp-extra;
+    mathcomp-extra.inputs.nixpkgs.follows = "nixpkgs";
+    mathcomp-extra.inputs.flake-utils.follows = "flake-utils";
+ };
   outputs = { self, nixpkgs, flake-utils
-  # , mathcomp-extra
-  , ssprove
-  }:
+            , ssprove , mathcomp-extra }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         ocamlPackages = pkgs.ocamlPackages;
         coq = pkgs.coq_8_18;
-
         coqPackages = pkgs.coqPackages_8_18.overrideScope
           (self: super: {
             mathcomp = super.mathcomp.override { version = "2.1.0"; };
             mathcomp-analysis = super.mathcomp-analysis.override { version = "1.0.0"; };
           });
-        # mathcompExtra = mathcomp-extra...
         ssp_args = {
           inherit (pkgs) stdenv which;
-          inherit coq coqPackages;
+          inherit coqPackages coq;
         };
         ssprove' = ssprove.mkDrv ssp_args;
+
+        mathcomp-extra' = mathcomp-extra.mkDrv.${system}
+          { inherit coqPackages coq; version = "0.1.0"; };
       in {
         devShell = pkgs.mkShell {
           packages =
-            (with pkgs; [ coq gnumake ])
-            ++
             (with ocamlPackages; [ dune_3 ])
             ++
-            (with coqPackages; [
-              equations
-              mathcomp-analysis
-              mathcomp-ssreflect
-              # mathcompExtra
-              extructures
-              deriving
-            ]);
+            (with pkgs; [coq gnumake])
+            ++
+            [ssprove' mathcomp-extra'];
 
           shellHook = ''
                     alias ll="ls -lasi"

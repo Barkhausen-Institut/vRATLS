@@ -5,11 +5,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1705309234,
-        "narHash": "sha256-uNRRNRKmJyCRC/8y1RqBkqWBLM034y4qN7EprSdmgyA=",
+        "lastModified": 1710146030,
+        "narHash": "sha256-SZ5L6eA7HJ/nmkzGG7/ISclqe6oZdOZTNoesiInkXPQ=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "1ef2e671c3b0c19053962c07dbda38332dcebf26",
+        "rev": "b1d9ab70662946ef0850d488da1c9019f3a9752a",
         "type": "github"
       },
       "original": {
@@ -18,46 +18,36 @@
         "type": "github"
       }
     },
-    "flake-utils_2": {
+    "mathcomp-extra": {
       "inputs": {
-        "systems": "systems_2"
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
       },
       "locked": {
-        "lastModified": 1705309234,
-        "narHash": "sha256-uNRRNRKmJyCRC/8y1RqBkqWBLM034y4qN7EprSdmgyA=",
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "rev": "1ef2e671c3b0c19053962c07dbda38332dcebf26",
+        "lastModified": 1711656673,
+        "narHash": "sha256-mKwkchRGrXsRcnTKqzeKKNG2MjS+Nomzl7n6t4ezimg=",
+        "owner": "sertel",
+        "repo": "mathcomp-extra",
+        "rev": "613e36ccdd6f75e71b18eb7c7b14dab0a1577935",
         "type": "github"
       },
       "original": {
-        "owner": "numtide",
-        "repo": "flake-utils",
+        "owner": "sertel",
+        "repo": "mathcomp-extra",
         "type": "github"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1707744326,
-        "narHash": "sha256-32lLDzVlHt1Z90012ijgdXO1a2eFJB0ljWuSGq/rH14=",
+        "lastModified": 1711052119,
+        "narHash": "sha256-Y0Y1NiJzUekgcX39luV52jEnNL02fAKNqzUaN/9ZOlQ=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "dd864dc7ddbb1632129ed1172e7f2459e4986ccc",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_2": {
-      "locked": {
-        "lastModified": 1707824078,
-        "narHash": "sha256-Au3wLi2d06bU7TDvahP2jIEeKwmjAxKHqi8l2uiBkGA=",
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "rev": "99d7b32e4cfdaf763d9335b4d9ecf4415cbdc405",
+        "rev": "0de923affe4f251f1a53742cdf2a684e9c3232de",
         "type": "github"
       },
       "original": {
@@ -75,40 +65,29 @@
     },
     "ssprove": {
       "inputs": {
-        "flake-utils": "flake-utils_2",
-        "nixpkgs": "nixpkgs_2"
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
       },
       "locked": {
-        "lastModified": 1710164662,
-        "narHash": "sha256-wOd7dSnLmu1WluLESerBBJHsR2Wv7q2oeF1ycFMy4ME=",
+        "lastModified": 1710948146,
+        "narHash": "sha256-LLw/xILQDVpWssyezU7k7tYDqBE9VZrxGKFmYrs7Z0g=",
         "owner": "sertel",
         "repo": "ssprove",
-        "rev": "08d0350f9b4d3b95cfb6b90849254b74824eacc9",
+        "rev": "51b7d413f394a16d3e3eb7a27bd864525a5592e1",
         "type": "github"
       },
       "original": {
         "owner": "sertel",
-        "ref": "mathcomp.2.1.0",
+        "ref": "nix",
         "repo": "ssprove",
         "type": "github"
       }
     },
     "systems": {
-      "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
-        "owner": "nix-systems",
-        "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-systems",
-        "repo": "default",
-        "type": "github"
-      }
-    },
-    "systems_2": {
       "locked": {
         "lastModified": 1681028828,
         "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
