@@ -30,6 +30,10 @@ Currently there is no package for Spacemacs on Nix. Hence, we suggest to install
 
 ## Development
 
+To compile the theories, simply run ```make```.
+
+( old version:
 We use `dune` for building the project.
 So please run:
 ```dune build```
+)
