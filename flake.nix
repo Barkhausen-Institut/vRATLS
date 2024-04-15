@@ -7,7 +7,7 @@
     ssprove.inputs.nixpkgs.follows = "nixpkgs";
     ssprove.inputs.flake-utils.follows = "flake-utils";
 
-    mathcomp-extra.url = github:sertel/mathcomp-extra;
+    mathcomp-extra.url = github:sertel/mathcomp-extra/nix;
     mathcomp-extra.inputs.nixpkgs.follows = "nixpkgs";
     mathcomp-extra.inputs.flake-utils.follows = "flake-utils";
  };
@@ -29,7 +29,7 @@
         };
         ssprove' = ssprove.mkDrv ssp_args;
 
-        mathcomp-extra' = mathcomp-extra.mkDrv.${system}
+        mathcomp-extra' = mathcomp-extra.mkDrv
           { inherit coqPackages coq; version = "0.1.0"; };
       in {
         devShell = pkgs.mkShell {

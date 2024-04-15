@@ -28,26 +28,27 @@
         ]
       },
       "locked": {
-        "lastModified": 1712836310,
-        "narHash": "sha256-JS2TFeD2wfr7cOiB8nKYdejhhxkAI4+Zo6VSsLzxGGk=",
+        "lastModified": 1713123249,
+        "narHash": "sha256-jypD7n4vZMiNUXN5AmLdJvZWuUxyyeSg/5ZWLfHQpQA=",
         "owner": "sertel",
         "repo": "mathcomp-extra",
-        "rev": "719d115277c23ecc7ddfb05148cd57183e22811e",
+        "rev": "34a1f269c700d917a71f0f622829d01939b29206",
         "type": "github"
       },
       "original": {
         "owner": "sertel",
+        "ref": "nix",
         "repo": "mathcomp-extra",
         "type": "github"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1711052119,
-        "narHash": "sha256-Y0Y1NiJzUekgcX39luV52jEnNL02fAKNqzUaN/9ZOlQ=",
+        "lastModified": 1713123221,
+        "narHash": "sha256-5l3clzB2U4tXRCTw7zk2r3BrzBKAm1LfH8pz9qqeqik=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "0de923affe4f251f1a53742cdf2a684e9c3232de",
+        "rev": "5d0b251de2371acca2bdb6b79a602a68b71a8f97",
         "type": "github"
       },
       "original": {
@@ -74,11 +75,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1710948146,
-        "narHash": "sha256-LLw/xILQDVpWssyezU7k7tYDqBE9VZrxGKFmYrs7Z0g=",
+        "lastModified": 1712925623,
+        "narHash": "sha256-A/cpWpAUl6w01utNqrwssMDiZz33NxX7oUTLNaoE5Zo=",
         "owner": "sertel",
         "repo": "ssprove",
-        "rev": "51b7d413f394a16d3e3eb7a27bd864525a5592e1",
+        "rev": "3ac61c8942b2530b16b3864dacfebcefeb3a8904",
         "type": "github"
       },
       "original": {
