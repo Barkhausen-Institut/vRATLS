@@ -1,2 +1,2 @@
--R _build/default/theories vRATLS
-_build/default/theories
+-R theories vRATLS
+theories
