@@ -41,8 +41,8 @@ Obligation Tactic := idtac.
 
 #[local] Open Scope package_scope.
 
-Require Import examples.Signature.
-Require Import examples.RA.
+From vRATLS Require Import examples.Signature.
+From vRATLS Require Import examples.RA.
 
 Module Protocol
     (π1 : SignatureParams)

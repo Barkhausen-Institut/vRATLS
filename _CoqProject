@@ -1,16 +1,17 @@
 -Q theories vRATLS
 
+# extension of extructures
+theories/extructurespp/ord.v
+theories/extructurespp/fmap.v
 
 theories/examples/Conversions.v
+theories/examples/Signature.v
+theories/examples/Sig_Prot.v
 theories/examples/RA.v
 theories/examples/RA_Prot.v
 theories/examples/RSA.v
-theories/examples/Sig_Prot.v
-theories/examples/Signature.v
 
 # Omitted
 # theories/examples/sig.v
 # theories/examples/test_hax_to_ssprove.v
 
-theories/extructures/fmap.v
-theories/extructures/ord.v

@@ -55,9 +55,9 @@ Obligation Tactic := idtac.
 
 #[local] Open Scope package_scope.
 
-Require Import examples.Signature.
-Require Import extructurespp.ord.
-Require Import extructurespp.fmap.
+From vRATLS Require Import examples.Signature.
+From vRATLS Require Import extructurespp.ord.
+From vRATLS Require Import extructurespp.fmap.
 
 Module Type RemoteAttestationParams (π2 : SignatureConstraints).
 

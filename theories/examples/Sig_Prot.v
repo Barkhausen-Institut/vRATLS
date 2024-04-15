@@ -41,7 +41,7 @@ Import Num.Def.
 Import Num.Theory.
 Import Order.POrderTheory.
 
-Require Import examples.Signature.
+From vRATLS Require Import examples.Signature.
 
 Import PackageNotation.
 

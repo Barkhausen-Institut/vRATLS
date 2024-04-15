@@ -7,7 +7,7 @@ From Coq Require Import Utf8.
 From Coq Require Import Unicode.Utf8.
 
 From extructures Require Import ord fset fmap.
-Require Import extructurespp.ord.
+From vRATLS Require Import extructurespp.ord.
 
 
 (*
@@ -115,7 +115,6 @@ Section Facts.
              move: a'_lt_a'; rewrite /Ord.lt; move/andP => [a'_leq_a a'_neq_a].
              move: a'_lt_x; rewrite /Ord.lt; move/andP => [a'_leq_x a'_neq_x].
              move: x_lt_a; rewrite /Ord.lt; move/andP => [x_leq_a x_neq_a].
-             have t:= (Ord.leq_trans a'_leq_x x_leq_a).
              rewrite ifF //=.
              *** rewrite ifF //=.
                  **** rewrite ifF.
