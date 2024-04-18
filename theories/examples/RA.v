@@ -337,7 +337,7 @@ Module Type RemoteAttestationHash
     Aux_Sig_ideal := {package Aux ∘ Sig_ideal}.
   Next Obligation.
     ssprove_valid.
-    - rewrite /Aux_locs/Comp_locs/Key_locs.
+    - rewrite /Aux_locs/Comp_locs/Key_locs/Aux_locs.
       rewrite fset_cons.
       rewrite [X in fsubset _ X]fset_cons.
       apply fsetUS.
@@ -568,9 +568,11 @@ Module Type RemoteAttestationHash
       auto_in_fset.
   Qed.
 
+  (*Print extructures.ord.tag_ordType.*)
+
   Lemma INV'_full_heap_eq'_get : forall s1 s2,
       full_heap_eq' (s1, s2) ->
-      ∀ l : tag_ordType (I:=choice_type_ordType) (λ _ : choice_type, nat_ordType),
+      ∀ l,
         l \notin Attestation_locs_ideal ->
         l \notin Comp_locs ->
         get_heap s1 l = get_heap s2 l.
@@ -590,7 +592,7 @@ Module Type RemoteAttestationHash
 
   Lemma INV'_full_heap_eq'_get_set : forall s1 s2,
       full_heap_eq' (s1, s2) ->
-      ∀ (l : tag_ordType (I:=choice_type_ordType) (λ _ : choice_type, nat_ordType)) (v : Value l.π1),
+      ∀ l (v : Value l.π1),
         l \notin Attestation_locs_ideal ->
         l \notin Comp_locs ->
         full_heap_eq' (set_heap s1 l v, set_heap s2 l v).
@@ -650,7 +652,7 @@ Module Type RemoteAttestationHash
     : typeclass_instances ssprove_invariant.
 
   Lemma get_pre_cond_full_heap:
-    ∀ (ℓ : tag_ordType (I:=choice_type_ordType) (λ _ : choice_type, nat_ordType))
+    ∀ ℓ
       (L: {fset Location}),
       (fdisjoint (fset [:: attest_loc_long; sign_loc]) L) ->
       ℓ \in L ->
@@ -669,9 +671,7 @@ Module Type RemoteAttestationHash
 
 
   Lemma put_pre_cond_full_heap:
-    ∀ (ℓ : tag_ordType (I:=choice_type_ordType) (λ _ : choice_type, nat_ordType))
-      (v : Value ℓ.π1)
-      (L: {fset Location}),
+    ∀ ℓ (v : Value ℓ.π1) (L: {fset Location}),
       (fdisjoint (fset [:: attest_loc_long; sign_loc]) L) ->
       ℓ \in L -> put_pre_cond ℓ v full_heap_eq'.
   Proof.
@@ -1032,7 +1032,7 @@ Module Type RemoteAttestationHash
 
   Lemma put_bind:
     forall (t : Choice.type) (l : Location) (v : l) (c : raw_code t),
-      putr l v c = bind (putr l v (ret tt)) (fun (x:unit_choiceType) => c).
+      putr l v c = bind (putr l v (ret tt)) (fun x => c).
   Proof. by[]. Qed. 
 
 

@@ -157,6 +157,6 @@ Module Type SignatureProt
            apply Signature_prop.
       ---- by [move: pre; rewrite /inv_conj; repeat case].
   Qed.
-    
+      
 End SignatureProt.
 
