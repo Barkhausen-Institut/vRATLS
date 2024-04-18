@@ -26,4 +26,5 @@ jobs:
 
       # Runs the flake
       - name: Build
-        run: | nix build
+        run: |
+          nix build
