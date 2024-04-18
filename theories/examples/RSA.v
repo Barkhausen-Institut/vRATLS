@@ -44,7 +44,7 @@ Import PackageNotation.
 Obligation Tactic := idtac.
 
 #[local] Open Scope package_scope.
-(*
+
 Module Type RSA_Key_Gen_params.
 
   (* currently useless *)
@@ -127,4 +127,3 @@ Module Type RSA
     ].
 
 End
-*)
