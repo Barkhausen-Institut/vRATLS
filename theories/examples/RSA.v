@@ -56,7 +56,7 @@ Module Type RSA_Key_Gen_params.
 
 End RSA_Key_Gen_params.
 
-Module Type RSA 
+Module Type RSA_params
     (π1 : SignatureParams) 
     (π2 : SignatureConstraints) 
     (π3 : KeyGeneration π1 π2)
@@ -64,14 +64,69 @@ Module Type RSA
 
   Import π1 π2 π3 π4.
 
-  Module rsa_alg <: SignatureAlgorithms.
+  Record rsa := { 
+    p : nat;
+    q : nat;
+    pq : nat;
+    e : nat;
+    d : nat; 
+    wf : [&& prime p, prime q, p != q,
+            0 < pq, p.-1 %| pq, q.-1 %| pq &
+            e * d == 1 %[mod pq]]}.
+Check e.
+  (** Encryption *)
+  Definition encrypt' e p q w : nat := w ^ e %% (p * q ).
+
+  Check encrypt'.
+
+  Theorem enc_eq : forall e p q r w,  encrypt' e p q w = encrypt r w.
+  Proof.
+    intros. rewrite /encrypt/encrypt'.
+    rewrite /(rsa.e r). 
+    (* 
+    rewrite /rsa.e/rsa.p/rsa.q.
+    *)
+  Admitted.
 
   
+  (** Decryption *)
+  Definition decrypt' d p q w := w ^ d %% (p * q).
 
-  Definition sk := e.
+  Theorem dec_eq : forall d p q r w, decrypt' d p q w = decrypt r w.
+  Proof.
+  Admitted.
+
+  Theorem rsa_correct' d e p q pq w : 
+    [&& prime p, prime q, p != q,
+    0 < pq, p.-1 %| pq, q.-1 %| pq &
+    e * d == 1 %[mod pq]] ->
+    decrypt' e p q (encrypt' d p q w)  = w %[mod p * q].
+  Proof.
+    intros. 
+    apply /eqP.
+    rewrite -/enc_eq.
+    
+    rewrite /decrypt'/encrypt'.
+    
+  Qed.
+  
+  Definition Sign : ∀ (d : SecKey) (m : chMessage), Signature :=
+    let (d',p',q',wf',pq') := d in
+    let e' := 1 in
+    let r := rsa p' q' pq' e' d' wf'
+    in encrypt d pq m.
+
+  Definition Ver_sig : ∀ (e :  PubKey) (sig : Signature) (m : chMessage) (r:rsa), 
+      'bool.
+  
+  Definition sk : SecKey := d.
+
+End RSA_params.
+
+Module rsa_alg <: SignatureAlgorithms.
 
   Definition Sign : ∀ (sk : SecKey) (m : chMessage), Signature :=
-    encrypt (Hash m) sk.
+    encrypt m sk.
 
   Parameter Ver_sig : ∀ (pk :  PubKey) (sig : Signature) (m : chMessage), 
    'bool.
@@ -88,42 +143,6 @@ Module Type RSA
 
   
 
-  (*
-  Definition SecKey' := Datatypes_prod__canonical__choice_Choice.
-  Definition PubKey' := Datatypes_prod__canonical__choice_Choice.
-
-  Notation " 'pubkey2 "    := PubKey' (in custom pack_type at level 2).
-  Notation " 'pubkey2 "    := PubKey' (at level 2): package_scope.
-  Notation " 'seckey2 "    := SecKey' (in custom pack_type at level 2).
-  Notation " 'seckey2 "    := SecKey' (at level 2): package_scope.
-
-  Definition Key_Gen_rsa : package Key_locs [interface] KeyGen_ifce
-    := [package
-        #def  #[key_gen] (_ : 'unit) : ('seckey × 'pubkey)
-        { 
-            p ← sample uniform i_sk ;;
-            q ← sample uniform i_sk ;;
-            #assert (prime p == true) ;;
-            #assert (prime q) ;;
-            ret (p,q)
-        }
-      ].
-  *)
-
-  Definition SecKey' :choice_type := nat.
-  Definition PubKey' := nat.
-
-  Notation " 'pubkey2 "    := PubKey' (in custom pack_type at level 2).
-  Notation " 'pubkey2 "    := PubKey' (at level 2): package_scope.
-  Notation " 'seckey2 "    := SecKey' (in custom pack_type at level 2).
-  Notation " 'seckey2 "    := SecKey' (at level 2): package_scope.
-
-  Definition Key_Gen_rsa : package Key_locs [interface] KeyGen_ifce
-  := [package
-      #def  #[key_gen] (_ : 'unit) : ('seckey × 'pubkey)
-      {           
-        ret (d,e)
-      }
-    ].
+  
 
 End
