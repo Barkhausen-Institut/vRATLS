@@ -103,8 +103,8 @@ Check e.
     decrypt' e p q (encrypt' d p q w)  = w %[mod p * q].
   Proof.
     intros. 
-    apply /eqP.
-    rewrite -/enc_eq.
+    (*apply /eqP.*)
+    rewrite enc_eq.
     
     rewrite /decrypt'/encrypt'.
     
