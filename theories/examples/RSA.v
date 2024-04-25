@@ -64,7 +64,7 @@ Module Type RSA_params
 
   Import π1 π2 π3 π4.
 
-  Record rsa := { 
+  Record rsa' := { 
     p : nat;
     q : nat;
     pq : nat;
@@ -79,10 +79,19 @@ Check e.
 
   Check encrypt'.
 
-  Theorem enc_eq : forall e p q r w,  encrypt' e p q w = encrypt r w.
+  Definition wf_type p q pq e d := [&& prime p, prime q, p != q,
+    0 < pq, p.-1 %| pq, q.-1 %| pq &
+    e * d == 1 %[mod pq]].
+
+  Theorem enc_eq : forall (e p q pq d : nat) (wf : wf_type p q pq d e) w, 
+    let r := Build_rsa wf in
+    encrypt' e p q w = encrypt r w.
   Proof.
-    intros. rewrite /encrypt/encrypt'.
-    rewrite /(rsa.e r). 
+    intros.
+    rewrite /encrypt/encrypt'.
+    case: r. 
+    intros.
+    rewrite /rsa.e/rsa.p/rsa.q.
     (* 
     rewrite /rsa.e/rsa.p/rsa.q.
     *)

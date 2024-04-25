@@ -74,7 +74,7 @@ Module Protocol
   
       (* Protocol *)
       pk ← get_pk_att tt ;;
-      e ;;
+      chal ← sample uniform i_chal ;;
       '(att, msg) ← attest chal ;;
       bool ← verify_att (chal, att) ;;
       ret (pk, ( att, bool ))
