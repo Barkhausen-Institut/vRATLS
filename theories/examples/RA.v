@@ -568,8 +568,6 @@ Module Type RemoteAttestationHash
       auto_in_fset.
   Qed.
 
-  (*Print extructures.ord.tag_ordType.*)
-
   Lemma INV'_full_heap_eq'_get : forall s1 s2,
       full_heap_eq' (s1, s2) ->
       ∀ l,
@@ -728,15 +726,11 @@ Module Type RemoteAttestationHash
       injective f -> (* if this is bijective then I would not end up in omap! *)
       fmap_kmap' f (setm m k v) = setm (fmap_kmap' f m) (f k) v.
   Proof.
-    Print fmap_kmap'.
     move => f k v m inj_f.
     rewrite /fmap_kmap'.
     Fail rewrite [X in _ = setm _ X]mapm2E.
     (* TODO *)
-    Check eq_fmap.
     (* rewrite -eq_fmap. *)
-    Locate "=1".
-    Print eqfun.
 
    (** * Approach 1:
 
