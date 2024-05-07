@@ -75,8 +75,8 @@ End SignatureConstraints.
 (** |     KEY      |
     |  GENERATION  | **)
 
-Module Type KeyGeneration 
-    (π1 : SignatureParams) 
+Module Type KeyGeneration
+    (π1 : SignatureParams)
     (π2 : SignatureConstraints).
 
   Import π1 π2.
@@ -125,37 +125,37 @@ Module Type KeyGeneration
   Definition Key_Gen : package Key_locs [interface] KeyGen_ifce
   := [package
        #def  #[key_gen] (_ : 'unit) : ('seckey × 'pubkey)
-       { 
-         let (sk, pk) := KeyGen in 
+       {
+         let (sk, pk) := KeyGen in
          #put sk_loc := sk ;;
          #put pk_loc := pk ;;
-         
-         ret (sk, pk)      
+
+         ret (sk, pk)
        }
      ].
- 
+
 End KeyGeneration.
 
 (** |  SIGNATURE  |
     |   SCHEME    | **)
 
-Module Type SignatureAlgorithms 
-    (π1 : SignatureParams) 
-    (π2 : SignatureConstraints) 
+Module Type SignatureAlgorithms
+    (π1 : SignatureParams)
+    (π2 : SignatureConstraints)
     (π3 : KeyGeneration π1 π2).
 
   Import π1 π2 π3.
 
   Parameter Sign : ∀ (sk : SecKey) (m : chMessage), Signature.
 
-  Parameter Ver_sig : ∀ (pk :  PubKey) (sig : Signature) (m : chMessage), 
+  Parameter Ver_sig : ∀ (pk :  PubKey) (sig : Signature) (m : chMessage),
    'bool.
 
   (* TODO: fmap (Signature * A * A ) -> (Signature * A * A )  triggert endless loop  *)
 
   (* Final proposition for a signature scheme to be indistinguishable *)
   Parameter Signature_prop:
-    ∀ (l: {fmap (Signature  * chMessage ) -> 'unit}) 
+    ∀ (l: {fmap (Signature  * chMessage ) -> 'unit})
       (s : Signature) (pk : PubKey) (m  : chMessage),
       Ver_sig pk s m = ((s,m) \in domm l).
 
@@ -168,7 +168,7 @@ Module Type SignaturePrimitives
   (π1 : SignatureParams)
   (π2 : SignatureConstraints)
   (KG : KeyGeneration π1 π2)
-  (Alg : SignatureAlgorithms π1 π2 KG).  
+  (Alg : SignatureAlgorithms π1 π2 KG).
 
   Import π1 π2 KG Alg.
 
@@ -186,7 +186,7 @@ Module Type SignaturePrimitives
 
   (* The signature scheme requires a heap location to store the seen signatures. *)
   Definition Sig_locs_real := Key_locs.
-  Definition Sig_locs_ideal := Sig_locs_real :|: fset [:: sign_loc ]. 
+  Definition Sig_locs_ideal := Sig_locs_real :|: fset [:: sign_loc ].
 
   Definition Sig_ifce := [interface 
     #val #[get_pk] : 'unit → 'pubkey ;
@@ -291,7 +291,6 @@ Module Type SignaturePrimitives
   Sig_real_c ≈₀ Sig_ideal_c.
   Proof.
     eapply (eq_rel_perf_ind_ignore (fset [:: sign_loc])).
-    Check (_ :|: _).
     - rewrite /Sig_locs_real/Sig_locs_ideal/Key_locs/Sig_locs_real/Key_locs.
       apply fsubsetU.
       apply/orP; right.
