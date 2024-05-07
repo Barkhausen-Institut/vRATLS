@@ -160,6 +160,7 @@ Module Type SignatureProt
   Qed.
 
   Module Correctness.
+
     Definition prot_res := 100.
 
     Definition Prot_res_ifce :=
@@ -235,9 +236,7 @@ Module Type SignatureProt
       ssprove_sync_eq => sk.
       ssprove_sync_eq => pk.
       rewrite /tt_.
-      have correct_prop: forall p s m, Ver_sig p (Sign s m) m == true.
-      1: { admit.} (* FIXME specify correctness condition *)
-      rewrite (correct_prop pk sk x) /=.
+      rewrite (Signature_correct pk sk x) /=.
       apply r_ret => s0 s1 s0_eq_s1 //=.
     Qed.
 

@@ -159,6 +159,9 @@ Module Type SignatureAlgorithms
       (s : Signature) (pk : PubKey) (m  : chMessage),
       Ver_sig pk s m = ((s,m) \in domm l).
 
+  (* Functional correctness property for signatures *)
+  Parameter Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
+
 End SignatureAlgorithms.
 
 Module Type SignaturePrimitives
