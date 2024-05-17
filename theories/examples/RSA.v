@@ -3,7 +3,7 @@ From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr realsum
   fingroup.fingroup solvable.cyclic prime ssrnat ssreflect ssrfun ssrbool ssrnum
-  eqtype choice seq.
+  eqtype choice seq fintype.
 Set Warnings "notation-overridden,ambiguous-paths".
 
 From extra Require Import rsa.
@@ -45,113 +45,207 @@ Obligation Tactic := idtac.
 
 #[local] Open Scope package_scope.
 
-Module Type RSA_Key_Gen_params.
 
-  (* currently useless *)
-  Parameter Z_n : finType.
-  Parameter Z_n_pos : Positive #|Z_n|.
-  #[local] Existing Instance Z_n_pos.
-  Definition chZ_n := 'fin #|Z_n|.
-  Definition i_Z_n := #|Z_n|.
+Module Type RSA_params <: SignatureParams.
 
-End RSA_Key_Gen_params.
+  Parameter A : Type.
+  Parameter pq : A -> nat.
 
-Module Type RSA_params
-    (π1 : SignatureParams) 
-    (π2 : SignatureConstraints) 
-    (π3 : KeyGeneration π1 π2)
-    (π4 : RSA_Key_Gen_params).
-
-  Import π1 π2 π3 π4.
-
-  Record rsa' := { 
+  (*
+  Record rsa := { 
     p : nat;
     q : nat;
-    pq : nat;
+   pq : nat;
     e : nat;
     d : nat; 
-    wf : [&& prime p, prime q, p != q,
+   wf : [&& prime p, prime q, p != q,
             0 < pq, p.-1 %| pq, q.-1 %| pq &
             e * d == 1 %[mod pq]]}.
-Check e.
-  (** Encryption *)
+
+  Print rsa.
+*)
+
+  (*
+  Definition n {r} := (pq r).
+  Definition R {r}:= [finType of 'Z_n].
+  *)
+
+  Definition wf_type p q pq e d := [&& prime p, prime q, p != q,
+  0 < pq, p.-1 %| pq, q.-1 %| pq &
+  e * d == 1 %[mod pq]].
+
+  Local Open Scope ring_scope.
+  Import GroupScope GRing.Theory.
+
+  Variable n : nat.
+
+  Definition R := [finType of 'Z_n].
+  Definition Z_n_prod := [finType of ('Z_n * 'Z_n)].
+  Definition Z_n_prod' := [finType of ('Z_(n*n))].
+
+  Local Open Scope ring_scope. 
+
+  Definition SecKey    : finType := Z_n_prod.  
+  Definition PubKey    : finType := Z_n_prod.
+  Definition Signature : finType := R.
+  Definition Message   : finType := R.
+  Definition Challenge : finType := R.
+
+  Definition sk0  : SecKey := (0,0).
+  Definition pk0  : PubKey := (0,0).
+  Definition sig0 : Signature := 0%R.
+  Definition m0   : Message := 0%R.
+  Definition ch0  : Challenge := 0%R.
+
+End RSA_params.
+
+
+
+Module RSA_KeyGen (π1 : RSA_params) 
+    <: KeyGeneration π1.
+
+  Import π1.
+
+  #[export] Instance positive_SecKey : Positive #|SecKey|.  
+  Proof.
+    apply /card_gt0P. exists sk0. auto.
+  Qed.
+  Definition SecKey_pos : Positive #|SecKey| := _ .
+  
+  #[export] Instance positive_PubKey : Positive #|PubKey|. 
+  Proof.
+    apply /card_gt0P. exists pk0. auto.
+  Qed.
+  Definition PubKey_pos : Positive #|PubKey| := _.
+
+  #[export] Instance positive_Sig : Positive #|Signature|.   
+  Proof.
+    apply /card_gt0P. exists sig0. auto.
+  Qed.
+  Definition Signature_pos: Positive #|Signature| := _.
+
+  #[export] Instance positive_Message : Positive #|Message|.   
+  Proof.
+    apply /card_gt0P. exists m0. auto.
+  Qed.
+  Definition Message_pos : Positive #|Message| := _.
+
+  #[export] Instance positive_Chal : Positive #|Challenge|.   
+  Proof.
+    apply /card_gt0P. exists ch0. auto.
+  Qed.
+  Definition Challenge_pos : Positive #|Challenge| := _.
+
+
+
+  (* Encryption *)
   Definition encrypt' e p q w : nat := w ^ e %% (p * q ).
 
-  Check encrypt'.
+  Theorem enc_eq {p q pq d e : nat} (wf : wf_type p q pq d e) w :
+    let r := Build_rsa wf in
+    encrypt' d p q w = encrypt r w.
+  Proof.
+    by rewrite /encrypt/encrypt'/r. 
+  Qed.
+  
+  (* Decryption *)
+  Definition decrypt' d p q w := w ^ d %% (p * q).
+
+  Theorem dec_eq {p q pq d e : nat} (wf : wf_type p q pq d e) w :
+    let r := Build_rsa wf in
+    decrypt' e p q w = decrypt r w.
+  Proof.
+    by rewrite /encrypt/encrypt'/r.
+  Qed.
+ 
+  Theorem rsa_correct' {p q pq d e : nat} (wf : wf_type p q pq d e) w :
+    let r := Build_rsa wf in
+    decrypt' e p q (encrypt' d p q w)  = w %[mod p * q].
+  Proof.
+    rewrite (enc_eq wf) (dec_eq wf) /=.
+    apply rsa_correct.
+  Qed.
+
+  Definition chSecKey  : choice_type := 'fin #|SecKey|.
+  Definition chPubKey : choice_type := 'fin #|PubKey|.
+  Definition chSignature : choice_type := 'fin #|Signature|.
+  Definition chMessage : choice_type := 'fin #|Message|.
+  Definition chChallenge : choice_type := 'fin #|Challenge|.
+
+  Definition i_sk := #|SecKey|.
+  Definition i_pk := #|SecKey|.
+  Definition i_sig := #|Signature|.  
+
+  Definition KeyGen {L : {fset Location}} :
+  code L [interface] (chPubKey × chSecKey) :=
+  {code
+    p ← sample uniform i_pk ;;
+    q ← sample uniform i_pk ;;
+    e ← sample uniform i_sk ;;
+    d ← sample uniform i_sk ;;
+    
+    assert (prime p) ;;
+    assert (prime p) ;;
+    ret (p,p)
+  }.
+ 
+
+End RSA_KeyGen.
+
+
+Module RSA_params (π1 : SignatureParams) 
+    <: KeyGeneration π1.
+
+Import π1.
+
+  (* Encryption *)
+  Definition encrypt' e p q w : nat := w ^ e %% (p * q ).
 
   Definition wf_type p q pq e d := [&& prime p, prime q, p != q,
     0 < pq, p.-1 %| pq, q.-1 %| pq &
     e * d == 1 %[mod pq]].
 
-  Theorem enc_eq : forall (e p q pq d : nat) (wf : wf_type p q pq d e) w, 
+  Theorem enc_eq {p q pq d e : nat} (wf : wf_type p q pq d e) w :
     let r := Build_rsa wf in
-    encrypt' e p q w = encrypt r w.
+    encrypt' d p q w = encrypt r w.
   Proof.
-    intros.
-    rewrite /encrypt/encrypt'.
-    case: r. 
-    intros.
-    rewrite /rsa.e/rsa.p/rsa.q.
-    (* 
-    rewrite /rsa.e/rsa.p/rsa.q.
-    *)
-  Admitted.
-
-  
-  (** Decryption *)
-  Definition decrypt' d p q w := w ^ d %% (p * q).
-
-  Theorem dec_eq : forall d p q r w, decrypt' d p q w = decrypt r w.
-  Proof.
-  Admitted.
-
-  Theorem rsa_correct' d e p q pq w : 
-    [&& prime p, prime q, p != q,
-    0 < pq, p.-1 %| pq, q.-1 %| pq &
-    e * d == 1 %[mod pq]] ->
-    decrypt' e p q (encrypt' d p q w)  = w %[mod p * q].
-  Proof.
-    intros. 
-    (*apply /eqP.*)
-    rewrite enc_eq.
-    
-    rewrite /decrypt'/encrypt'.
-    
+    by rewrite /encrypt/encrypt'/r. 
   Qed.
   
-  Definition Sign : ∀ (d : SecKey) (m : chMessage), Signature :=
-    let (d',p',q',wf',pq') := d in
-    let e' := 1 in
-    let r := rsa p' q' pq' e' d' wf'
-    in encrypt d pq m.
+  (* Decryption *)
+  Definition decrypt' d p q w := w ^ d %% (p * q).
 
-  Definition Ver_sig : ∀ (e :  PubKey) (sig : Signature) (m : chMessage) (r:rsa), 
-      'bool.
-  
-  Definition sk : SecKey := d.
+  Theorem dec_eq {p q pq d e : nat} (wf : wf_type p q pq d e) w :
+    let r := Build_rsa wf in
+    decrypt' e p q w = decrypt r w.
+  Proof.
+    by rewrite /encrypt/encrypt'/r.
+  Qed.
+ 
+  Theorem rsa_correct' {p q pq d e : nat} (wf : wf_type p q pq d e) w :
+    let r := Build_rsa wf in
+    decrypt' e p q (encrypt' d p q w)  = w %[mod p * q].
+  Proof.
+    rewrite (enc_eq wf) (dec_eq wf) /=.
+    apply rsa_correct.
+  Qed.
+ 
 
 End RSA_params.
 
-Module rsa_alg <: SignatureAlgorithms.
+Module RSA_SignatureAlgorithms 
+(π1 : SignatureParams)
+(π3 : KeyGeneration π1) <: SignatureAlgorithms π1 π3.
 
-  Definition Sign : ∀ (sk : SecKey) (m : chMessage), Signature :=
-    encrypt m sk.
+  Definition Sign := encrypt'.
 
-  Parameter Ver_sig : ∀ (pk :  PubKey) (sig : Signature) (m : chMessage), 
-   'bool.
+  Definition Ver_sig := decrypt'.
 
-  (* TODO: fmap (Signature * A * A ) -> (Signature * A * A )  triggert endless loop  *)
-
-  (* Final proposition for a signature scheme to be indistinguishable *)
-  Parameter Signature_prop:
-    ∀ (l: {fmap (Signature  * chMessage ) -> 'unit}) 
-      (s : Signature) (pk : PubKey) (m  : chMessage),
+  (*
+  Theorem Signature_prop :
+    ∀ (l: {fmap (Signature  * w ) -> 'unit}) 
+      (s : Signature) (d : nat) (w : nat),
       Ver_sig pk s m = ((s,m) \in domm l).
+      *)
 
-  End rsa_alg.
-
-  
-
-  
-
-End
+End RSA_SignatureAlgorithms.

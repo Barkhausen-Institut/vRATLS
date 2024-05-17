@@ -1152,6 +1152,7 @@ Module Type RemoteAttestationHash
                  (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq' (s₀,s₁))).
       2:{ case => b₀ s₀; case  => b₁ s₁. by [rewrite -/(full_heap_eq' (s₀,s₁))]. }
     - Fail ssprove_sync.
+      ssprove_sync => sk_loc.
       (*
       eapply rpost_weaken_rule.
       -- ssprove_sync.
