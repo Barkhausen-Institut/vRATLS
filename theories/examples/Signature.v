@@ -49,7 +49,7 @@ Definition tt := Datatypes.tt.
 
 Print finType.
 
-Module Type SignatureParams.   
+Module Type SignatureParams.
     (*Parameter SecKey : forall (A : Type), A -> finType.*)
     Parameter SecKey PubKey Signature Message Challenge : finType.
     Parameter sk0 : SecKey.
@@ -98,16 +98,18 @@ Module Type KeyGeneration (π1 : SignatureParams).
 
   Print chSecKey.
 
-  Parameter KeyGen :
-    ∀ {L : {fset Location}},
-      code L [interface] (chPubKey × chSecKey).
-
   Definition pk_loc : Location := ('pubkey ; 0%N).
   Definition sk_loc : Location := ('seckey ; 1%N).
 
   Definition key_gen : nat := 2.  (* Routine for initial key generation. *)
   Definition apply   : nat := 3.
   Definition Key_locs := fset [:: pk_loc ; sk_loc].
+
+  Parameter KeyGen :
+      code Key_locs [interface] (chPubKey × chSecKey).
+
+  Parameter KeyGenValid :
+    ValidCode Key_locs [interface] KeyGen.
 
   Definition KeyGen_ifce := [interface
     #val #[key_gen] : 'unit → ('seckey × 'pubkey)
@@ -116,20 +118,20 @@ Module Type KeyGeneration (π1 : SignatureParams).
   Definition Key_Gen : package Key_locs [interface] KeyGen_ifce
   := [package
        #def  #[key_gen] (_ : 'unit) : ('seckey × 'pubkey)
-       { 
+       {
          '(pk, sk) ← KeyGen ;;
          #put sk_loc := sk ;;
-         #put pk_loc := pk ;;         
-         ret (sk, pk)      
+         #put pk_loc := pk ;;
+         ret (sk, pk)
        }
      ].
- 
+
 End KeyGeneration.
 
 (** |  SIGNATURE  |
     |   SCHEME    | **)
 
-Module Type SignatureAlgorithms 
+Module Type SignatureAlgorithms
     (π1 : SignatureParams)
     (π2 : KeyGeneration π1).
 
@@ -137,11 +139,11 @@ Module Type SignatureAlgorithms
 
   Parameter Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature.
 
-  Parameter Ver_sig : ∀ (pk :  chPubKey) (sig : chSignature) (m : chMessage), 
+  Parameter Ver_sig : ∀ (pk :  chPubKey) (sig : chSignature) (m : chMessage),
    'bool.
 
   Parameter Signature_prop:
-    ∀ (l: {fmap (chSignature  * chMessage ) -> 'unit}) 
+    ∀ (l: {fmap (chSignature  * chMessage ) -> 'unit})
       (s : chSignature) (pk : chPubKey) (m  : chMessage),
       Ver_sig pk s m = ((s,m) \in domm l).
 
@@ -150,7 +152,7 @@ End SignatureAlgorithms.
 Module Type SignaturePrimitives
   (π1 : SignatureParams)
   (KG : KeyGeneration π1)
-  (Alg : SignatureAlgorithms π1 KG).  
+  (Alg : SignatureAlgorithms π1 KG).
 
   Import π1 KG Alg.
 
@@ -168,9 +170,9 @@ Module Type SignaturePrimitives
 
   (* The signature scheme requires a heap location to store the seen signatures. *)
   Definition Sig_locs_real := Key_locs.
-  Definition Sig_locs_ideal := Sig_locs_real :|: fset [:: sign_loc ]. 
+  Definition Sig_locs_ideal := Sig_locs_real :|: fset [:: sign_loc ].
 
-  Definition Sig_ifce := [interface 
+  Definition Sig_ifce := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
     #val #[sign] : 'message → 'signature ;
     #val #[verify_sig] : ('signature × 'message) → 'bool
@@ -179,7 +181,7 @@ Module Type SignaturePrimitives
   Definition Sig_real : package Sig_locs_real KeyGen_ifce Sig_ifce
   := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
-    { 
+    {
       #import {sig #[key_gen] : 'unit → ('seckey × 'pubkey) } as key_gen ;;
       '(sk,pk) ← key_gen tt ;;
       pk ← get pk_loc  ;;
@@ -283,21 +285,44 @@ Module Type SignaturePrimitives
       apply fsetUS.
       apply fsubsetxx.
     - simplify_eq_rel x.
-      -- simplify_linking. 
-        ssprove_code_simpl. 
-        rewrite /cast_fun/eq_rect_r/eq_rect.
-        simplify_linking.
-        ssprove_code_simpl.
-        intros.
-        eapply rsame_head_alt_pre.
-        ---
-           admit.
-           (* here the proof needs to be finished *)
-
+      -- simplify_linking.
+         ssprove_code_simpl.
+         rewrite /cast_fun/eq_rect_r/eq_rect.
+         simplify_linking.
+         ssprove_code_simpl.
+         eapply rsame_head_alt_pre.
+         --- Fail eapply r_reflexivity_alt.
+             (*
+               This really needs a tactic.
+               This postcondition has the wrong shape.
+               It needs [b0 = b1 /\ f (s0, s1)].
+               But we have [f (s0, s1) /\ b0 = b1].
+               The rewrite is a bit more evolved though because
+               we would need setoid_rewrite to rewrite under binders.
+               The SSProvers instead provide the following way:
+              *)
+             apply (rpost_weaken_rule _
+                       (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ heap_ignore (fset [:: sign_loc]) (s₀, s₁))).
+             ---- eapply r_reflexivity_alt.
+                  ----- instantiate (1:=Key_locs). exact: KeyGenValid.
+                  ----- move => l.
+                  rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
+                  ssprove_invariant.
+                  Search (_ \in _) reflect.
+                  Search (_ \in _) "2".
+                  Search ([fset _ ; _]).
+                  (*
+                  move: l_not_in_Key_locs.
+                  rewrite in_fset2.
+                  move/fset2P.
+                   *)
+                  admit. (* Some searching for the right lemmas and you are done. *)
+                  ----- move => l v l_not_in_Key_locs. ssprove_invariant.
+                  ---- case => a0 s0; case => a1 s1. case => l r. by [split].
         --- intro a.
             ssprove_code_simpl.
             ssprove_code_simpl_more.
-            destruct a.        
+            destruct a.
             ssprove_sync.
             ssprove_sync.
             ssprove_sync => pk_loc.
