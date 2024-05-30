@@ -307,16 +307,14 @@ Module Type SignaturePrimitives
                   ----- instantiate (1:=Key_locs). exact: KeyGenValid.
                   ----- move => l.
                   rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
-                  ssprove_invariant.
-                  Search (_ \in _) reflect.
-                  Search (_ \in _) "2".
-                  Search ([fset _ ; _]).
-                  (*
+                  ssprove_invariant.                      
                   move: l_not_in_Key_locs.
-                  rewrite in_fset2.
-                  move/fset2P.
-                   *)
-                  admit. (* Some searching for the right lemmas and you are done. *)
+                  rewrite fset_cons.
+                  apply/fdisjointP.
+                  rewrite fdisjointUl.
+                  apply/andP.
+                  split; 
+                  (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset). 
                   ----- move => l v l_not_in_Key_locs. ssprove_invariant.
                   ---- case => a0 s0; case => a1 s1. case => l r. by [split].
         --- intro a.
