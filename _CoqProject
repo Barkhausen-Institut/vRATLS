@@ -3,6 +3,7 @@
 # extension of extructures
 theories/extructurespp/ord.v
 theories/extructurespp/fmap.v
+theories/extructurespp/fset.v
 
 theories/examples/Conversions.v
 theories/examples/Signature.v
