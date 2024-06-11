@@ -1413,29 +1413,24 @@ Module Type RemoteAttestationHash
       fdisjoint LA Aux_locs →
       fdisjoint LA (Att_real_locp).(locs) →
       fdisjoint LA (Att_ideal_locp).(locs) →
-      (AdvantageE (Att_ideal_c) (Att_real_c) A 
-        <= AdvantageE (Aux_Sig_ideal ∘ Key_Gen) (Aux ∘ Sig_real_c) A)%R.
+      (AdvantageE (Att_ideal_c) (Att_real_c) A
+        <= AdvantageE (Aux ∘ Sig_ideal ∘ Key_Gen) (Aux ∘ Sig_real_c) A)%R.
   Proof.
     move => va H1 H2 H3 H4 H5.
     rewrite Advantage_sym.
-    simpl in H1.
-    simpl in H2.
-    simpl in H3.
-    simpl in H4.    
-    simpl in H5.
+    simpl in *|-.
     ssprove triangle (Att_real ∘ Key_Gen) [::
       Aux ∘ Sig_real ∘ Key_Gen ;
-      Aux_Sig_ideal ∘ Key_Gen
+      Aux ∘ Sig_ideal ∘ Key_Gen
       ] (Att_ideal ∘ Key_Gen) A as ineq.
     eapply le_trans.
     1: { exact: ineq. }
     clear ineq.
     rewrite sig_real_vs_att_real.
-    
-    2: rewrite /concat_1_real.
-    2: simpl; exact: H4.
+
+    (* 2: rewrite /concat_1_real. *)
+    2: exact: H4.
     2: {
-      simpl.
       rewrite fdisjointUr.
       apply/andP; split; assumption.
     }
@@ -1448,7 +1443,7 @@ Module Type RemoteAttestationHash
     (* Type class resolution failed because of the [Att_interface_f].
        Both advantages need to be on the same interface!
      *)
-    2: { simpl; exact: H5. }
+    2: exact: H5.
     2: {
       (* TODO There should be a tactic for discharging such [fdisjoint] goals! *)
       rewrite /Comp_locs.
@@ -1471,6 +1466,7 @@ Module Type RemoteAttestationHash
       }
       rewrite /Sig_locs_real/Key_locs.
 
+      (*
       have rem_pk_loc_dup: fset [:: pk_loc; state_loc; pk_loc; sk_loc; sign_loc] = fset [:: pk_loc; sk_loc; state_loc; sign_loc].
       1:{
         rewrite -eq_fset /(_ =i _) => x0.
@@ -1482,14 +1478,16 @@ Module Type RemoteAttestationHash
         f_equal.
         rewrite [in LHS]fset_swap12 //=.
       }
+       *)
+      (*
       rewrite concat_2/Comp_locs.
       rewrite /Sig_locs_real/Key_locs.
-      rewrite concat_3.
-      by rewrite rem_pk_loc_dup.
+       *)
+      exact: id.
     }
     rewrite GRing.addr0.
-    rewrite /Aux_Sig_ideal.
-    by [rewrite (* -Advantage_link *) Advantage_sym].    
+    (* rewrite /Aux_Sig_ideal. *)
+    by [rewrite (* -Advantage_link *) Advantage_sym].
   Qed.
 
 End RemoteAttestationHash.
