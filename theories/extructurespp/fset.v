@@ -52,12 +52,16 @@ Section fset_help.
     by repeat rewrite fset1E.
   Qed.
 
-  Lemma fset_fsetU (a b c : T) :
-    fset [:: a; b; c] = fset [:: a; b] :|: fset [:: c].
+  Lemma fset_fsetU (a b : T) (s : seq T) :
+    fset ([:: a; b] ++ s) = fset [:: a; b] :|: fset s.
   Proof.
-    rewrite [LHS]fset_fsetU_norm3.
-    rewrite -fset_cat.
-    by rewrite cat1s.
+    apply fset_cat.
+  Qed.
+
+  Lemma fset_cons_cat (a b : T) (s : seq T) :
+    fset [:: a, b & s] = fset ([:: a; b] ++ s).
+  Proof.
+    by rewrite /(_ ++ _).
   Qed.
 
   Lemma fset_setC (a b : T) :
@@ -76,5 +80,19 @@ Section fset_help.
   Qed.
 
 End fset_help.
+
+
+Ltac normalize :=
+  match goal with
+  | [ |- fset (cons _ (cons _ _)) = _ ] =>
+      repeat rewrite fset_cons_cat fset_cat fset_fsetU_norm2;
+      repeat rewrite fsetUA
+  end.
+
+Lemma fset_fsetU_norm5' {T : ordType} (a b c d e : T) :
+  fset [:: a; b; c; d; e] = fset [:: a] :|: fset [:: b] :|: fset [:: c] :|: fset [:: d] :|: fset [:: e].
+Proof.
+  by normalize.
+Qed.
 
 (* TODO create a normalization tactic for [fset] where [fsetU] is the normal form.*)
