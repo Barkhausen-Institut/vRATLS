@@ -1121,11 +1121,6 @@ Module Type RemoteAttestationHash
     apply fsub0set.
   Qed.
 
-  Print Comp_locs.
-  Print Sig_locs_ideal.
-  Print Sig_locs_real.
-  Print Key_locs.
-  Print Aux_locs.
 
   Lemma concat₃ :
     (Aux_locs :|: (Sig_locs_ideal :|: Key_locs)) = Comp_locs.
@@ -1374,37 +1369,83 @@ Module Type RemoteAttestationHash
     - by [].
   Qed.
 
-  Lemma concat_3_help :
-    (fset [:: pk_loc; sk_loc] :|: fset [:: sign_loc] :|: fset [:: pk_loc; sk_loc])
-    =
-    fset [:: pk_loc; sk_loc; sign_loc].
-  Proof.
-    apply/eqP.
-    rewrite fsetUC.
-    rewrite -fset_cat /cat.
-    rewrite -/(fsubset (fset [:: pk_loc; sk_loc]) _).
-    rewrite fset_cons.
-    rewrite [X in fsubset X _]fset_cons.
-    apply fsetUS.
-    rewrite fset_cons.
-    rewrite [X in fsubset X _]fset_cons.
-    apply fsetUS.
-    rewrite !fset_cons -fset0E.
-    apply fsub0set.
-  Qed.
 
   Lemma concat_3 :
-    fset [:: pk_loc; state_loc] 
-      :|: (fset [:: pk_loc; sk_loc] 
+    fset [:: pk_loc; state_loc]
+      :|: (fset [:: pk_loc; sk_loc]
       :|: fset [:: sign_loc]
-      :|: fset [:: pk_loc; sk_loc]) 
+      :|: fset [:: pk_loc; sk_loc])
     = fset [:: pk_loc; state_loc; pk_loc; sk_loc; sign_loc].
   Proof.
-    rewrite concat_3_help.
-    apply/eqP.
-    rewrite -fset_cat /cat.
-    intuition eauto.
-  Admitted.
+    (* LHS *)
+    repeat rewrite fset_fsetU_norm2.
+    repeat rewrite -fsetUA. (* base shape *)
+
+    (* stategy: deduplicate by moving same items to the left. *)
+    (* shift item on index 4 to the right (index starts from 0) *)
+    do 2! rewrite fsetUA.
+    rewrite [X in _ :|: X]fsetUC.
+    repeat rewrite -fsetUA.
+    rewrite fsetUid.
+
+    rewrite fsetUC.
+    repeat rewrite -fsetUA.
+
+    rewrite [X in _ :|: X]fsetUC.
+    repeat rewrite -fsetUA.
+    rewrite fsetUid.
+
+    do 1! rewrite fsetUA.
+    rewrite [X in _ :|: X]fsetUC.
+    repeat rewrite -fsetUA.
+    rewrite fsetUid.
+
+    (* final order *)
+    do 1! rewrite fsetUA.
+    rewrite [X in _ :|: X]fsetUC.
+    repeat rewrite -fsetUA.
+
+    (* do 0! rewrite fsetUA. *)
+    rewrite [X in _ :|: X]fsetUC.
+    repeat rewrite -fsetUA.
+
+    rewrite fsetUC.
+    repeat rewrite -fsetUA.
+
+    (* collapse into fset *)
+    repeat rewrite -fset_cat cat1s.
+
+    (* RHS *)
+    apply esym.
+
+    repeat rewrite fset_fsetU_norm5. (* normalize *)
+    repeat rewrite -fsetUA. (* base shape *)
+
+    rewrite fsetUC.
+    repeat rewrite -fsetUA.
+
+    (* do 0! rewrite fsetUA. *)
+    rewrite [X in _ :|: X]fsetUC.
+    repeat rewrite -fsetUA.
+    rewrite fsetUid.
+
+    (* final order *)
+
+    (* do 0! rewrite fsetUA. *)
+    rewrite [X in _ :|: X]fsetUC.
+    repeat rewrite -fsetUA.
+
+    (* do 0! rewrite fsetUA. *)
+    rewrite [X in _ :|: X]fsetUC.
+    repeat rewrite -fsetUA.
+
+    rewrite fsetUC.
+    repeat rewrite -fsetUA.
+
+    (* collapse into fset *)
+    by repeat rewrite -fset_cat cat1s.
+  Qed.
+
 
   Theorem RA_unforg LA A :
       ValidPackage LA Att_interface A_export A →
@@ -1428,7 +1469,6 @@ Module Type RemoteAttestationHash
     clear ineq.
     rewrite sig_real_vs_att_real.
 
-    (* 2: rewrite /concat_1_real. *)
     2: exact: H4.
     2: {
       rewrite fdisjointUr.
@@ -1457,37 +1497,12 @@ Module Type RemoteAttestationHash
       move: prim_aux; rewrite -fdisjointUr (* -/fset_cat *) /=.
 
       (* TODO move below into extructurespp and extend. *)
-      have fset_swap12 (O:ordType) (x y:O) s (x_neq_y: x ≠ y) : fset (x :: (y :: s)) = fset (y :: (x :: s)).
-      1:{ clear. rewrite -eq_fset /(_ =i _) => x0.
-          repeat rewrite fset_cons.
-          repeat rewrite in_fsetU1.
-          do 2! rewrite Bool.orb_assoc.
-          by rewrite (@Bool.orb_comm (x0==x) (x0==y)).
-      }
       rewrite /Sig_locs_real/Key_locs.
 
-      (*
-      have rem_pk_loc_dup: fset [:: pk_loc; state_loc; pk_loc; sk_loc; sign_loc] = fset [:: pk_loc; sk_loc; state_loc; sign_loc].
-      1:{
-        rewrite -eq_fset /(_ =i _) => x0.
-        rewrite [in LHS]fset_cons [in RHS]fset_cons.
-        rewrite [in LHS]in_fsetU1 [in RHS]in_fsetU1.
-        rewrite [in LHS]fset_swap12 //=.
-        rewrite [in LHS]fset_cons [in LHS]in_fsetU1 [in LHS]Bool.orb_assoc.
-        rewrite [in LHS]Bool.orb_diag.
-        f_equal.
-        rewrite [in LHS]fset_swap12 //=.
-      }
-       *)
-      (*
-      rewrite concat_2/Comp_locs.
-      rewrite /Sig_locs_real/Key_locs.
-       *)
       exact: id.
     }
     rewrite GRing.addr0.
-    (* rewrite /Aux_Sig_ideal. *)
-    by [rewrite (* -Advantage_link *) Advantage_sym].
+    by [rewrite Advantage_sym].
   Qed.
 
 End RemoteAttestationHash.
