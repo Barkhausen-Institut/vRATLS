@@ -48,7 +48,7 @@ Notation " 'set t " := (chSet t) (at level 2): package_scope.
 Definition tt := Datatypes.tt.
 
 Module Type SignatureParams.
-   
+
     Parameter fSecKey : finType.
     Parameter SecKey_pos : Positive #|fSecKey|.
     #[local] Existing Instance SecKey_pos.
@@ -58,7 +58,7 @@ Module Type SignatureParams.
     Proof.
     rewrite /i_sk. apply SecKey_pos.
     Qed.
-    
+
     Definition PubKey := SecKey.
     Definition Signature : choice_type := chFin(mkpos pos_n).
     (*
@@ -98,7 +98,7 @@ Module Type KeyGeneration
   (*
   "failed attempt to define apply function as enclave
   for secret key"
-  
+
   Context (T : choice_type).
   Notation " 't " := T (in custom pack_type at level 2).
   Notation " 't " := T (at level 2): package_scope.
@@ -110,9 +110,9 @@ Module Type KeyGeneration
 
   Definition Apply := mkopsig apply ('m L 'seckey) ('m L T).
 
-  Definition KeyGen_ifce T := fset (cons  
+  Definition KeyGen_ifce T := fset (cons
     (*(pair key_gen (pair 'unit 'pubkey)) *)
-    
+
     (pair apply (pair Apply T))
     (*#val #[apply] : ('m L 'seckey → 'm L 't) → 't *)
   nil).
@@ -188,7 +188,7 @@ Module Type SignaturePrimitives
   Definition Sig_locs_real := Key_locs.
   Definition Sig_locs_ideal := Sig_locs_real :|: fset [:: sign_loc ].
 
-  Definition Sig_ifce := [interface 
+  Definition Sig_ifce := [interface
     #val #[get_pk] : 'unit → 'pubkey ;
     #val #[sign] : 'message → 'signature ;
     #val #[verify_sig] : ('signature × 'message) → 'bool
@@ -197,7 +197,7 @@ Module Type SignaturePrimitives
   Definition Sig_real : package Sig_locs_real KeyGen_ifce Sig_ifce
   := [package
     #def  #[get_pk] (_ : 'unit) : 'pubkey
-    { 
+    {
       #import {sig #[key_gen] : 'unit → ('seckey × 'pubkey) } as key_gen ;;
       '(sk,pk) ← key_gen tt ;;
       pk ← get pk_loc  ;;
