@@ -3,7 +3,7 @@ From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr realsum
   fingroup.fingroup solvable.cyclic prime ssrnat ssreflect ssrfun ssrbool ssrnum
-  eqtype choice seq fintype.
+  eqtype choice seq fintype zmodp prime finset.
 Set Warnings "notation-overridden,ambiguous-paths".
 
 From extra Require Import rsa.
@@ -22,11 +22,6 @@ Require Import Coq.Init.Logic.
 Require Import List.
 
 Set Equations With UIP.
-(*
-  This is needed to make definitions with Equations transparent.
-  Otherwise they are opaque and code simplifications in the
-  proofs with [ssprove_code_simpl] do not resolve properly.
- *)
 Set Equations Transparent.
 
 Set Bullet Behavior "Strict Subproofs".
@@ -43,16 +38,37 @@ Import PackageNotation.
 
 Obligation Tactic := idtac.
 
-#[local] Open Scope package_scope.
-
+(*
+  Parameter gT : finGroupType.
+  Definition ζ : {set gT} := [set : gT].
+  Parameter g :  gT.
+  Parameter g_gen : ζ = <[g]>.
+  Parameter order_gt1 : (1 < #[g])%N.
+*)
 
 Module Type RSA_params <: SignatureParams.
 
+  Variable n : nat.
+  
+  Definition P : [set x : 'I_n.+1 | prime x].
+
+  Definition P' (y : 'I_n.+1) := (P :\ y)%SET.
+
+  Definition proj_1 (p : {x : 'I_n.+1 | prime x}) : 'I_n.+1 :=
+    proj1_sig p.
+
+  Lemma p_q_ineq : forall y, y \in P -> P :!=: P' y.
+  Proof. 
+    unfold P'. intros. 
+    apply properD1 in H.
+    rewrite eqtype.eq_sym.
+    apply proper_neq.
+    exact H.
+  Qed.
   Parameter A : Type.
   Parameter pq : A -> nat.
 
-  (*
-  Record rsa := { 
+  (* Record rsa := { 
     p : nat;
     q : nat;
    pq : nat;
@@ -60,15 +76,11 @@ Module Type RSA_params <: SignatureParams.
     d : nat; 
    wf : [&& prime p, prime q, p != q,
             0 < pq, p.-1 %| pq, q.-1 %| pq &
-            e * d == 1 %[mod pq]]}.
-
-  Print rsa.
-*)
+            e * d == 1 %[mod pq]]}.*)
 
   (*
   Definition n {r} := (pq r).
-  Definition R {r}:= [finType of 'Z_n].
-  *)
+  Definition R {r}:= [finType of 'Z_n]. *)
 
   Definition wf_type p q pq e d := [&& prime p, prime q, p != q,
   0 < pq, p.-1 %| pq, q.-1 %| pq &
@@ -77,11 +89,8 @@ Module Type RSA_params <: SignatureParams.
   Local Open Scope ring_scope.
   Import GroupScope GRing.Theory.
 
-  Variable n : nat.
-
-  Definition R := [finType of 'Z_n].
-  Definition Z_n_prod := [finType of ('Z_n * 'Z_n)].
-  Definition Z_n_prod' := [finType of ('Z_(n*n))].
+  Definition R := [finType of 'I_n.+1].
+  Definition Z_n_prod := [finType of ('I_n.+1 * 'I_n.+1)].
 
   Local Open Scope ring_scope. 
 
@@ -99,10 +108,8 @@ Module Type RSA_params <: SignatureParams.
 
 End RSA_params.
 
-
-
-Module RSA_KeyGen (π1 : RSA_params) 
-    <: KeyGeneration π1.
+Module RSA_KeyGen (π1  : RSA_params)  
+    <: KeyGeneration  π1.
 
   Import π1.
 
@@ -176,19 +183,38 @@ Module RSA_KeyGen (π1 : RSA_params)
   Definition i_pk := #|SecKey|.
   Definition i_sig := #|Signature|.  
 
+  Import PackageNotation.
+  
+  Local Open Scope package_scope.
+
+  Check P.
+  
+  Definition i_P := #|P|.
+  Instance pos_i_P : Positive i_P.
+  Proof.
+  Admitted. 
+
+  Print mem.
+  Print P.
+  Print otf.
+  Print enum_val.
+
+  Definition cast (p : Arit (uniform i_P) ) : {set fintype_ordinal__canonical__fintype_Finite π1.n.+1} :=
+    otf p.
+
+    'I_#|fintype_ordinal__canonical__fintype_Finite π1.n.+1|
+
   Definition KeyGen {L : {fset Location}} :
   code L [interface] (chPubKey × chSecKey) :=
   {code
-    p ← sample uniform i_pk ;;
-    q ← sample uniform i_pk ;;
-    e ← sample uniform i_sk ;;
-    d ← sample uniform i_sk ;;
-    
-    assert (prime p) ;;
-    assert (prime p) ;;
-    ret (p,p)
+    p ← sample uniform i_P ;; 
+    let p' := otf p in   
+    let sk := (p',p') in
+    let pk := (p',p') in    
+    ret (sk, pk)
   }.
  
+
 
 End RSA_KeyGen.
 
@@ -246,6 +272,6 @@ Module RSA_SignatureAlgorithms
     ∀ (l: {fmap (Signature  * w ) -> 'unit}) 
       (s : Signature) (d : nat) (w : nat),
       Ver_sig pk s m = ((s,m) \in domm l).
-      *)
+  *)
 
 End RSA_SignatureAlgorithms.
