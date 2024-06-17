@@ -84,15 +84,24 @@ End fset_help.
 
 Ltac normalize :=
   match goal with
-  | [ |- fset (cons _ (cons _ _)) = _ ] =>
+  | [ |- context[ fset (cons _ (cons _ _)) ] = _ ] =>
       repeat rewrite fset_cons_cat fset_cat fset_fsetU_norm2;
       repeat rewrite fsetUA
   end.
 
-Lemma fset_fsetU_norm5' {T : ordType} (a b c d e : T) :
+Example fset_fsetU_norm5' {T : ordType} (a b c d e : T) :
   fset [:: a; b; c; d; e] = fset [:: a] :|: fset [:: b] :|: fset [:: c] :|: fset [:: d] :|: fset [:: e].
 Proof.
   by normalize.
 Qed.
+
+Ltac move_right n :=
+  match n with
+  | O => rewrite fsetUC
+  | S O => rewrite [X in _ :|: X]fsetUC
+  | _ =>
+      let r := constr:(n-2) in
+      do r! rewrite fsetUA; [X in _ :|: X]fsetUC
+  end; repeat rewrite fsetUA.
 
 (* TODO create a normalization tactic for [fset] where [fsetU] is the normal form.*)
