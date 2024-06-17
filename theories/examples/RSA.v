@@ -49,13 +49,15 @@ Obligation Tactic := idtac.
 Module Type RSA_params <: SignatureParams.
 
   Variable n : nat.
-  
-  Definition P : [set x : 'I_n.+1 | prime x].
 
-  Definition P' (y : 'I_n.+1) := (P :\ y)%SET.
+  (* the set of prime numbers. *)
+  Definition prime_num : Type := {x: 'I_n.+1 | prime x}.
+  Definition P : {set prime_num} := [set : prime_num].
 
-  Definition proj_1 (p : {x : 'I_n.+1 | prime x}) : 'I_n.+1 :=
-    proj1_sig p.
+  Definition P' (y : prime_num) := (P :\ y)%SET.
+
+  Definition proj_1 (p : prime_num) : 'I_n.+1 :=
+    projT1 p.
 
   Lemma p_q_ineq : forall y, y \in P -> P :!=: P' y.
   Proof. 
