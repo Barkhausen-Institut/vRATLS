@@ -82,26 +82,60 @@ Section fset_help.
 End fset_help.
 
 
-Ltac normalize :=
+(* ** festU normalization
+   The following tactics normalize fset(s) to fsetU(s) and
+   provide a simple tactic to move and rotate the members of the
+   fset.
+*)
+
+Ltac normalize_lhs :=
   match goal with
-  | [ |- context[ fset (cons _ (cons _ _)) ] = _ ] =>
-      repeat rewrite fset_cons_cat fset_cat fset_fsetU_norm2;
-      repeat rewrite fsetUA
+  | [ |- ?mLHS = _ ] =>
+      match mLHS with
+      | context [ fset (cons _ (cons _ _)) ] =>
+          repeat rewrite fset_cons_cat fset_cat fset_fsetU_norm2;
+          repeat rewrite fsetUA
+      end
   end.
 
-Example fset_fsetU_norm5' {T : ordType} (a b c d e : T) :
+Goal forall (T : ordType) (a b c d e : T),
   fset [:: a; b; c; d; e] = fset [:: a] :|: fset [:: b] :|: fset [:: c] :|: fset [:: d] :|: fset [:: e].
 Proof.
-  by normalize.
+  by intros; normalize_lhs.
 Qed.
 
 Ltac move_right n :=
+  (* we need the other form for rewriting *)
+  repeat rewrite -fsetUA;
   match n with
-  | O => rewrite fsetUC
-  | S O => rewrite [X in _ :|: X]fsetUC
-  | _ =>
-      let r := constr:(n-2) in
-      do r! rewrite fsetUA; [X in _ :|: X]fsetUC
-  end; repeat rewrite fsetUA.
+  | O   => rewrite fsetUC
+  | S O => rewrite [(X in _ :|: X)]fsetUC (* parentheses needed: https://github.com/coq/coq/issues/10928 *)
+  | S ?n =>
+      do n! rewrite fsetUA; rewrite [(X in _ :|: X)]fsetUC
+  end;
+  (* normalize again with respect to the parenthesis *)
+  repeat rewrite fsetUA.
 
-(* TODO create a normalization tactic for [fset] where [fsetU] is the normal form.*)
+Goal forall (T : ordType) (a b c d e : T),
+    fset [:: a; b; c; d; e] = fset [:: b] :|: fset [:: c] :|: fset [:: d] :|: fset [:: e] :|: fset [:: a].
+Proof.
+  by intros; normalize_lhs; move_right 0.
+Qed.
+
+Goal forall (T : ordType) (a b c d e : T),
+    fset [:: a; b; c; d; e] = fset [:: a] :|: fset [:: c] :|: fset [:: d] :|: fset [:: e] :|: fset [:: b].
+Proof.
+  by intros; normalize_lhs; move_right 1.
+Qed.
+
+Goal forall (T : ordType) (a b c d e : T),
+    fset [:: a; b; c; d; e] = fset [:: a] :|: fset [:: b] :|: fset [:: d] :|: fset [:: e] :|: fset [:: c].
+Proof.
+  by intros; normalize_lhs; move_right 2.
+Qed.
+
+Goal forall (T : ordType) (a b c d e : T),
+    fset [:: a; b; c; d; e] = fset [:: a] :|: fset [:: b] :|: fset [:: c] :|: fset [:: e] :|: fset [:: d].
+Proof.
+  by intros; normalize_lhs; move_right 3.
+Qed.
