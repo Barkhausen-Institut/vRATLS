@@ -139,3 +139,7 @@ Goal forall (T : ordType) (a b c d e : T),
 Proof.
   by intros; normalize_lhs; move_right 3.
 Qed.
+
+Ltac denormalize :=
+  (* now fold back into fset (from right to left ... think list!) *)
+  repeat rewrite -fset_cat cat1s.
