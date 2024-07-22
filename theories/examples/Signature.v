@@ -52,11 +52,6 @@ Print finType.
 Module Type SignatureParams.
     (*Parameter SecKey : forall (A : Type), A -> finType.*)
     Parameter SecKey PubKey Signature Message Challenge : finType.
-    Parameter sk0 : SecKey.
-    Parameter pk0 : PubKey.
-    Parameter sig0 : Signature.
-    Parameter m0 : Message.
-    Parameter ch0 : Challenge.
 End SignatureParams.
 
 (** |     KEY      |
@@ -76,14 +71,6 @@ Module Type KeyGeneration (π1 : SignatureParams).
   #[local] Existing Instance Signature_pos.
   #[local] Existing Instance Message_pos.
   #[local] Existing Instance Challenge_pos.
-
-  (*
-  Parameter chSecKey    : 'fin #|SecKey|.
-  Parameter chPubKey    : 'fin #|PubKey|.
-  Parameter chSignature : 'fin #|Signature|.
-  Parameter chMessage   : 'fin #|Message|.
-  Parameter chChallenge : 'fin #|Challenge|.
-  *)
 
   Definition chSecKey    := 'fin #|SecKey|.
   Definition chPubKey    := 'fin #|PubKey|.

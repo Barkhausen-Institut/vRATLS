@@ -38,6 +38,9 @@ Import PackageNotation.
 
 Obligation Tactic := idtac.
 
+Local Open Scope package_scope.
+
+
 (*
   Parameter gT : finGroupType.
   Definition ζ : {set gT} := [set : gT].
@@ -49,15 +52,18 @@ Obligation Tactic := idtac.
 Module Type RSA_params <: SignatureParams.
 
   Variable n : nat.
+  Definition pos_n : nat := 2^n.
 
   (* the set of prime numbers. *)
-  Definition prime_num : Type := {x: 'I_n.+1 | prime x}.
+  Definition prime_num : finType := {x: 'I_n.+1 | prime x}.
   Definition P : {set prime_num} := [set : prime_num].
 
   Definition P' (y : prime_num) := (P :\ y)%SET.
 
+  (*
   Definition proj_1 (p : prime_num) : 'I_n.+1 :=
     projT1 p.
+  *)
 
   Lemma p_q_ineq : forall y, y \in P -> P :!=: P' y.
   Proof. 
@@ -67,47 +73,28 @@ Module Type RSA_params <: SignatureParams.
     apply proper_neq.
     exact H.
   Qed.
-  Parameter A : Type.
-  Parameter pq : A -> nat.
 
-  (* Record rsa := { 
-    p : nat;
-    q : nat;
-   pq : nat;
-    e : nat;
-    d : nat; 
-   wf : [&& prime p, prime q, p != q,
-            0 < pq, p.-1 %| pq, q.-1 %| pq &
-            e * d == 1 %[mod pq]]}.*)
-
-  (*
-  Definition n {r} := (pq r).
-  Definition R {r}:= [finType of 'Z_n]. *)
 
   Definition wf_type p q pq e d := [&& prime p, prime q, p != q,
   0 < pq, p.-1 %| pq, q.-1 %| pq &
   e * d == 1 %[mod pq]].
-
+  
   Local Open Scope ring_scope.
   Import GroupScope GRing.Theory.
 
-  Definition R := [finType of 'I_n.+1].
-  Definition Z_n_prod := [finType of ('I_n.+1 * 'I_n.+1)].
+  Definition R := Finite.clone _ 'I_n.+1.
+  Locate choice_type.
+  Print Crypt.choice_type.
+  
+  Definition chR : choice_type := 'fin (mkpos pos_n).
+  Definition Z_n_prod : choice_type := (chR × chR).
 
-  Local Open Scope ring_scope. 
-
-  Definition SecKey    : finType := Z_n_prod.  
-  Definition PubKey    : finType := Z_n_prod.
-  Definition Signature : finType := R.
-  Definition Message   : finType := R.
-  Definition Challenge : finType := R.
-
-  Definition sk0  : SecKey := (0,0).
-  Definition pk0  : PubKey := (0,0).
-  Definition sig0 : Signature := 0%R.
-  Definition m0   : Message := 0%R.
-  Definition ch0  : Challenge := 0%R.
-
+  Definition SecKey := Z_n_prod.  
+  Definition PubKey := Z_n_prod.
+  Definition Signature := R.
+  Definition Message := R.
+  Definition Challenge := R.
+  
 End RSA_params.
 
 Module RSA_KeyGen (π1  : RSA_params)  
@@ -188,29 +175,27 @@ Module RSA_KeyGen (π1  : RSA_params)
   Import PackageNotation.
   
   Local Open Scope package_scope.
-
-  Check P.
   
   Definition i_P := #|P|.
   Instance pos_i_P : Positive i_P.
   Proof.
   Admitted. 
 
-  Print mem.
-  Print P.
-  Print otf.
+  Locate predArgType.
   Print enum_val.
+  Locate enum_val.
 
-  Definition cast (p : Arit (uniform i_P) ) : {set fintype_ordinal__canonical__fintype_Finite π1.n.+1} :=
+  Fail Definition cast (p : Arit (uniform i_P) ) : prime_num :=
     otf p.
 
-    'I_#|fintype_ordinal__canonical__fintype_Finite π1.n.+1|
+  Definition cast (p : Arit (uniform i_P) ) : prime_num :=
+    enum_val p.
 
   Definition KeyGen {L : {fset Location}} :
   code L [interface] (chPubKey × chSecKey) :=
   {code
     p ← sample uniform i_P ;; 
-    let p' := otf p in   
+    let p' := cast p in   
     let sk := (p',p') in
     let pk := (p',p') in    
     ret (sk, pk)
