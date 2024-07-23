@@ -83,8 +83,6 @@ Module Type KeyGeneration (π1 : SignatureParams).
   Notation " 'seckey "    := chSecKey (in custom pack_type at level 2).
   Notation " 'seckey "    := chSecKey (at level 2): package_scope.
 
-  Print chSecKey.
-
   Definition pk_loc : Location := ('pubkey ; 0%N).
   Definition sk_loc : Location := ('seckey ; 1%N).
 
