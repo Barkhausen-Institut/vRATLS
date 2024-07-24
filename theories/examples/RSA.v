@@ -102,7 +102,7 @@ Module Type RSA_params <: SignatureParams.
 End RSA_params.
 
 Module RSA_KeyGen (π1  : RSA_params)
-    <: KeyGeneration  π1.
+    <: KeyGeneration π1.
 
   Import π1.
 
@@ -251,6 +251,12 @@ Equations? KeyGen {L : {fset Location}} :
     ret ( (fto (sk,sk)) , fto (sk,sk) )
   }.
   Defined.
+
+
+  
+  Definition pk_loc : Location := ('pubkey ; 0%N).
+  Definition sk_loc : Location := ('seckey ; 1%N).
+  Definition Key_locs := fset [:: pk_loc ; sk_loc].
 
   Locate Key_locs.
 
