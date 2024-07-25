@@ -149,6 +149,9 @@ Module Type SignatureAlgorithms
       (s : chSignature) (pk : chPubKey) (m  : chMessage),
       Ver_sig pk s m = ((s,m) \in domm l).
 
+  (* Functional correctness property for signatures *)
+  Parameter Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
+
 End SignatureAlgorithms.
 
 Module Type SignaturePrimitives
@@ -245,7 +248,7 @@ Module Type SignaturePrimitives
       rewrite fset_cons.
       apply fsetUS.
       apply fsubsetxx.
-    - rewrite /Sig_locs_real/Key_locs. rewrite /KGP.Key_locs. 
+    - rewrite /Sig_locs_real/Key_locs.  
       rewrite fset_cons. 
       apply fsetUS.
       rewrite fset_cons.
@@ -279,7 +282,6 @@ Module Type SignaturePrimitives
   Sig_real_c ≈₀ Sig_ideal_c.
   Proof.
     eapply (eq_rel_perf_ind_ignore (fset [:: sign_loc])).
-    Check (_ :|: _).
     - rewrite /Sig_locs_real/Sig_locs_ideal/Key_locs/Sig_locs_real/Key_locs.
       apply fsubsetU.
       apply/orP; right.

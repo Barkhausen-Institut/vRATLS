@@ -165,6 +165,91 @@ Module Type SignatureProt
     Definition prot_res := 100.
 
     Definition Prot_res_ifce :=
+      [interface #val #[prot_res] : 'message → 'unit ].
+
+
+    Equations prot_result (msg : 'message) : code Sig_locs_real Sig_prot_ifce 'bool :=
+      prot_result msg := {code
+        #import {sig #[protocol] : 'message → 'pubkey × ('signature × 'bool) } as protocol ;;
+        '(pk, t) ← protocol msg;;
+        let '(_, result) := t in
+        ret result
+    }.
+
+    (* FIXME This just cannot simplify because it is not clear what the import is! *)
+    Theorem prot_correct seed msg:
+        Run sampler (prot_result msg) seed = Some true.
+    Proof.
+      simpl.
+    Admitted.
+
+
+    Equations prot_result_pkg : package Sig_locs_real Sig_prot_ifce Prot_res_ifce
+      :=
+      prot_result_pkg := [package
+            #def  #[prot_res] (msg : 'message) : 'unit
+            {
+              #import {sig #[protocol] : 'message → 'pubkey × ('signature × 'bool) } as protocol ;;
+              '(_, t) ← protocol msg;;
+              let '(_, result) := t in
+              ret tt
+            }
+        ].
+
+    (* TODO Why do I need this cast here? *)
+    Definition tt_ : chElement 'unit := tt.
+
+    Equations prot_result_pkg' : package Sig_locs_real Sig_prot_ifce Prot_res_ifce
+      :=
+      prot_result_pkg' := [package
+        #def  #[prot_res] (msg : 'message) : 'unit
+        {
+          #import {sig #[protocol] : 'message → 'pubkey × ('signature × 'bool) } as protocol ;;
+          '(_, t) ← protocol msg;;
+          let '(_, result) := t in
+          #assert (result == true) ;;
+          ret tt_
+        }
+        ].
+
+    Equations prot_result_real : package Sig_locs_real [interface] Prot_res_ifce :=
+      prot_result_real := {package prot_result_pkg ∘ Sig_prot ∘ Sig_real_c }.
+    Next Obligation.
+      ssprove_valid.
+      all: by [apply: fsubsetxx].
+    Defined.
+
+    Equations prot_result_real' : package Sig_locs_real [interface] Prot_res_ifce :=
+      prot_result_real' := {package prot_result_pkg' ∘ Sig_prot ∘ Sig_real_c }.
+    Next Obligation.
+      ssprove_valid.
+      all: by [apply: fsubsetxx].
+    Defined.
+
+    Lemma fun_correct:
+      prot_result_real ≈₀ prot_result_real'.
+    Proof.
+      eapply eq_rel_perf_ind_eq.
+      simplify_eq_rel x.
+      all: simplify_linking; ssprove_code_simpl.
+      repeat ssprove_sync_eq.
+      move => _.
+      ssprove_sync_eq => sk.
+      ssprove_sync_eq => pk.
+      rewrite /tt_.
+      rewrite (Signature_correct pk sk x) /=.
+      apply r_ret => s0 s1 s0_eq_s1 //=.
+    Qed.
+
+  End Correctness.
+
+End SignatureProt.
+
+  Module Correctness.
+
+    Definition prot_res := 100.
+
+    Definition Prot_res_ifce :=
       [interface #val #[prot_res] : 'message → 'unit ]. 
 
 

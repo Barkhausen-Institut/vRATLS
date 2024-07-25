@@ -32,13 +32,28 @@
         mathcomp-extra' = mathcomp-extra.mkDrv
           { inherit coqPackages coq; version = "0.1.0"; };
       in {
-        devShell = pkgs.mkShell {
-          packages =
+        packages.default = coqPackages.mkCoqDerivation {
+          pname = "vRATLS";
+          owner = "Barkhausen-Institut";
+          version = "0.0.1";
+
+          src = ./.;
+
+          buildInputs =
             (with ocamlPackages; [ dune_3 ])
             ++
             (with pkgs; [coq gnumake])
             ++
             [ssprove' mathcomp-extra'];
+
+          meta = {
+            description = "Formal verification of remote attestation";
+            license = coqPackages.lib.licenses.mit;
+          };
+       };
+
+        devShells.default = pkgs.mkShell {
+          inputsFrom = [self.packages.${system}.default];
 
           shellHook = ''
                     alias ll="ls -lasi"
