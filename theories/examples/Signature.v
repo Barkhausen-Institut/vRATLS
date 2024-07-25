@@ -47,8 +47,6 @@ Notation " 'set t " := (chSet t) (at level 2): package_scope.
 
 Definition tt := Datatypes.tt.
 
-Print finType.
-
 Module Type SignatureParams.
     (*Parameter SecKey : forall (A : Type), A -> finType.*)
     Parameter SecKey PubKey Signature Message Challenge : finType.
@@ -99,22 +97,18 @@ End KeyGenParams_extended.
 
 Module Type KeyGen_code (π1 : SignatureParams) (π2 : KeyGenParams π1).
   Import π1 π2.
-  Module D := KeyGenParams_extended π1 π2.
-  Import D.
+  Module KGP := KeyGenParams_extended π1 π2.
+  Import KGP.
   
   Parameter KeyGen :
       code Key_locs [interface] (chPubKey × chSecKey).
-
-  Parameter KeyGenValid :
-    ValidCode Key_locs [interface] KeyGen.
 
 End KeyGen_code.
 
 Module KeyGen (π1 : SignatureParams) (π2 : KeyGenParams π1) 
                       (π3 : KeyGen_code π1 π2).
   Import π1 π2 π3.
-  Module KGP := KeyGenParams_extended π1 π2.
-  Import KGP.
+  Import π3.KGP.
 
   Definition KeyGen_ifce := [interface
     #val #[key_gen] : 'unit → ('seckey × 'pubkey)
@@ -142,10 +136,8 @@ Module Type SignatureAlgorithms
     (π3 : KeyGen_code π1 π2).
 
   Import π1 π2 π3.
-
-  Module KGP := KeyGenParams_extended π1 π2.
   Module KG := KeyGen π1 π2 π3.
-  Import KGP KG.
+  Import  π3.KGP KG.
 
   Parameter Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature.
 
@@ -166,10 +158,7 @@ Module Type SignaturePrimitives
   (π4 : SignatureAlgorithms π1 π2 π3).
 
   Import π1 π2 π3 π4.
-
-  Module KGP := KeyGenParams_extended π1 π2.
-  Module KG := KeyGen π1 π2 π3.
-  Import KGP KG.
+  Import  π3.KGP  π4.KG.
 
   Notation " 'signature " := chSignature   (in custom pack_type at level 2).
   Notation " 'signature " := chSignature   (at level 2): package_scope.
@@ -319,7 +308,7 @@ Module Type SignaturePrimitives
              apply (rpost_weaken_rule _
                        (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ heap_ignore (fset [:: sign_loc]) (s₀, s₁))).
              ---- eapply r_reflexivity_alt.
-                  ----- instantiate (1:=Key_locs). exact: KeyGenValid.
+                  ----- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
                   ----- move => l.
                   rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
                   ssprove_invariant.                      

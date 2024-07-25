@@ -58,11 +58,13 @@ Definition tt := Datatypes.tt.
 
 Module Type SignatureProt
   (π1 : SignatureParams)
-  (KG : KeyGeneration π1)
-  (Alg : SignatureAlgorithms π1 KG)
-  (Prim : SignaturePrimitives π1 KG Alg).
+  (π2 : KeyGenParams π1)
+  (π3 : KeyGen_code π1 π2)
+  (π4 : SignatureAlgorithms π1 π2 π3)
+  (π5 : SignaturePrimitives π1 π2 π3 π4).
 
-  Import π1 KG Alg Prim.
+  Import π1 π2 π3 π4 π5.
+  Import π3.KGP π4.KG.
 
   Definition protocol := 30.
   Definition Sig_prot_ifce :=
