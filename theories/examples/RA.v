@@ -1235,61 +1235,43 @@ Module Type RemoteAttestationHash
         ----  rewrite -(reshape_pair_id full_heap_eq').  
               eapply r_reflexivity_alt.
             ----- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
-            ----- move => l.
+             ----- move => l.
                   rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
                   ssprove_invariant.
-                  Unset Printing Notations.
-                  Search fdisjoint.
-                  Search (_ :#: _ ).
-
                   rewrite fset_cons.
-                  apply/fdisjointP.
-
-                  Search (_ \in _).
-
-
-                  
-                  rewrite [X in _ :#: X]fset_cons.
-                  rewrite fset_cons.
-                  intros x0 H.
-                  destruct H.
-                
-                  
-                  rewrite fdisjointUl.
-
-
-                  apply (@l_in_lSet pk_loc).
-                  rewrite -fset1E fdisjoints1; auto_in_fset.
-                  move: l_not_in_Key_locs.
-                  rewrite fset_cons.
-                  apply/fdisjointP.
                   rewrite fdisjointUl.
                   apply/andP.
                   split; 
                   (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset). 
-    ----- move => l v l_not_in_Key_locs. ssprove_invariant.
-    ---- case => a0 s0; case => a1 s1. case => l r. by [split].
-    --- intro a.
+            ----- move => l v l_not_in_Key_locs. ssprove_invariant.
+                  unfold Key_locs.
+                  ssprove_invariant.
+                  rewrite fset_cons.
+                  rewrite fdisjointUl.
+                  apply/andP.
+                  split; 
+                  (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset). 
+        ---- case => a0 s0; case => a1 s1. case => l r. by [split].
+      -- intro a.       
+         destruct a.
+         rewrite -(reshape_pair_id full_heap_eq').
+         ssprove_sync. 2: apply (@l_in_lSet sk_loc).
+          1: rewrite -fset1E fdisjoints1; auto_in_fset.
 
+          ssprove_sync. 2: apply (@l_in_lSet pk_loc).
+          1: rewrite -fset1E fdisjoints1; auto_in_fset.
+          ssprove_sync. 2: apply (@l_in_lSet pk_loc).
+          1: rewrite -fset1E fdisjoints1; auto_in_fset.
 
-      ssprove_sync => sk_loc.
-      (*
-      eapply rpost_weaken_rule.
-      -- ssprove_sync.
-         (*eapply r_reflexivity_alt.*)
-         (*eapply r_put_vs_put.*)
-      (*ssprove_sync_eq => sk_loc.  *)*)  
-      (*admit.
-      (*
-      sync_sig_att. 1: { auto_in_fset. }
-      move => a; by [apply r_ret].*)
-    - sync_sig_att. 1: { auto_in_fset. }
+          move => a; by [apply r_ret].
+    - ssprove_swap_rhs 0%N.
+      sync_sig_att. 1: auto_in_fset.
       move => state.
       sync_sig_att.
       + ssprove_invariant.
       + move => state_loc.
 
-        (* I think this is from above and not needed anymore.
+      (* I think this is from above and not needed anymore.
       rewrite put_bind.
       rewrite [in X in ⊢ ⦃ _ ⦄ _ ≈ X ⦃ _ ⦄ ]put_bind.
       (* The below fails because the post condition is [b₀ = b₁ /\ pre (s₀, s₁)]
@@ -1437,140 +1419,139 @@ Module Type RemoteAttestationHash
     - by [].
   Qed.
 
-
   Lemma concat_3 :
-    fset [:: pk_loc; state_loc]
-      :|: (fset [:: pk_loc; sk_loc]
-      :|: fset [:: sign_loc]
-      :|: fset [:: pk_loc; sk_loc])
-    = fset [:: pk_loc; state_loc; pk_loc; sk_loc; sign_loc].
-  Proof.
-    (* LHS *)
-    repeat rewrite fset_fsetU_norm2.
-    repeat rewrite -fsetUA. (* base shape *)
+  fset [:: pk_loc; state_loc]
+    :|: (fset [:: pk_loc; sk_loc]
+    :|: fset [:: sign_loc]
+    :|: fset [:: pk_loc; sk_loc])
+  = fset [:: pk_loc; state_loc; pk_loc; sk_loc; sign_loc].
+Proof.
+  (* LHS *)
+  repeat rewrite fset_fsetU_norm2.
+  repeat rewrite -fsetUA. (* base shape *)
 
-    (* stategy: deduplicate by moving same items to the left. *)
-    (* shift item on index 4 to the right (index starts from 0) *)
-    do 2! rewrite fsetUA.
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
-    rewrite fsetUid.
+  (* stategy: deduplicate by moving same items to the left. *)
+  (* shift item on index 4 to the right (index starts from 0) *)
+  do 2! rewrite fsetUA.
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
+  rewrite fsetUid.
 
-    rewrite fsetUC.
-    repeat rewrite -fsetUA.
+  rewrite fsetUC.
+  repeat rewrite -fsetUA.
 
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
-    rewrite fsetUid.
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
+  rewrite fsetUid.
 
-    do 1! rewrite fsetUA.
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
-    rewrite fsetUid.
+  do 1! rewrite fsetUA.
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
+  rewrite fsetUid.
 
-    (* final order *)
-    do 1! rewrite fsetUA.
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
+  (* final order *)
+  do 1! rewrite fsetUA.
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
 
-    (* do 0! rewrite fsetUA. *)
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
+  (* do 0! rewrite fsetUA. *)
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
 
-    rewrite fsetUC.
-    repeat rewrite -fsetUA.
+  rewrite fsetUC.
+  repeat rewrite -fsetUA.
 
-    (* collapse into fset *)
-    repeat rewrite -fset_cat cat1s.
+  (* collapse into fset *)
+  repeat rewrite -fset_cat cat1s.
 
-    (* RHS *)
-    apply esym.
+  (* RHS *)
+  apply esym.
 
-    repeat rewrite fset_fsetU_norm5. (* normalize *)
-    repeat rewrite -fsetUA. (* base shape *)
+  repeat rewrite fset_fsetU_norm5. (* normalize *)
+  repeat rewrite -fsetUA. (* base shape *)
 
-    rewrite fsetUC.
-    repeat rewrite -fsetUA.
+  rewrite fsetUC.
+  repeat rewrite -fsetUA.
 
-    (* do 0! rewrite fsetUA. *)
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
-    rewrite fsetUid.
+  (* do 0! rewrite fsetUA. *)
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
+  rewrite fsetUid.
 
-    (* final order *)
+  (* final order *)
 
-    (* do 0! rewrite fsetUA. *)
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
+  (* do 0! rewrite fsetUA. *)
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
 
-    (* do 0! rewrite fsetUA. *)
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
+  (* do 0! rewrite fsetUA. *)
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
 
-    rewrite fsetUC.
-    repeat rewrite -fsetUA.
+  rewrite fsetUC.
+  repeat rewrite -fsetUA.
 
-    (* collapse into fset *)
-    by repeat rewrite -fset_cat cat1s.
-  Qed.
+  (* collapse into fset *)
+  by repeat rewrite -fset_cat cat1s.
+Qed.
 
 
-  Theorem RA_unforg LA A :
-      ValidPackage LA Att_interface A_export A →
-      fdisjoint LA (Sig_real_locp).(locs) →
-      fdisjoint LA (Sig_ideal_locp).(locs) →
-      fdisjoint LA Aux_locs →
-      fdisjoint LA (Att_real_locp).(locs) →
-      fdisjoint LA (Att_ideal_locp).(locs) →
-      (AdvantageE (Att_ideal_c) (Att_real_c) A
-        <= AdvantageE (Aux ∘ Sig_ideal ∘ Key_Gen) (Aux ∘ Sig_real_c) A)%R.
-  Proof.
-    move => va H1 H2 H3 H4 H5.
-    rewrite Advantage_sym.
-    simpl in *|-.
-    ssprove triangle (Att_real ∘ Key_Gen) [::
-      Aux ∘ Sig_real ∘ Key_Gen ;
-      Aux ∘ Sig_ideal ∘ Key_Gen
-      ] (Att_ideal ∘ Key_Gen) A as ineq.
-    eapply le_trans.
-    1: { exact: ineq. }
-    clear ineq.
-    rewrite sig_real_vs_att_real.
+Theorem RA_unforg LA A :
+    ValidPackage LA Att_interface A_export A →
+    fdisjoint LA (Sig_real_locp).(locs) →
+    fdisjoint LA (Sig_ideal_locp).(locs) →
+    fdisjoint LA Aux_locs →
+    fdisjoint LA (Att_real_locp).(locs) →
+    fdisjoint LA (Att_ideal_locp).(locs) →
+    (AdvantageE (Att_ideal_c) (Att_real_c) A
+      <= AdvantageE (Aux ∘ Sig_ideal ∘ Key_Gen) (Aux ∘ Sig_real_c) A)%R.
+Proof.
+  move => va H1 H2 H3 H4 H5.
+  rewrite Advantage_sym.
+  simpl in *|-.
+  ssprove triangle (Att_real ∘ Key_Gen) [::
+    Aux ∘ Sig_real ∘ Key_Gen ;
+    Aux ∘ Sig_ideal ∘ Key_Gen
+    ] (Att_ideal ∘ Key_Gen) A as ineq.
+  eapply le_trans.
+  1: { exact: ineq. }
+  clear ineq.
+  rewrite sig_real_vs_att_real.
 
-    2: exact: H4.
-    2: {
-      rewrite fdisjointUr.
-      apply/andP; split; assumption.
-    }
-    rewrite GRing.add0r.
-    rewrite [X in (_ + X <= _)%R]Advantage_sym.
+  2: exact: H4.
+  2: {
+    rewrite fdisjointUr.
+    apply/andP; split; assumption.
+  }
+  rewrite GRing.add0r.
+  rewrite [X in (_ + X <= _)%R]Advantage_sym.
 
-    (* Set Typeclasses Debug Verbosity 2. *)
+  (* Set Typeclasses Debug Verbosity 2. *)
 
-    rewrite sig_ideal_vs_att_ideal.
-    (* Type class resolution failed because of the [Att_interface_f].
-       Both advantages need to be on the same interface!
-     *)
-    2: exact: H5.
-    2: {
-      (* TODO There should be a tactic for discharging such [fdisjoint] goals! *)
-      rewrite /Comp_locs.
-      rewrite /Aux_locs in H3.
-      rewrite /Sig_locs_ideal in H2.
-      (* This feels like a silly construction. Is there a better way to arrive at this [Prop]? *)
-      rewrite /is_true in H3; rewrite /is_true in H2.
-      have prim_aux : true && true by [].
-      rewrite -[X in X && _]H3  -[X in _ && X]H2 in prim_aux.
+  rewrite sig_ideal_vs_att_ideal.
+  (* Type class resolution failed because of the [Att_interface_f].
+     Both advantages need to be on the same interface!
+   *)
+  2: exact: H5.
+  2: {
+    (* TODO There should be a tactic for discharging such [fdisjoint] goals! *)
+    rewrite /Comp_locs.
+    rewrite /Aux_locs in H3.
+    rewrite /Sig_locs_ideal in H2.
+    (* This feels like a silly construction. Is there a better way to arrive at this [Prop]? *)
+    rewrite /is_true in H3; rewrite /is_true in H2.
+    have prim_aux : true && true by [].
+    rewrite -[X in X && _]H3  -[X in _ && X]H2 in prim_aux.
 
-      move: prim_aux; rewrite -fdisjointUr (* -/fset_cat *) /=.
+    move: prim_aux; rewrite -fdisjointUr (* -/fset_cat *) /=.
 
-      (* TODO move below into extructurespp and extend. *)
-      rewrite /Sig_locs_real/Key_locs.
+    (* TODO move below into extructurespp and extend. *)
+    rewrite /Sig_locs_real/Key_locs.
 
-      exact: id.
-    }
-    rewrite GRing.addr0.
-    by [rewrite Advantage_sym].
-  Qed.
+    exact: id.
+  }
+  rewrite GRing.addr0.
+  by [rewrite Advantage_sym].
+Qed.
 
 End RemoteAttestationHash.
