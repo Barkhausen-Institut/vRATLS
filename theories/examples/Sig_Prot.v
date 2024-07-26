@@ -144,20 +144,46 @@ Module Type SignatureProt
       apply fsubsetxx.
     - simplify_eq_rel m.
       simplify_linking.
-      ssprove_sync. ssprove_sync.
+      rewrite /cast_fun/eq_rect_r/eq_rect.
+      simplify_linking.
+      ssprove_code_simpl.
+      eapply rsame_head_alt_pre.
+      -- apply (rpost_weaken_rule _
+      (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ heap_ignore (fset [:: sign_loc]) (s₀, s₁))).
+        --- eapply r_reflexivity_alt.
+          ---- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
+          ---- move => l.
+          rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
+          ssprove_invariant.                      
+          move: l_not_in_Key_locs.
+          rewrite fset_cons.
+          apply/fdisjointP.
+          rewrite fdisjointUl.
+          apply/andP.
+          split; 
+          (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset). 
+          ---- move => l v l_not_in_Key_locs. ssprove_invariant.
+        --- case => a0 s0; case => a1 s1. case => l r. by [split].
+    --intro a.
+      ssprove_code_simpl.
+      ssprove_code_simpl_more.
+      destruct a.
+      ssprove_sync.
+      ssprove_sync.
       ssprove_sync => pk.
       ssprove_sync => sk.
       eapply r_get_remember_rhs => sig.
       eapply r_put_rhs.
       ssprove_restore_mem.
-      -- ssprove_invariant.
-      -- eapply r_get_remember_rhs => sig'.
-         eapply r_get_remember_lhs => KG_pk.
-         eapply r_ret => s0 s1 pre //=.
-         split.
+      --- ssprove_invariant.
+      --- eapply r_get_remember_rhs => sig'.
+          eapply r_get_remember_lhs => KG_pk.          
+          eapply r_ret.
+          intuition eauto.
+          
       ---- repeat f_equal.
            apply Signature_prop.
-      ---- by [move: pre; rewrite /inv_conj; repeat case].
+      ---- by [move: H; rewrite /inv_conj; repeat case].
   Qed.
 
   Module Correctness.
@@ -233,6 +259,29 @@ Module Type SignatureProt
       simplify_eq_rel x.
       all: simplify_linking; ssprove_code_simpl.
       repeat ssprove_sync_eq.
+      simplify_linking.
+      ssprove_code_simpl.
+      rewrite /cast_fun/eq_rect_r/eq_rect.
+      simplify_linking.
+      ssprove_code_simpl.
+      eapply rsame_head_alt_pre.
+      - apply (rpost_weaken_rule _
+                       (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ heap_ignore (fset [:: sign_loc]) (s₀, s₁))).
+        -- admit.
+        -- intro a. 
+           intro a1.
+           simplify_linking.
+           ssprove_code_simpl.
+           ssprove_code_simpl_more.
+           destruct a.
+           ssprove_sync.
+           ssprove_sync.
+           ssprove_sync => pk_loc.
+           eapply r_ret.
+           intuition eauto.
+
+
+
       move => _.
       ssprove_sync_eq => sk.
       ssprove_sync_eq => pk.

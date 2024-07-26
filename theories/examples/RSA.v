@@ -323,15 +323,16 @@ Import KGP KG.
     ∀ (l: {fmap (chSignature  * chMessage ) -> 'unit})
       (s : chSignature) (pk : chPubKey) (m  : chMessage),
       Ver_sig pk s m = ((s,m) \in domm l).
+  Proof.
+    intros l s pk m.
+    rewrite /domm/unzip1. 
+    rewrite /Ver_sig/dec_to_In/decrypt''/otf/enum_val. 
+    destruct pk. 
+    simpl.
+    destruct l. simpl.
+    Search (_ \in fset _).
+    
 
-      Check domm.
-      Print domm.
-      Unset Printing Notations.
-      Locate in_mem.
-      Print mem.
-      Check mem.
-      Print in_mem.
-      Print mem_pred.
 
 
   Proof.
