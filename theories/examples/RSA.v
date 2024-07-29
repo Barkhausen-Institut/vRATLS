@@ -648,14 +648,31 @@ Qed.
   Proof.
     move => l s pk m.
     apply esym.
-    apply/dommP.
-    rewrite /Ver_sig.
-
     (*
       This looks promising already.
       I would like to move this inequaility onto the branches
       to then say that this is the [v] that is not in the map.
       But for that I need a transformation first to remove the [unit].
      *)
+    rewrite mem_domm.
+    rewrite /Ver_sig.
+    rewrite /getm/getm_def.
+    rewrite /dec_to_In/decrypt''.
+    (*
+      I take that back:
+      I do not see how this can be provable at all!
+
+      A map if a partial function. Whether [Ver_sig] indeed implements
+      that particular function or phrase the other way around, whether the map
+      contains the pairs for the particular [Ver_sig] implementation
+      cannot be derived without further evidence!
+      (At least I cannot see where this information is supposed to come from!)
+
+      It all feels to me like this wants to be a functional correctness property.
+      Or it needs to be part of a different game.
+     *)
+
+
+    Abort.
 
 End RSA_SignatureAlgorithms.
