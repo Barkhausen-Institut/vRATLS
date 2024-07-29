@@ -16,7 +16,7 @@ From Crypt Require Import Axioms ChoiceAsOrd SubDistr Couplings
   Package Prelude RandomOracle.
 
 From Coq Require Import Utf8.
-From extructures Require Import ord fset fmap.
+From extructures Require Import ord fset fmap ffun.
 
 From Equations Require Import Equations.
 Require Equations.Prop.DepElim.
@@ -319,24 +319,343 @@ Import KGP KG.
     fun (pk :  chPubKey) (sig : chSignature) (m : chMessage)
        => ( dec_to_In (fst (otf pk)) (snd (otf pk)) (otf sig )) == (otf m).
 
+
+  (* Playground begin *)
+
+  Definition fun_from_set {S T:ordType} (s:{fset S*T}) : S -> option T :=
+    let m := mkfmap s in λ s₁:S, getm m s₁.
+
+  Definition currying_fmap {S T:ordType} {X:eqType} (m:{fmap (S*T) -> X}) : {fmap S -> {fmap T -> X}} :=
+    currym m.
+
+  Definition map_from_set {S T:ordType} (s:{fset S*T}) : {fmap S -> T} := mkfmap s.
+
+  (* I believe that this is the lemma that we need: *)
+  Check mem_domm.
+
+
+  (**
+     Note this: Our function is total but our fmap is actually not.
+     It may return None. This situation is expressed in the function with the comparison
+     of the given and decrypted signature/message.
+
+     So there is:
+     [if k ∈ m then true else false]
+     or for short:
+     [k ∈ m]
+
+     As a function, we have [f] where [k ∈ f] is defined as
+     [k₀ == f k]
+
+     As a consequence, we cannot relate [f] to [m] but this function [f']
+     f' := k₀ == f k
+
+     This means that [k₀] represents all values that are not in the map.
+     Consequently, we cannot prove a general lemma because we need this equality check
+     and [k₀].
+   *)
+
+  (* Playground end *)
+
+  Lemma xxx {S T:ordType} {X:eqType} (s:{fmap (S*T) -> X}) (f: S -> T) (x₁:S) (x₂:T) :
+    (x₁, x₂) \in domm s = (x₂ == f x₁).
+  Proof.
+    apply/dommP.
+  Admitted.
+
+  Definition prod_key_map {S T:ordType} {X:eqType} (s:{fmap (S*T) -> X}) : {fmap S -> T} :=
+    mkfmap (domm s).
+
+  Definition has_key {S T:ordType} (s:{fmap S -> T}) (x:S) : bool := x \in domm s.
+
+  Lemma rem_unit {S T:ordType} {X:eqType} (s:{fmap (S*T) -> X}) (x₁:S) (x₂:T) :
+      (x₁, x₂) \in domm s -> has_key (prod_key_map s) x₁.
+  Proof.
+    rewrite /has_key/prod_key_map.
+    move/dommP. case => x in_s.
+    apply/dommP.
+
+    Restart.
+
+    rewrite /has_key/prod_key_map.
+    rewrite mem_domm.
+    rewrite mem_domm.
+    (*move => in_s. *)
+    Check getm.
+    rewrite /getm.
+
+  Abort.
+
+  Lemma getm_def_seq_step {S T:ordType} {a₀:S*T} {a₁: seq.seq (S*T)} {a₂:S} :
+    getm_def (fset (a₀ :: a₁)) a₂ = getm_def (a₀ :: (fset a₁)) a₂.
+  Proof.
+  Admitted.
+
+  Lemma rem_unit {S T:ordType} {X:eqType} (s:{fmap (S*T) -> X}) (x₁:S) (x₂:T):
+    (x₁, x₂) \in domm s = has_key (prod_key_map s) x₁.
+  Proof.
+    rewrite /has_key/prod_key_map.
+    (*
+      Careful here!
+      When rewriting with [mem_domm] then
+      a check in the domain of a map that evaluates to [bool]
+      becomes
+      a check for the element itself that evaluates to an [option T].
+      This works because Coq coerces [Some _] to [true] and [None] to [false].
+      But be careful:
+      The comparison [Some x₁ = Some x₂] requires that [x₁ = x₂].
+      While this is not necessarily needed! Especially for our lemma!
+     *)
+    rewrite mem_domm.
+    rewrite mem_domm.
+    elim/fmap_ind : s => /=.
+    - rewrite /domm /=.
+      by rewrite -fset0E /mkfmap/foldr.
+    - move => s iH [x₁' x₂'] v.
+      move/dommPn => notin_s.
+      rewrite setmE.
+      rewrite domm_set mkfmapE -fset_cons getm_def_seq_step /getm_def.
+      rewrite -/(getm_def _ x₁) -mkfmapE /=.
+
+    Restart.
+
+    rewrite /has_key/prod_key_map mem_domm mem_domm.
+    move: x₁ x₂.
+    elim/fmap_ind : s => /=.
+    - move => x₁ x₂ /=. rewrite /domm /=.
+      by rewrite -fset0E /mkfmap/foldr.
+    - move => s iH [x₁' x₂'] v notin_s x₁ x₂.
+      rewrite setmE.
+      rewrite domm_set mkfmapE -fset_cons getm_def_seq_step /getm_def.
+      rewrite -/(getm_def _ x₁) -mkfmapE /=.
+
+      case H: ((x₁,x₂) == (x₁',x₂')).
+      -- move/eqP:H => H; inversion H => //=. (* turns left side back into bool because the types differ [T != X] *)
+         by rewrite ifT.
+      -- case H_x₁: (x₁ == x₁').
+         2: exact: iH.
+         simpl. (* turns the RHS into [true] *)
+
+         (* This case now seems not solvable:
+            [x₁ = x₁' /\ x₂ != x₂']
+            The problem is that we do not have any evidence that the LHS
+            [(x₁,x₂) ∈ s]
+            always holds [true].
+
+            And why should this even be the case?!
+            - Our argument was that both sides are derived from the same [s].
+              Hence, when [x₁] is in the RHS it also needs to be in the LHS.
+              The same holds for when it is not in [s].
+
+            Then why do we fail?
+            - Oh well, that is because of the induction!
+              The case that we stumble over is the one where we discover an [x₂'] in the RHS
+              even without consulting [s] at all.
+          *)
+
+    Restart.
+
+    rewrite /has_key/prod_key_map mem_domm mem_domm.
+    elim/fmap_ind : s => /=.
+    - rewrite /domm /=.
+      by rewrite -fset0E /mkfmap/foldr.
+    - move => s iH [x₁' x₂'] v notin_s.
+      rewrite setmE. (* LHS *)
+      rewrite domm_set mkfmapE -fset_cons getm_def_seq_step /getm_def -/(getm_def _ x₁) -mkfmapE /=. (* RHS *)
+      (*
+        Indeed, it is the whole approach to solve this via [get_defm]
+        just does not work this way.
+        In the case, where we add something, we unfold [get_defm] once to
+        get the inductive step.
+        In this one unfolding, there is always the case where we
+        do not consult [s].
+
+        I never use the fact that [(x₁',x₂') ∉ s].
+        Let me try.
+       *)
+
+    Restart.
+
+    rewrite /has_key/prod_key_map mem_domm mem_domm.
+    move: x₁ x₂.
+    elim/fmap_ind : s => /=.
+    - move => x₁ x₂ /=. rewrite /domm /=.
+      by rewrite -fset0E /mkfmap/foldr.
+    - move => s iH [x₁' x₂'] v notin_s x₁ x₂.
+      rewrite setmE.
+      rewrite domm_set mkfmapE -fset_cons getm_def_seq_step /getm_def.
+      rewrite -/(getm_def _ x₁) -mkfmapE /=.
+
+      case H: ((x₁,x₂) == (x₁',x₂')).
+      -- move/eqP:H => H; inversion H => //=. (* turns left side back into bool *)
+         by rewrite ifT.
+      -- case H_x₁: (x₁ == x₁').
+         2: exact: iH.
+         move/dommPn:notin_s => notin_s.
+         specialize (iH x₁' x₂').
+         rewrite notin_s in iH.
+         move/eqP: H_x₁ => H_x₁; rewrite -H_x₁ in iH.
+
+         (*
+           Nevermind the last transformations.
+           Let's check out the following hypothesis
+           [s (x₁',x₂') = None] which transforms into [s (x₁,x₂') = None]
+           and the goal
+           [s (x₁,x₂) = Some x₂'].
+           The key point that we were missing is the fact that the hypothesis
+           contradicts the goal.
+           This is because of the following lemma:
+          *)
+         have xxx : s (x₁,x₂') = None -> forall x₂'', s (x₁,x₂'') = None.
+
+         (*
+           Nope, this does not hold!
+
+           But maybe there is a different contradiction.
+          *)
+
+         Restart.
+
+    rewrite /has_key/prod_key_map mem_domm mem_domm.
+    elim/fmap_ind : s => /=.
+    - rewrite /domm /=.
+      by rewrite -fset0E /mkfmap/foldr.
+    - move => s iH [x₁' x₂'] v notin_s.
+      rewrite setmE.
+      rewrite domm_set mkfmapE -fset_cons getm_def_seq_step /getm_def.
+      rewrite -/(getm_def _ x₁) -mkfmapE /=.
+
+      case H: ((x₁,x₂) == (x₁',x₂')).
+      -- move/eqP:H => H; inversion H => //=. (* turns left side back into bool *)
+         by rewrite ifT.
+      -- case H_x₁: (x₁ == x₁').
+         2: exact: iH.
+         rewrite xpair_eqE in H.
+         rewrite H_x₁ in H.
+         simpl in H.
+
+         Check fmap_ind.
+
+         (*
+           The problem is that the induction tries to add something to the map
+           that is not yet there.
+           Hence, we get into trouble in the first case where it does not consult
+           the map itself.
+          *)
+
+         Restart.
+
+    rewrite /has_key/prod_key_map mem_domm mem_domm.
+    elim/fmap_ind : s => /=.
+    - rewrite /domm /=.
+      by rewrite -fset0E /mkfmap/foldr.
+    - move => s iH [x₁' x₂'] v notin_s.
+
+      (*
+        Why do I think that this holds?
+
+        Case analysis on [x₁ == x₁'].
+        - Case: [x₁ == x₁']
+            -- RHS always finds [x₂']
+            -- LHS needs case analysis on [x₂ == x₂']
+              --- Case [x₂ == x₂']: LHS finds it in the first step
+              --- Case [x₂ != x₂']: consults [s] where it may find it or not
+
+        So this is the problem. The queries against the maps differ!
+        The RHS only looks for [x₁] while the LHS looks for [(x₁,x₂)].
+
+        Does that mean I can prove a lemma where [x₂] is more restricted?
+       *)
+
+
+  Abort.
+
+  Lemma rem_unit {S T:ordType} {X:eqType} (s:{fmap (S*T) -> X}) (x₁:S) :
+    (exists (x₂:T), (x₁, x₂) \in domm s) = has_key (prod_key_map s) x₁.
+  Proof.
+    rewrite /has_key/prod_key_map mem_domm.
+    elim/fmap_ind : s => /=.
+    - rewrite /domm /=.
+      rewrite -fset0E /mkfmap/foldr.
+      simpl.
+      From HB Require Import structures.
+      HB.about ordType.
+      HB.about hasChoice.
+      Search false.
+      (* rewrite in_fset0. *)
+
+  Abort.
+
+
+  Lemma rem_unit {S T:ordType} {X:eqType} (s:{fmap (S*T) -> X}) (x₁:S) (x₂:T):
+    (x₁, x₂) \in domm s -> has_key (prod_key_map s) x₁.
+  Proof.
+    move: x₁ x₂.
+    elim/fmap_ind : s => /=.
+    - move => x₁ x₂.
+      by rewrite domm0 in_fset0.
+    - move => s iH [x₁ x₂] v x_notin_s x₁' x₂'.
+      rewrite /has_key/prod_key_map.
+      rewrite mem_domm mem_domm.
+
+      rewrite setmE.
+      rewrite domm_set mkfmapE -fset_cons getm_def_seq_step /getm_def.
+      rewrite -/(getm_def _ x₁') -mkfmapE /=.
+
+      case H: ((x₁',x₂') == (x₁,x₂)).
+      -- move/eqP:H => H; inversion H.
+         rewrite ifT //=.
+      -- rewrite -mem_domm => x'_in_s.
+         case H_x₁: (x₁' == x₁).
+         --- by [].
+         --- specialize (iH x₁' x₂' x'_in_s).
+             rewrite /has_key/prod_key_map mem_domm in iH.
+             exact: iH.
+  Qed.
+
+  Lemma rem_unit' {S T:ordType} {X:eqType} (s:{fmap (S*T) -> X}) (x₁:S):
+    has_key (prod_key_map s) x₁ -> exists (x₂:T), (x₁, x₂) \in domm s.
+  Proof.
+    move: x₁.
+    elim/fmap_ind : s => /=.
+    - move => x₁.
+      rewrite /has_key/prod_key_map.
+      rewrite mem_domm mkfmapE domm0 //=.
+    - move => s iH [x₁ x₂] v x_notin_s x₁'.
+      rewrite /has_key/prod_key_map.
+      rewrite mem_domm.
+
+      rewrite domm_set mkfmapE -fset_cons getm_def_seq_step /getm_def -/(getm_def _ x₁') -mkfmapE /=.
+
+      case H_x₁: (x₁' == x₁).
+      -- move => x_in_s.
+         exists x₂.
+         move/eqP:H_x₁ => H_x₁; rewrite H_x₁ //=.
+         auto_in_fset. (* TODO remove when pushing this into extructures. or move the tactic alltogether. *)
+      -- rewrite /has_key /prod_key_map in iH.
+         rewrite -mem_domm => x₁'_in_s.
+         specialize (iH x₁' x₁'_in_s).
+         case: iH => x₂' iH.
+         exists x₂'.
+         rewrite /domm in iH.
+         by rewrite fset_cons in_fsetU1; apply/orP; right.
+Qed.
+
   Theorem Signature_prop:
     ∀ (l: {fmap (chSignature  * chMessage ) -> 'unit})
       (s : chSignature) (pk : chPubKey) (m  : chMessage),
       Ver_sig pk s m = ((s,m) \in domm l).
   Proof.
-    intros l s pk m.
-    rewrite /domm/unzip1. 
-    rewrite /Ver_sig/dec_to_In/decrypt''/otf/enum_val. 
-    destruct pk. 
-    simpl.
-    destruct l. simpl.
-    Search (_ \in fset _).
-    
+    move => l s pk m.
+    apply esym.
+    apply/dommP.
+    rewrite /Ver_sig.
 
-
-
-  Proof.
-  rewrite /Ver_sig/dec_to_In.
-  
+    (*
+      This looks promising already.
+      I would like to move this inequaility onto the branches
+      to then say that this is the [v] that is not in the map.
+      But for that I need a transformation first to remove the [unit].
+     *)
 
 End RSA_SignatureAlgorithms.
