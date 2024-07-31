@@ -68,10 +68,6 @@ Module Type RemoteAttestationParams (π2 : SignatureParams).
   Definition Attestation : choice_type := 'fin (mkpos pos_n).
   Definition chMessage   : choice_type := 'fin (mkpos pos_n).
 
-  Parameter Challenge : finType.
-  Parameter Challenge_pos : Positive #|Challenge|.
-  #[local] Existing Instance Challenge_pos.
-  Definition chChallenge := 'fin #|Challenge|.
 
 End RemoteAttestationParams.
 
