@@ -86,7 +86,6 @@ Module Type SignatureProt
       }
     ].
 
-
   Equations Sig_prot_real : package Sig_locs_real [interface] Sig_prot_ifce :=
     Sig_prot_real := {package Sig_prot ∘ Sig_real_c }.
   Next Obligation.
@@ -193,7 +192,6 @@ Module Type SignatureProt
     Definition Prot_res_ifce :=
       [interface #val #[prot_res] : 'message → 'unit ].
 
-
     Equations prot_result (msg : 'message) : code Sig_locs_real Sig_prot_ifce 'bool :=
       prot_result msg := {code
         #import {sig #[protocol] : 'message → 'pubkey × ('signature × 'bool) } as protocol ;;
@@ -251,6 +249,12 @@ Module Type SignatureProt
       ssprove_valid.
       all: by [apply: fsubsetxx].
     Defined.
+
+    Lemma reshape_pair_id {T T0 T1 : Type} (f : T * T0 -> T1) : (fun '(pair x y) => f (pair x y)) = f.
+  Proof.
+    apply functional_extensionality; by [case].
+  Qed.
+  (* To DO: Get from RA.v, to import here and in RA.v *)
 
     Lemma fun_correct:
       prot_result_real ≈₀ prot_result_real'.
@@ -265,116 +269,43 @@ Module Type SignatureProt
       simplify_linking.
       ssprove_code_simpl.
       eapply rsame_head_alt_pre.
-      - apply (rpost_weaken_rule _
-                       (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ heap_ignore (fset [:: sign_loc]) (s₀, s₁))).
-        -- admit.
+      - set xxx := fun '(s0,s1) => s0 = s1. 
+        rewrite -(reshape_pair_id xxx).
+      apply (rpost_weaken_rule _
+                       (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ (xxx (s₀, s₁)) )).
+        -- eapply r_reflexivity_alt.
+        --- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
+        --- move => l.
+            rewrite /Key_locs/xxx. 
+            unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
+            rewrite /get_pre_cond.
+            by intros s0 s1 [=->].
+        --- intros.
+            rewrite /xxx/put_pre_cond.
+            by intros s0 s1 [=->].
+
         -- intro a. 
            intro a1.
            simplify_linking.
+           destruct a. destruct a1. intros H. destruct H.
+           by split.
+        - intros a.
+
            ssprove_code_simpl.
            ssprove_code_simpl_more.
            destruct a.
-           ssprove_sync.
-           ssprove_sync.
-           ssprove_sync => pk_loc.
-           eapply r_ret.
-           intuition eauto.
-
-
-
-      move => _.
-      ssprove_sync_eq => sk.
-      ssprove_sync_eq => pk.
-      rewrite /tt_.
-      rewrite (Signature_correct pk sk x) /=.
-      apply r_ret => s0 s1 s0_eq_s1 //=.
+           ssprove_sync_eq.
+           ssprove_sync_eq.
+           ssprove_sync_eq => pk.
+           ssprove_sync_eq => sk.
+           ssprove_sync_eq => pk2.
+           rewrite /tt_.
+           rewrite (Signature_correct pk2 sk x) /=.
+           apply r_ret => s2 s1 s0_eq_s1 //=.
     Qed.
 
   End Correctness.
 
 End SignatureProt.
 
-  Module Correctness.
-
-    Definition prot_res := 100.
-
-    Definition Prot_res_ifce :=
-      [interface #val #[prot_res] : 'message → 'unit ]. 
-
-
-    Equations prot_result (msg : 'message) : code Sig_locs_real Sig_prot_ifce 'bool :=
-      prot_result msg := {code
-        #import {sig #[protocol] : 'message → 'pubkey × ('signature × 'bool) } as protocol ;;
-        '(pk, t) ← protocol msg;;
-        let '(_, result) := t in
-        ret result
-    }.
-
-    (* FIXME This just cannot simplify because it is not clear what the import is! *)
-    Theorem prot_correct seed msg:
-        Run sampler (prot_result msg) seed = Some true.
-    Proof.
-      simpl.
-    Admitted.
-
-
-    Equations prot_result_pkg : package Sig_locs_real Sig_prot_ifce Prot_res_ifce
-      :=
-      prot_result_pkg := [package
-            #def  #[prot_res] (msg : 'message) : 'unit
-            {
-              #import {sig #[protocol] : 'message → 'pubkey × ('signature × 'bool) } as protocol ;;
-              '(_, t) ← protocol msg;;
-              let '(_, result) := t in
-              ret tt
-            }
-        ].
-
-    (* TODO Why do I need this cast here? *)
-    Definition tt_ : chElement 'unit := tt.
-
-    Equations prot_result_pkg' : package Sig_locs_real Sig_prot_ifce Prot_res_ifce
-      :=
-      prot_result_pkg' := [package
-        #def  #[prot_res] (msg : 'message) : 'unit
-        {
-          #import {sig #[protocol] : 'message → 'pubkey × ('signature × 'bool) } as protocol ;;
-          '(_, t) ← protocol msg;;
-          let '(_, result) := t in
-          #assert (result == true) ;;
-          ret tt_
-        }
-        ].
-
-    Equations prot_result_real : package Sig_locs_real [interface] Prot_res_ifce :=
-      prot_result_real := {package prot_result_pkg ∘ Sig_prot ∘ Sig_real_c }.
-    Next Obligation.
-      ssprove_valid.
-      all: by [apply: fsubsetxx].
-    Defined.
-
-    Equations prot_result_real' : package Sig_locs_real [interface] Prot_res_ifce :=
-      prot_result_real' := {package prot_result_pkg' ∘ Sig_prot ∘ Sig_real_c }.
-    Next Obligation.
-      ssprove_valid.
-      all: by [apply: fsubsetxx].
-    Defined.
-
-    Lemma fun_correct:
-      prot_result_real ≈₀ prot_result_real'.
-    Proof.
-      eapply eq_rel_perf_ind_eq.
-      simplify_eq_rel x.
-      all: simplify_linking; ssprove_code_simpl.
-      repeat ssprove_sync_eq.
-      move => _.
-      ssprove_sync_eq => sk.
-      ssprove_sync_eq => pk.
-      rewrite /tt_.
-      rewrite (Signature_correct pk sk x) /=.
-      apply r_ret => s0 s1 s0_eq_s1 //=.
-    Qed.
-
-  End Correctness.
-
-End SignatureProt.
+  
