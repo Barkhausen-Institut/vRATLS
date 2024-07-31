@@ -1,0 +1,17 @@
+\begin{thebibliography}{1}
+
+\bibitem{arpachiDusseau18:osbook}
+Remzi~H. Arpaci-Dusseau and Arpaci-Dusseau~Andrea C.
+\newblock {\em Operating Systems: Three Easy Pieces}.
+\newblock Arpaci-Dusseau Books, LLC, 1.00 edition, 2015.
+\newblock \url{http://pages.cs.wisc.edu/~remzi/OSTEP/}.
+
+\bibitem{waldspurger02}
+Carl~A. Waldspurger.
+\newblock Memory resource management in {VMware ESX} server.
+\newblock In {\em USENIX Symposium on Operating System Design and
+  Implementation (OSDI)}, pages 181--194, 2002.
+\newblock
+  \url{https://www.usenix.org/legacy/event/osdi02/tech/waldspurger/waldspurger.pdf}.
+
+\end{thebibliography}
