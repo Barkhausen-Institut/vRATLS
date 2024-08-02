@@ -83,8 +83,7 @@ Module Type RSA_params <: SignatureParams.
   Local Open Scope ring_scope.
   Import GroupScope GRing.Theory.
 
-  Definition R : Type := 'I_(n*n).+3.
-  
+  Definition R : Type := 'I_(n*n).+3.  
   
   (*Definition chR : choice_type := 'fin (mkpos pos_n).*)
   Definition Z_n_prod : finType := prod_finType R R.
@@ -94,6 +93,7 @@ Module Type RSA_params <: SignatureParams.
   Definition Signature : finType := R.
   Definition Message : finType := R.
   Definition Challenge : finType := R.
+  Definition Sample_space : finType := R.
   
 End RSA_params.
 
@@ -162,6 +162,7 @@ Module RSA_KeyGen (π1  : RSA_params)
   Definition sig0 : Signature := 1%g.
   Definition m0 : Message := 1%g.
   Definition chal0 : Challenge := 1%g.
+  Definition ss0 :Sample_space := 1%g.
 
   
   #[export] Instance positive_SecKey : Positive #|SecKey|.  
@@ -194,6 +195,12 @@ Module RSA_KeyGen (π1  : RSA_params)
   Qed.
   Definition Challenge_pos : Positive #|Challenge| := _.
 
+  #[export] Instance positive_Sample : Positive #|Sample_space|.   
+  Proof.
+    apply /card_gt0P. exists ss0. auto.
+  Qed.
+  Definition Sample_pos : Positive #|Sample_space| := _.
+
 
   Definition chSecKey  : choice_type := 'fin #|SecKey|.
   Definition chPubKey : choice_type := 'fin #|PubKey|.
@@ -205,6 +212,7 @@ Module RSA_KeyGen (π1  : RSA_params)
   Definition i_sk := #|SecKey|.
   Definition i_pk := #|SecKey|.
   Definition i_sig := #|Signature|.  
+  Definition i_ss := #|Sample_space|.
 
 End RSA_KeyGen.
 
@@ -281,14 +289,20 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       p ← sample uniform P ;; 
       let p := enum_val p in
       q ← sample uniform P ;;
-      (*#assert (p != q) ;;*)
       let q := enum_val q in
+      (* #assert (p != q) ;; *)
       let p := cast p in
       let q := cast q in
-      let sk := mult_cast p q in 
-      #put sk_loc := (fto (sk,sk)) ;;
-      #put pk_loc := (fto (sk,sk)) ;;
-      ret ( (fto (sk,sk)) , fto (sk,sk) )
+
+      e ← sample uniform i_ss ;;
+      d ← sample uniform i_ss ;;
+      let e := enum_val e in 
+      let d := enum_val d in
+      (* assert ed = 1 (mod Phi(n)) *)
+      let n := mult_cast p q in 
+      #put sk_loc := (fto (n,e)) ;;
+      #put pk_loc := (fto (n,d)) ;;
+      ret ( (fto (n,e)) , fto (n,d) )
     }.
     Defined.
 
