@@ -143,12 +143,12 @@ Module Type SignatureAlgorithms
 
   Parameter Ver_sig : ∀ (pk :  chPubKey) (sig : chSignature) (m : chMessage),
    'bool.
-
+(*
   Parameter Signature_prop:
     ∀ (l: {fmap (chSignature  * chMessage ) -> 'unit})
       (s : chSignature) (pk : chPubKey) (m  : chMessage),
       Ver_sig pk s m = ((s,m) \in domm l).
-
+*)
   (* Functional correctness property for signatures *)
   Parameter Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
 

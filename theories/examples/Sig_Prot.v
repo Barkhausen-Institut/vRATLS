@@ -153,36 +153,112 @@ Module Type SignatureProt
           ---- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
           ---- move => l.
           rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
-          ssprove_invariant.                      
+          ssprove_invariant.
           move: l_not_in_Key_locs.
           rewrite fset_cons.
           apply/fdisjointP.
           rewrite fdisjointUl.
           apply/andP.
-          split; 
-          (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset). 
+          split;
+            (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset).
           ---- move => l v l_not_in_Key_locs. ssprove_invariant.
         --- case => a0 s0; case => a1 s1. case => l r. by [split].
-    --intro a.
+      -- intro a.
+         (*
+         ssprove_code_simpl.
+         ssprove_code_simpl_more.
+          *)
+         destruct a.
+         ssprove_sync.
+         ssprove_sync.
+         ssprove_sync => pk.
+         ssprove_sync => sk.
+         eapply r_get_remember_rhs => sig.
+         eapply r_put_rhs.
+         ssprove_restore_mem.
+         (*
+           At this point, the proof looses the information about
+           what is put into the [sign_loc].
+           This is due to the [heap_ignore] invariant.
+           What are basically saying that we do not care what is
+           being stored in [sign_loc] for the proof.
+          *)
+         --- ssprove_invariant.
+         --- eapply r_get_remember_rhs => sig'.
+             eapply r_get_remember_lhs => KG_pk.
+             eapply r_ret.
+             intuition eauto.
+             ---- repeat f_equal.
+                  apply Signature_prop.
+             ---- by [move: H; rewrite /inv_conj; repeat case].
+  Qed.
+
+
+  Lemma ext_unforge_sig_prot_full:
+    Sig_prot_real ≈₀ Sig_prot_ideal.
+  Proof.
+     eapply (eq_rel_perf_ind_ignore (fset [:: sign_loc])).
+    - rewrite /Sig_locs_real/Sig_locs_ideal.
+      apply fsubsetU.
+      apply/orP.
+      right.
+      rewrite !fset_cons.
+      apply fsubsetU ; apply /orP ; right.
+      apply fsetUS.
+      apply fsubsetxx.
+    - simplify_eq_rel m.
+      simplify_linking.
+      rewrite /cast_fun/eq_rect_r/eq_rect.
+      simplify_linking.
       ssprove_code_simpl.
-      ssprove_code_simpl_more.
-      destruct a.
-      ssprove_sync.
-      ssprove_sync.
-      ssprove_sync => pk.
-      ssprove_sync => sk.
-      eapply r_get_remember_rhs => sig.
-      eapply r_put_rhs.
-      ssprove_restore_mem.
-      --- ssprove_invariant.
-      --- eapply r_get_remember_rhs => sig'.
-          eapply r_get_remember_lhs => KG_pk.          
-          eapply r_ret.
-          intuition eauto.
-          
-      ---- repeat f_equal.
-           apply Signature_prop.
-      ---- by [move: H; rewrite /inv_conj; repeat case].
+      eapply rsame_head_alt_pre.
+      -- apply (rpost_weaken_rule _
+      (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ heap_ignore (fset [:: sign_loc]) (s₀, s₁))).
+        --- eapply r_reflexivity_alt.
+          ---- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
+          ---- move => l.
+          rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
+          ssprove_invariant.
+          move: l_not_in_Key_locs.
+          rewrite fset_cons.
+          apply/fdisjointP.
+          rewrite fdisjointUl.
+          apply/andP.
+          split;
+            (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset).
+          ---- move => l v l_not_in_Key_locs. ssprove_invariant.
+        --- case => a0 s0; case => a1 s1. case => l r. by [split].
+      -- intro a.
+         (*
+         ssprove_code_simpl.
+         ssprove_code_simpl_more.
+          *)
+         destruct a.
+         ssprove_sync.
+         ssprove_sync.
+         ssprove_sync => pk.
+         ssprove_sync => sk.
+         eapply r_get_remember_rhs => sig.
+         eapply r_put_rhs.
+         eapply r_get_remember_rhs => sig'.
+         eapply r_get_remember_lhs => KG_pk.
+         eapply r_ret.
+         intuition eauto;
+           move:H; do 3! case; move => x; do 2! case; move => h_ignore sign_loc_is_sig set_s1 sign_log_is_sig' _.
+         --- repeat f_equal.
+             move: sign_log_is_sig'; rewrite /rem_rhs set_s1.
+             rewrite get_set_heap_eq.
+             intros [=<-].
+             rewrite mem_domm.
+             rewrite setmE.
+             rewrite ifT //=.
+             apply/eqP.
+             exact: Signature_correct.
+         --- rewrite set_s1.
+             rewrite /heap_ignore => l l_notin_sign_loc.
+             specialize (h_ignore l l_notin_sign_loc).
+             move: l_notin_sign_loc; rewrite -fset1E in_fset1 => l_neq_sig.
+             by rewrite get_set_heap_neq.
   Qed.
 
   Module Correctness.

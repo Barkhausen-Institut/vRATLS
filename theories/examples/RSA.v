@@ -653,7 +653,7 @@ Import KGP KG.
          exists x₂'.
          rewrite /domm in iH.
          by rewrite fset_cons in_fsetU1; apply/orP; right.
-Qed.
+  Qed.
 
   Theorem Signature_prop:
     ∀ (l: {fmap (chSignature  * chMessage ) -> 'unit})
@@ -689,9 +689,32 @@ Qed.
 
     Abort.
 
+  Theorem Signature_prop':
+    ∀ (l: {fmap (chSignature  * chMessage ) -> 'unit})
+      (pk : chPubKey)
+      (sk : chSecKey)
+      (m  : chMessage),
+      Ver_sig pk (Sign sk m) m = ((Sign sk m, m) \in domm l).
+  Proof.
+    move => l pk sk m.
+    rewrite mem_domm.
+    rewrite /Ver_sig/Sign.
 
-    Theorem Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
-    Proof.
-    Admitted.
+    generalize (otf m) => m'.
+    case: pk => pk pk_lt /=.
+
+    (* LHS *)
+    rewrite /enc_to_In/dec_to_In.
+    rewrite rsa_correct''.
+
+    (* I can certainly reduce the LHS to [true].
+       But the RHS talks about the [Sign] of real instead of ideal!
+       We still miss the fact that this tuple is actually really in [l].
+     *)
+  Abort.
+
+  Theorem Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
+  Proof.
+  Admitted.
 
 End RSA_SignatureAlgorithms.
