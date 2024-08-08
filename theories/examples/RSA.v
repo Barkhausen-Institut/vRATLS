@@ -689,4 +689,9 @@ Qed.
 
     Abort.
 
+
+    Theorem Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
+    Proof.
+    Admitted.
+
 End RSA_SignatureAlgorithms.
