@@ -308,9 +308,9 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
 
 End RSA_KeyGen_code.
 
-Module RSA_SignatureAlgorithms (π1  : RSA_params) (π2 : KeyGenParams π1)
-<:SignatureAlgorithms π1 π2.
-Import π1 π2.
+Module RSA_SignatureAlgorithms (π1  : RSA_params) (π2 : KeyGenParams π1) (π3 : KeyGen_code π1 π2)
+<:SignatureAlgorithms π1 π2 π3.
+Import π1 π2 π3.
 Module KGP := KeyGenParams_extended π1 π2.
 Module KG := RSA_KeyGen π1.
 Import KGP KG.
@@ -548,8 +548,6 @@ Import KGP KG.
          rewrite H_x₁ in H.
          simpl in H.
 
-         Check fmap_ind.
-
          (*
            The problem is that the induction tries to add something to the map
            that is not yet there.
@@ -592,10 +590,7 @@ Import KGP KG.
     - rewrite /domm /=.
       rewrite -fset0E /mkfmap/foldr.
       simpl.
-      From HB Require Import structures.
-      HB.about ordType.
-      HB.about hasChoice.
-      Search false.
+ 
       (* rewrite in_fset0. *)
 
   Abort.
@@ -705,7 +700,7 @@ Import KGP KG.
 
     (* LHS *)
     rewrite /enc_to_In/dec_to_In.
-    rewrite rsa_correct''.
+    Fail rewrite rsa_correct''.
 
     (* I can certainly reduce the LHS to [true].
        But the RHS talks about the [Sign] of real instead of ideal!
@@ -715,6 +710,48 @@ Import KGP KG.
 
   Theorem Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
   Proof.
-  Admitted.
+    intros pk sk msg.
+    rewrite /Ver_sig/Sign/dec_to_In/enc_to_In. 
+    rewrite !otf_fto. simpl.
+    Search modn.
+    apply/eqP/eqP.
+    Print Ordinal.
+    case: (Ordinal (n:=(n * n).+3)
+    (m:=decrypt'' (otf pk).1 (otf pk).2
+          (encrypt'' (otf sk).1 
+             (otf sk).2 (otf msg)))
+    (dec_smaller_n (otf pk).1 (otf pk).2
+       (Ordinal (n:=(n * n).+3)
+          (m:=encrypt'' (otf sk).1 
+                (otf sk).2 (otf msg))
+          (enc_smaller_n (otf sk).1 
+             (otf sk).2 (otf msg)))) ).
+    intros m i.
+    
+    rewrite modn_small.
+    
+    Unset Printing Notations.
+    Print rsa_correct''.
+    rewrite rsa_correct''.
+    
+
+
+
+
+   
+    rewrite  rsa_correct''. 
+    Search Ordinal.
+    elim/ordinal_ind.
+    
+
+
+
+    rewrite (eq_dec p q _ _ _ H).
+    rewrite (eq_enc p q _ _ _ H).
+    rewrite (enc_eq wf) (dec_eq wf) /=.
+    rewrite [X in _ %% X = _ %% X]H.
+    apply rsa_correct.
+
+
 
 End RSA_SignatureAlgorithms.
