@@ -713,45 +713,71 @@ Import KGP KG.
     intros pk sk msg.
     rewrite /Ver_sig/Sign/dec_to_In/enc_to_In. 
     rewrite !otf_fto. simpl.
-    Search modn.
     apply/eqP/eqP.
-    Print Ordinal.
-    case: (Ordinal (n:=(n * n).+3)
-    (m:=decrypt'' (otf pk).1 (otf pk).2
-          (encrypt'' (otf sk).1 
-             (otf sk).2 (otf msg)))
-    (dec_smaller_n (otf pk).1 (otf pk).2
-       (Ordinal (n:=(n * n).+3)
-          (m:=encrypt'' (otf sk).1 
-                (otf sk).2 (otf msg))
-          (enc_smaller_n (otf sk).1 
-             (otf sk).2 (otf msg)))) ).
-    intros m i.
-    
-    rewrite modn_small.
-    
-    Unset Printing Notations.
-    Print rsa_correct''.
-    rewrite rsa_correct''.
-    
+
+    case H: (Ordinal (n:=(n * n).+3)
+             (m:=decrypt'' (otf pk).1 (otf pk).2
+                   (encrypt'' (otf sk).1
+                      (otf sk).2 (otf msg)))
+             (dec_smaller_n (otf pk).1 (otf pk).2
+                (Ordinal (n:=(n * n).+3)
+                   (m:=encrypt'' (otf sk).1 (otf sk).2 (otf msg))
+                   (enc_smaller_n (otf sk).1
+                      (otf sk).2 (otf msg)))) ) => [m i].
+
+    case H₁ : (Ordinal (n:=(n * n).+3) (m:=encrypt'' (otf sk).1 (otf sk).2 (otf msg))
+                 (enc_smaller_n (otf sk).1 (otf sk).2 (otf msg))) => [m₀ i₀].
+    move Heqm₂: (encrypt'' (otf sk).1 (otf sk).2 (otf msg)) => x₂.
+    move Heqm₃: (enc_smaller_n (otf sk).1 (otf sk).2 (otf msg)) => x₃.
+
+    move Heqm₀: (decrypt'' (otf pk).1 (otf pk).2
+                     (encrypt'' (otf sk).1
+                        (otf sk).2 (otf msg))) => x₀.
+(*
+    rewrite rsa_correct'' in Heqm₀.
+    Check dec_smaller_n.
+    move Heqm₁: (dec_smaller_n (otf pk).1 (otf pk).2
+                   x₂) => x₁.
+    (* Why does the message need to be in [R] instead of [nat]? *)
+*)
+    move Heqm₁: (dec_smaller_n (otf pk).1 (otf pk).2
+                   (Ordinal (n:=(n * n).+3) (m:=encrypt'' (otf sk).1 (otf sk).2 (otf msg))
+                      (enc_smaller_n (otf sk).1 (otf sk).2 (otf msg)))) => x₁.
+
+    Check Ordinal.
+    (* rewrite rsa_correct'' in Heqm₀. *)
+    Fail have xxx : forall a b c, Ordinal (n:=a) (m:=b) c = b %% a.
+    (* have xxx1 : forall a b c, nat_of_ord (Ordinal (n:=a) (m:=b) c) = b %% a. *)
+    Check modn_small.
+    (*
+      May be generalize in x1 and then have a more general lemma that show that the output of
+      [decrypt''] is always smaller than ...
+
+      Or maybe just unfold [encrypt''] and [decrypt''].
+     *)
+
+    (*
+    move: Heqm₀.
+    rewrite -(@modn_small _ (n * n).+3 x₃).
+    Fail rewrite -(@modn_small _ (n * n).+3 x₁).
+     *)
+
+    Check enc_smaller_n.
+    Check decrypt''.
+    simpl in x₁.
+    (* Of course I can just simplify away the ordinal
+       because [decrypt''] only requires a [nat]!
+       So this is nothing but the coercion function that unfolds to
+       taking the [m] out of the ordinal!
+     *)
 
 
-
-
-   
-    rewrite  rsa_correct''. 
-    Search Ordinal.
-    elim/ordinal_ind.
-    
-
-
-
-    rewrite (eq_dec p q _ _ _ H).
-    rewrite (eq_enc p q _ _ _ H).
-    rewrite (enc_eq wf) (dec_eq wf) /=.
-    rewrite [X in _ %% X = _ %% X]H.
-    apply rsa_correct.
-
+    move: Heqm₀; rewrite -(@modn_small _ (n * n).+3 x₁).
+    Check rsa_correct''.
+    Fail rewrite [X in X = _ -> _]rsa_correct''.
+    (* This rewrite now fails because [rsa_correct''] requires that
+       [(otf pk).2 = (off sk).2].
+     *)
 
 
 End RSA_SignatureAlgorithms.
