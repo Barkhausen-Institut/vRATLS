@@ -777,6 +777,18 @@ Import KGP KG.
     Fail rewrite [X in X = _ -> _]rsa_correct''.
     (* This rewrite now fails because [rsa_correct''] requires that
        [(otf pk).2 = (off sk).2].
+
+       Indeed [(pk,sk) = KeyGen] is a necessary precondition.
+       Because otherwise [(pk₁,sk₁) = KeyGen] and [(pk₂,sk₂) = KeyGen],
+       such that we could be talking about [pk₁] and [sk₂] or
+       [pk₂] and [sk₁].
+       Clearly [decrypt sk₁ (encrypt pk₂ m) != m].
+
+       The "Joy of Crypto" book is also vague about this aspect.
+       See construction 13.7.
+
+       The "Seems Legit" paper (https://eprint.iacr.org/2019/779.pdf)
+       has this right. See the very first property stated in Section 4.1.
      *)
 
 
