@@ -324,15 +324,15 @@ Module RSA_SignatureAlgorithms
   Proof.
     Admitted.
   
-  Definition dec_to_In  (d pq m : R) : R := Ordinal (dec_smaller_n d pq m). 
-  Definition enc_to_In  (e pq m : R) : R := Ordinal (enc_smaller_n e pq m). 
+  Definition dec_to_In  (d pq m : R) : R := Ordinal (dec_smaller_n d pq m).
+  Definition enc_to_In  (e pq m : R) : R := Ordinal (enc_smaller_n e pq m).
 
-  Definition Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature := 
-    fun (sk : chSecKey) (m : chMessage) => fto ( enc_to_In (fst (otf sk)) (snd (otf sk)) (otf m )).
+  Definition Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature :=
+    fun (sk : chSecKey) (m : chMessage) => fto ( enc_to_In (snd (otf sk)) (fst (otf sk)) (otf m )).
 
   Definition Ver_sig : ∀ (pk :  chPubKey) (sig : chSignature) (m : chMessage), 'bool :=
     fun (pk :  chPubKey) (sig : chSignature) (m : chMessage)
-       => ( dec_to_In (fst (otf pk)) (snd (otf pk)) (otf sig )) == (otf m).
+       => ( dec_to_In (snd(otf pk)) (fst (otf pk)) (otf sig )) == (otf m).
 
 
   (* Playground begin *)
@@ -714,30 +714,30 @@ Module RSA_SignatureAlgorithms
     Ver_sig pk (Sign sk msg) msg == true.
   Proof.
     rewrite /Run/Run_aux /=.
-    case => pk₀ sk₀. (* injectivity *)
+    case => pk_eq sk_eq. (* injectivity *)
 
     rewrite /Ver_sig/Sign/dec_to_In/enc_to_In.
     rewrite !otf_fto. simpl.
     apply/eqP/eqP.
 
     case H: (Ordinal (n:=(n * n).+3)
-             (m:=decrypt'' (otf pk).1 (otf pk).2
-                   (encrypt'' (otf sk).1
-                      (otf sk).2 (otf msg)))
-             (dec_smaller_n (otf pk).1 (otf pk).2
+             (m:=decrypt'' (otf pk).2 (otf pk).1
+                   (encrypt'' (otf sk).2
+                      (otf sk).1 (otf msg)))
+             (dec_smaller_n (otf pk).2 (otf pk).1
                 (Ordinal (n:=(n * n).+3)
-                   (m:=encrypt'' (otf sk).1 (otf sk).2 (otf msg))
-                   (enc_smaller_n (otf sk).1
-                      (otf sk).2 (otf msg)))) ) => [m i].
+                   (m:=encrypt'' (otf sk).2 (otf sk).1 (otf msg))
+                   (enc_smaller_n (otf sk).2
+                      (otf sk).1 (otf msg)))) ) => [m i].
 
-    case H₁ : (Ordinal (n:=(n * n).+3) (m:=encrypt'' (otf sk).1 (otf sk).2 (otf msg))
-                 (enc_smaller_n (otf sk).1 (otf sk).2 (otf msg))) => [m₀ i₀].
-    move Heqm₂: (encrypt'' (otf sk).1 (otf sk).2 (otf msg)) => x₂.
-    move Heqm₃: (enc_smaller_n (otf sk).1 (otf sk).2 (otf msg)) => x₃.
+    case H₁ : (Ordinal (n:=(n * n).+3) (m:=encrypt'' (otf sk).2 (otf sk).1 (otf msg))
+                 (enc_smaller_n (otf sk).2 (otf sk).1 (otf msg))) => [m₀ i₀].
+    move Heqm₂: (encrypt'' (otf sk).2 (otf sk).1 (otf msg)) => x₂.
+    move Heqm₃: (enc_smaller_n (otf sk).2 (otf sk).1 (otf msg)) => x₃.
 
-    move Heqm₀: (decrypt'' (otf pk).1 (otf pk).2
-                     (encrypt'' (otf sk).1
-                        (otf sk).2 (otf msg))) => x₀.
+    move Heqm₀: (decrypt'' (otf pk).2 (otf pk).1
+                     (encrypt'' (otf sk).2
+                        (otf sk).1 (otf msg))) => x₀.
 (*
     rewrite rsa_correct'' in Heqm₀.
     Check dec_smaller_n.
@@ -745,9 +745,9 @@ Module RSA_SignatureAlgorithms
                    x₂) => x₁.
     (* Why does the message need to be in [R] instead of [nat]? *)
 *)
-    move Heqm₁: (dec_smaller_n (otf pk).1 (otf pk).2
-                   (Ordinal (n:=(n * n).+3) (m:=encrypt'' (otf sk).1 (otf sk).2 (otf msg))
-                      (enc_smaller_n (otf sk).1 (otf sk).2 (otf msg)))) => x₁.
+    move Heqm₁: (dec_smaller_n (otf pk).2 (otf pk).1
+                   (Ordinal (n:=(n * n).+3) (m:=encrypt'' (otf sk).2 (otf sk).1 (otf msg))
+                      (enc_smaller_n (otf sk).2 (otf sk).1 (otf msg)))) => x₁.
 
     Check Ordinal.
     (* rewrite rsa_correct'' in Heqm₀. *)
@@ -796,13 +796,20 @@ Module RSA_SignatureAlgorithms
        has this right. See the very first property stated in Section 4.1.
      *)
 
-    rewrite sk₀ pk₀ /=.
+    rewrite sk_eq pk_eq /=.
     rewrite !otf_fto /=.
+
+    (* SSReflect style generalization: *)
+    move: (pkg_interpreter.sampler_obligation_4 seed {| pos := P; cond_pos := pos_i_P |}) => p.
+    move: (pkg_interpreter.sampler_obligation_4 (seed + 1) {| pos := P; cond_pos := pos_i_P |}) => q.
+    move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => sk₁.
+    move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => pk₁.
+
     Check rsa_correct''.
     Fail rewrite [X in X = _ -> _]rsa_correct''.
-    (* This fails now because we probably mixed up the arguments!
-       The goal says that the first arguments are equal, while the lemma states that
-       the second arguments need to be equal.
+    (* This fails now because
+       the space of the LHS is [(n*n).+3] but
+       [rsa_correct''] requires it to be the same as [pq].
      *)
 
     
