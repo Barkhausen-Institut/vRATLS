@@ -274,15 +274,13 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
   Lemma n_smaller_nn : forall n : nat, n.+3 <= (n*n).+3.
   Proof.
     intro n. 
-    Search ( _ < _ ). 
-    Search injective ( _ < _ ).
     Admitted.
 
 
   Definition mult_cast (a b : 'I_n.+3) : R :=  
      ((widen_ord (n_smaller_nn n) a) * (widen_ord (n_smaller_nn n) b))%g.
 
-  Equations? KeyGen :
+  Equations KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
     KeyGen :=
     {code
@@ -304,16 +302,19 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       #put pk_loc := (fto (n,d)) ;;
       ret ( (fto (n,e)) , fto (n,d) )
     }.
-    Defined.
 
 End RSA_KeyGen_code.
 
-Module RSA_SignatureAlgorithms (π1  : RSA_params) (π2 : KeyGenParams π1) (π3 : KeyGen_code π1 π2)
-<:SignatureAlgorithms π1 π2 π3.
-Import π1 π2 π3.
-Module KGP := KeyGenParams_extended π1 π2.
-Module KG := RSA_KeyGen π1.
-Import KGP KG.
+Module RSA_SignatureAlgorithms
+  (π1  : RSA_params)
+  (π2 : KeyGenParams π1)
+  (π3 : KeyGen_code π1 π2)
+<: SignatureAlgorithms π1 π2 π3.
+
+  Import π1 π2 π3.
+  Module KGC := RSA_KeyGen_code π1 π2.
+  Import KGC KGC.KGP KGC.KG KGC.
+
 
   Lemma dec_smaller_n : forall (d pq m : R),  (decrypt'' d pq m) < (n*n).+3.
   Proof.
@@ -708,10 +709,14 @@ Import KGP KG.
      *)
   Abort.
 
-  Theorem Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
+  Theorem Signature_correct pk sk msg seed :
+    Some (pk,sk) = Run sampler KeyGen seed ->
+    Ver_sig pk (Sign sk msg) msg == true.
   Proof.
-    intros pk sk msg.
-    rewrite /Ver_sig/Sign/dec_to_In/enc_to_In. 
+    rewrite /Run/Run_aux /=.
+    case => pk₀ sk₀. (* injectivity *)
+
+    rewrite /Ver_sig/Sign/dec_to_In/enc_to_In.
     rewrite !otf_fto. simpl.
     apply/eqP/eqP.
 
@@ -791,5 +796,15 @@ Import KGP KG.
        has this right. See the very first property stated in Section 4.1.
      *)
 
+    rewrite sk₀ pk₀ /=.
+    rewrite !otf_fto /=.
+    Check rsa_correct''.
+    Fail rewrite [X in X = _ -> _]rsa_correct''.
+    (* This fails now because we probably mixed up the arguments!
+       The goal says that the first arguments are equal, while the lemma states that
+       the second arguments need to be equal.
+     *)
+
+    
 
 End RSA_SignatureAlgorithms.
