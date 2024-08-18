@@ -53,7 +53,7 @@ Local Open Scope package_scope.
 Module Type RSA_params <: SignatureParams.
 
   Variable n : nat.
-  
+
   Definition pos_n : nat := 2^n.
 
   (* the set of prime numbers. *)
@@ -68,8 +68,8 @@ Module Type RSA_params <: SignatureParams.
   *)
 
   Lemma p_q_ineq : forall y, y \in P -> P :!=: P' y.
-  Proof. 
-    unfold P'. intros. 
+  Proof.
+    unfold P'. intros.
     apply properD1 in H.
     rewrite eqtype.eq_sym.
     apply proper_neq.
@@ -79,30 +79,30 @@ Module Type RSA_params <: SignatureParams.
   Definition wf_type p q pq e d := [&& prime p, prime q, p != q,
   0 < pq, p.-1 %| pq, q.-1 %| pq &
   e * d == 1 %[mod pq]].
-  
+
   Local Open Scope ring_scope.
   Import GroupScope GRing.Theory.
 
-  Definition R : Type := 'I_(n*n).+3.  
-  
+  Definition R : Type := 'I_(n*n).+3.
+
   (*Definition chR : choice_type := 'fin (mkpos pos_n).*)
   Definition Z_n_prod : finType := prod_finType R R.
 
-  Definition SecKey := Z_n_prod.  
+  Definition SecKey := Z_n_prod.
   Definition PubKey : finType := Z_n_prod.
   Definition Signature : finType := R.
   Definition Message : finType := R.
   Definition Challenge : finType := R.
   Definition Sample_space : finType := R.
-  
+
 End RSA_params.
 
 Module RSA_KeyGen (π1  : RSA_params)
     <: KeyGenParams π1.
 
   Import π1.
-  
-  Definition n := π1.n.  
+
+  Definition n := π1.n.
 
   (* Encryption *)
   Definition encrypt' e p q w : nat := w ^ e %% (p * q ).
@@ -134,17 +134,19 @@ Module RSA_KeyGen (π1  : RSA_params)
 
    (* Encryption *)
    Definition encrypt'' e pq w : nat := w ^ e %% pq.
-   
+
    (* Decryption *)
    Definition decrypt'' d pq w := w ^ d %% pq.
 
-   Lemma eq_dec : forall (p q pq d w: nat) (H: pq = (p * q)%nat), decrypt'' d pq w = decrypt' d p q w.
+   Lemma eq_dec (p q pq d w: nat) (H: pq = (p * q)%nat) : decrypt'' d pq w = decrypt' d p q w.
    Proof.
-    Admitted.
-  
-   Lemma eq_enc : forall (p q pq d w: nat) (H: pq = (p * q)%nat), encrypt'' d pq w = encrypt' d p q w.
+     by rewrite /decrypt''/decrypt' H.
+   Qed.
+
+   Lemma eq_enc (p q pq d w: nat) (H: pq = (p * q)%nat) : encrypt'' d pq w = encrypt' d p q w.
    Proof.
-   Admitted.
+     by rewrite /encrypt''/encrypt' H.
+   Qed.
 
    Theorem rsa_correct'' {p q pq d e : nat} (H: pq = (p * q)%nat) (wf : wf_type p q pq d e) w :
     let r := Build_rsa wf in
@@ -164,38 +166,38 @@ Module RSA_KeyGen (π1  : RSA_params)
   Definition chal0 : Challenge := 1%g.
   Definition ss0 :Sample_space := 1%g.
 
-  
-  #[export] Instance positive_SecKey : Positive #|SecKey|.  
+
+  #[export] Instance positive_SecKey : Positive #|SecKey|.
   Proof.
     apply /card_gt0P. exists sk0. auto.
   Qed.
   Definition SecKey_pos : Positive #|SecKey| := _ .
-  
-  #[export] Instance positive_PubKey : Positive #|PubKey|. 
+
+  #[export] Instance positive_PubKey : Positive #|PubKey|.
   Proof.
     apply /card_gt0P. exists pk0. auto.
   Qed.
   Definition PubKey_pos : Positive #|PubKey| := _.
 
-  #[export] Instance positive_Sig : Positive #|Signature|.   
+  #[export] Instance positive_Sig : Positive #|Signature|.
   Proof.
     apply /card_gt0P. exists sig0. auto.
   Qed.
   Definition Signature_pos: Positive #|Signature| := _.
 
-  #[export] Instance positive_Message : Positive #|Message|.   
+  #[export] Instance positive_Message : Positive #|Message|.
   Proof.
     apply /card_gt0P. exists m0. auto.
   Qed.
   Definition Message_pos : Positive #|Message| := _.
 
-  #[export] Instance positive_Chal : Positive #|Challenge|.   
+  #[export] Instance positive_Chal : Positive #|Challenge|.
   Proof.
     apply /card_gt0P. exists chal0. auto.
   Qed.
   Definition Challenge_pos : Positive #|Challenge| := _.
 
-  #[export] Instance positive_Sample : Positive #|Sample_space|.   
+  #[export] Instance positive_Sample : Positive #|Sample_space|.
   Proof.
     apply /card_gt0P. exists ss0. auto.
   Qed.
@@ -211,7 +213,7 @@ Module RSA_KeyGen (π1  : RSA_params)
 
   Definition i_sk := #|SecKey|.
   Definition i_pk := #|SecKey|.
-  Definition i_sig := #|Signature|.  
+  Definition i_sig := #|Signature|.
   Definition i_ss := #|Sample_space|.
 
 End RSA_KeyGen.
@@ -223,26 +225,26 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
   Module KG := RSA_KeyGen π1.
   Import KGP KG.
 
-  Import PackageNotation.  
+  Import PackageNotation.
   Local Open Scope package_scope.
 
   Lemma prime2 (num : 'I_n.+3) (H: 2 = num) : prime num.
   Proof.
     rewrite -H. reflexivity.
-  Qed. 
+  Qed.
 
   Lemma two_smaller_three : forall n,  2 < n.+3.
   Proof.
     intro n.
     destruct n.
     - reflexivity.
-    - reflexivity. 
+    - reflexivity.
   Qed.
 
   Definition two : 'I_n.+3 := Ordinal (two_smaller_three n ).
-  
+
   Definition p0 : prime_num := exist _ two (prime2 two eq_refl).
-  
+
   Definition i_P := #|P|.
   Instance pos_i_P : Positive i_P.
   Proof.
@@ -252,8 +254,8 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
   Fail Definition cast (p : Arit (uniform i_P) ) :=
     otf p.
 
-  Definition cast (p : prime_num ) : 'I_n.+3 := 
-    match p with 
+  Definition cast (p : prime_num ) : 'I_n.+3 :=
+    match p with
     | exist x _ => x
     end.
 
@@ -261,24 +263,24 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     code Key_locs [interface] chChallenge :=
     KeyGen :=
     {code
-      p ← sample uniform P ;; 
+      p ← sample uniform P ;;
       let p' := enum_val p in
       q ← sample uniform (P' p') ;;
       let q' := enum_val q in
       let p2 := cast p' in
       let q2 := cast q' in
-      let sk := fto (p2 * q2)%g in   
+      let sk := fto (p2 * q2)%g in
       ret sk
     }.
 
   Lemma n_smaller_nn : forall n : nat, n.+3 <= (n*n).+3.
   Proof.
-    intro n. 
+    intro n.
     Admitted.
 
 
-  Definition mult_cast (a b : 'I_n.+3) : R :=  
-     ((widen_ord (n_smaller_nn n) a) * (widen_ord (n_smaller_nn n) b))%g.
+  Definition mult_cast (a b : 'I_n.+3) : R :=
+     ((widen_ord (n_smaller_nn n) a) * (widen_ord (n_smaller_nn n) b))%R.
 
   Equations KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
@@ -323,7 +325,7 @@ Module RSA_SignatureAlgorithms
   Lemma enc_smaller_n : forall (e pq m : R),  (encrypt'' e pq m) < (n*n).+3.
   Proof.
     Admitted.
-  
+
   Definition dec_to_In  (d pq m : R) : R := Ordinal (dec_smaller_n d pq m).
   Definition enc_to_In  (e pq m : R) : R := Ordinal (enc_smaller_n e pq m).
 
@@ -807,11 +809,26 @@ Module RSA_SignatureAlgorithms
 
     Check rsa_correct''.
     Fail rewrite [X in X = _ -> _]rsa_correct''.
-    (* This fails now because
-       the space of the LHS is [(n*n).+3] but
-       [rsa_correct''] requires it to be the same as [pq].
-     *)
+    rewrite (eq_dec (cast (enum_val p)) (cast (enum_val q))).
+    2: {
+      Check P.
+      (*
+         We need to establish a connection between [P]
+         and [n] such that we can say that the multiplication
+         never overflows.
+       *)
+      Print P.
+      move: p q. rewrite /P/prime_num => p q.
+      move: (cast (enum_val p)) => p'.
+      move: (cast (enum_val q)) => q'.
+      case: p' => p' p'_lt.
+      case: q' => q' q'_lt.
+      simpl.
+      (* Obviously our setup of the space is still incorrect. *)
+    }.
 
-    
+    rewrite (eq_enc (cast (enum_val p)) (cast (enum_val q))).
+
+
 
 End RSA_SignatureAlgorithms.
