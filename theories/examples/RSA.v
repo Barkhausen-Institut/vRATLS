@@ -5,7 +5,7 @@ Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr realsum
   fingroup.fingroup solvable.cyclic prime ssrnat ssreflect ssrfun ssrbool ssrnum
   eqtype choice seq fintype zmodp prime finset.
-  
+
 Set Warnings "notation-overridden,ambiguous-paths".
 
 From extra Require Import rsa.
@@ -42,13 +42,6 @@ Obligation Tactic := idtac.
 
 Local Open Scope package_scope.
 
-(*
-  Parameter gT : finGroupType.
-  Definition ζ : {set gT} := [set : gT].
-  Parameter g :  gT.
-  Parameter g_gen : ζ = <[g]>.
-  Parameter order_gt1 : (1 < #[g])%N.
-*)
 
 Module Type RSA_params <: SignatureParams.
 
@@ -56,16 +49,16 @@ Module Type RSA_params <: SignatureParams.
 
   Definition pos_n : nat := 2^n.
 
+  Definition r₀ : nat := n.+3.
+  Definition R₀ : Type := 'I_r₀.
+  Definition r : nat := r₀ * r₀.
+  Definition R : Type := 'I_r.
+
   (* the set of prime numbers. *)
-  Definition prime_num : finType := {x: 'I_n.+3 | prime x}.
+  Definition prime_num : finType := {x: R₀  | prime x}.
   Definition P : {set prime_num} := [set : prime_num].
 
   Definition P' (y : prime_num) := (P :\ y)%SET.
-
-  (*
-  Definition proj_1 (p : prime_num) : 'I_n.+1 :=
-    projT1 p.
-  *)
 
   Lemma p_q_ineq : forall y, y \in P -> P :!=: P' y.
   Proof.
@@ -77,15 +70,9 @@ Module Type RSA_params <: SignatureParams.
   Qed.
 
   Definition wf_type p q pq e d := [&& prime p, prime q, p != q,
-  0 < pq, p.-1 %| pq, q.-1 %| pq &
-  e * d == 1 %[mod pq]].
+      0 < pq, p.-1 %| pq, q.-1 %| pq &
+                            e * d == 1 %[mod pq]].
 
-  Local Open Scope ring_scope.
-  Import GroupScope GRing.Theory.
-
-  Definition R : Type := 'I_(n*n).+3.
-
-  (*Definition chR : choice_type := 'fin (mkpos pos_n).*)
   Definition Z_n_prod : finType := prod_finType R R.
 
   Definition SecKey := Z_n_prod.
@@ -102,8 +89,6 @@ Module RSA_KeyGen (π1  : RSA_params)
 
   Import π1.
 
-  Definition n := π1.n.
-
   (* Encryption *)
   Definition encrypt' e p q w : nat := w ^ e %% (p * q ).
 
@@ -111,9 +96,9 @@ Module RSA_KeyGen (π1  : RSA_params)
     let r := Build_rsa wf in
     encrypt' d p q w = encrypt r w.
   Proof.
-    by rewrite /encrypt/encrypt'/r. 
+    by rewrite /encrypt/encrypt'/r.
   Qed.
-  
+
   (* Decryption *)
   Definition decrypt' d p q w := w ^ d %% (p * q).
 
@@ -123,7 +108,7 @@ Module RSA_KeyGen (π1  : RSA_params)
   Proof.
     by rewrite /encrypt/encrypt'/r.
   Qed.
- 
+
   Theorem rsa_correct' {p q pq d e : nat} (wf : wf_type p q pq d e) w :
     let r := Build_rsa wf in
     decrypt' e p q (encrypt' d p q w)  = w %[mod p * q].
@@ -220,6 +205,7 @@ End RSA_KeyGen.
 
 Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     <: KeyGen_code π1 π2.
+
   Import π1 π2.
   Module KGP := KeyGenParams_extended π1 π2.
   Module KG := RSA_KeyGen π1.
@@ -228,20 +214,20 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
   Import PackageNotation.
   Local Open Scope package_scope.
 
-  Lemma prime2 (num : 'I_n.+3) (H: 2 = num) : prime num.
+  Lemma prime2 (num : R₀) (H: 2 = num) : prime num.
   Proof.
     rewrite -H. reflexivity.
   Qed.
 
-  Lemma two_smaller_three : forall n,  2 < n.+3.
+  Lemma two_smaller_three : 2 < r₀.
   Proof.
-    intro n.
-    destruct n.
+    rewrite /r.
+    destruct π1.n.
     - reflexivity.
     - reflexivity.
   Qed.
 
-  Definition two : 'I_n.+3 := Ordinal (two_smaller_three n ).
+  Definition two : R₀ := Ordinal two_smaller_three.
 
   Definition p0 : prime_num := exist _ two (prime2 two eq_refl).
 
@@ -254,11 +240,12 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
   Fail Definition cast (p : Arit (uniform i_P) ) :=
     otf p.
 
-  Definition cast (p : prime_num ) : 'I_n.+3 :=
+  Definition cast (p : prime_num ) : R₀ :=
     match p with
     | exist x _ => x
     end.
 
+  (* TODO make this work *)
   Fail Equations? KeyGen:
     code Key_locs [interface] chChallenge :=
     KeyGen :=
@@ -273,20 +260,19 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       ret sk
     }.
 
-  Lemma n_smaller_nn : forall n : nat, n.+3 <= (n*n).+3.
+  Lemma n_smaller_nn : r₀ <= r.
   Proof.
-    intro n.
-    Admitted.
+  Admitted.
 
 
-  Definition mult_cast (a b : 'I_n.+3) : R :=
-     ((widen_ord (n_smaller_nn n) a) * (widen_ord (n_smaller_nn n) b))%R.
+  Definition mult_cast (a b : R₀) : R :=
+     ((widen_ord n_smaller_nn a) * (widen_ord n_smaller_nn b))%R.
 
   Equations KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
     KeyGen :=
     {code
-      p ← sample uniform P ;; 
+      p ← sample uniform P ;;
       let p := enum_val p in
       q ← sample uniform P ;;
       let q := enum_val q in
@@ -296,10 +282,10 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
 
       e ← sample uniform i_ss ;;
       d ← sample uniform i_ss ;;
-      let e := enum_val e in 
+      let e := enum_val e in
       let d := enum_val d in
       (* assert ed = 1 (mod Phi(n)) *)
-      let n := mult_cast p q in 
+      let n := mult_cast p q in
       #put sk_loc := (fto (n,e)) ;;
       #put pk_loc := (fto (n,d)) ;;
       ret ( (fto (n,e)) , fto (n,d) )
@@ -318,11 +304,11 @@ Module RSA_SignatureAlgorithms
   Import KGC KGC.KGP KGC.KG KGC.
 
 
-  Lemma dec_smaller_n : forall (d pq m : R),  (decrypt'' d pq m) < (n*n).+3.
+  Lemma dec_smaller_n : forall (d pq m : R),  (decrypt'' d pq m) < r.
   Proof.
     Admitted.
 
-  Lemma enc_smaller_n : forall (e pq m : R),  (encrypt'' e pq m) < (n*n).+3.
+  Lemma enc_smaller_n : forall (e pq m : R),  (encrypt'' e pq m) < r.
   Proof.
     Admitted.
 
@@ -347,8 +333,9 @@ Module RSA_SignatureAlgorithms
 
   Definition map_from_set {S T:ordType} (s:{fset S*T}) : {fmap S -> T} := mkfmap s.
 
-  (* I believe that this is the lemma that we need: *)
-  Check mem_domm.
+  (* I believe that this is the lemma that we need:
+     [Check mem_domm.]
+   *)
 
 
   (**
@@ -722,17 +709,17 @@ Module RSA_SignatureAlgorithms
     rewrite !otf_fto. simpl.
     apply/eqP/eqP.
 
-    case H: (Ordinal (n:=(n * n).+3)
+    case H: (Ordinal (n:=r)
              (m:=decrypt'' (otf pk).2 (otf pk).1
                    (encrypt'' (otf sk).2
                       (otf sk).1 (otf msg)))
              (dec_smaller_n (otf pk).2 (otf pk).1
-                (Ordinal (n:=(n * n).+3)
+                (Ordinal (n:=r)
                    (m:=encrypt'' (otf sk).2 (otf sk).1 (otf msg))
                    (enc_smaller_n (otf sk).2
                       (otf sk).1 (otf msg)))) ) => [m i].
 
-    case H₁ : (Ordinal (n:=(n * n).+3) (m:=encrypt'' (otf sk).2 (otf sk).1 (otf msg))
+    case H₁ : (Ordinal (n:=r) (m:=encrypt'' (otf sk).2 (otf sk).1 (otf msg))
                  (enc_smaller_n (otf sk).2 (otf sk).1 (otf msg))) => [m₀ i₀].
     move Heqm₂: (encrypt'' (otf sk).2 (otf sk).1 (otf msg)) => x₂.
     move Heqm₃: (enc_smaller_n (otf sk).2 (otf sk).1 (otf msg)) => x₃.
@@ -748,7 +735,7 @@ Module RSA_SignatureAlgorithms
     (* Why does the message need to be in [R] instead of [nat]? *)
 *)
     move Heqm₁: (dec_smaller_n (otf pk).2 (otf pk).1
-                   (Ordinal (n:=(n * n).+3) (m:=encrypt'' (otf sk).2 (otf sk).1 (otf msg))
+                   (Ordinal (n:=r) (m:=encrypt'' (otf sk).2 (otf sk).1 (otf msg))
                       (enc_smaller_n (otf sk).2 (otf sk).1 (otf msg)))) => x₁.
 
     Check Ordinal.
@@ -779,7 +766,7 @@ Module RSA_SignatureAlgorithms
      *)
 
 
-    move: Heqm₀; rewrite -(@modn_small _ (n * n).+3 x₁).
+    move: Heqm₀; rewrite -(@modn_small _ r x₁).
     Check rsa_correct''.
     Fail rewrite [X in X = _ -> _]rsa_correct''.
     (* This rewrite now fails because [rsa_correct''] requires that
