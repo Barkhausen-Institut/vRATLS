@@ -786,7 +786,7 @@ Module RSA_SignatureAlgorithms
      *)
 
     rewrite sk_eq pk_eq /=.
-    rewrite !otf_fto /=.
+    rewrite !otf_fto.
 
     (* SSReflect style generalization: *)
     move: (pkg_interpreter.sampler_obligation_4 seed {| pos := P; cond_pos := pos_i_P |}) => p.
@@ -798,24 +798,47 @@ Module RSA_SignatureAlgorithms
     Fail rewrite [X in X = _ -> _]rsa_correct''.
     rewrite (eq_dec (cast (enum_val p)) (cast (enum_val q))).
     2: {
-      Check P.
       (*
          We need to establish a connection between [P]
          and [n] such that we can say that the multiplication
          never overflows.
        *)
-      Print P.
       move: p q. rewrite /P/prime_num => p q.
       move: (cast (enum_val p)) => p'.
       move: (cast (enum_val q)) => q'.
       case: p' => p' p'_lt.
       case: q' => q' q'_lt.
       simpl.
-      (* Obviously our setup of the space is still incorrect. *)
+      rewrite /r₀ /=.
+      rewrite modn_small //=.
+      rewrite -/Nat.add -/Nat.mul.
+      rewrite /r₀ in p'_lt q'_lt.
+
+      rewrite plusE multE.
+      rewrite (addnC π1.n (muln _ _)).
+      repeat rewrite -addSn.
+      rewrite -[X in _ < _ + (_ + X)]addn3.
+      rewrite -/Nat.add plusE.
+      rewrite -[X in _ < _ + (_ + X)]addnA.
+      rewrite addn3.
+      rewrite -mulSnr -mulSn -mulSn.
+      by rewrite ltn_mul.
     }.
 
     rewrite (eq_enc (cast (enum_val p)) (cast (enum_val q))).
 
+    2: {
+      (* similar to the proof above. *)
+      admit.
+    }
 
-
+    rewrite /r.
+    Check rsa_correct'.
+    Fail rewrite rsa_correct'.
+    (* This fails now because [%% (r₀ * r₀)]
+       is not the same as [%% (p * q)]
+     *)
+    Print P.
+    Print prime_num.
+    Print R₀.
 End RSA_SignatureAlgorithms.
