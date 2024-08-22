@@ -69,11 +69,13 @@ Module Type RSA_params <: SignatureParams.
     exact H.
   Qed.
 
+  Definition R' : finType := {x:R | 0 < x}.
+
   Definition wf_type p q pq e d := [&& prime p, prime q, p != q,
       0 < pq, p.-1 %| pq, q.-1 %| pq &
                             e * d == 1 %[mod pq]].
 
-  Definition Z_n_prod : finType := prod_finType R R.
+  Definition Z_n_prod : finType := prod_finType R' R.
 
   Definition SecKey := Z_n_prod.
   Definition PubKey : finType := Z_n_prod.
@@ -144,8 +146,8 @@ Module RSA_KeyGen (π1  : RSA_params)
     apply rsa_correct.
   Qed.
 
-  Definition sk0 : SecKey := (1,1)%g.
-  Definition pk0 : PubKey := (1,1)%g.
+  Definition sk0 : SecKey := (exist _ 1%R (ltn0Sn 0), 1)%g.
+  Definition pk0 : PubKey := (exist _ 1%R (ltn0Sn 0), 1)%g.
   Definition sig0 : Signature := 1%g.
   Definition m0 : Message := 1%g.
   Definition chal0 : Challenge := 1%g.
@@ -194,7 +196,6 @@ Module RSA_KeyGen (π1  : RSA_params)
   Definition chSignature : choice_type := 'fin #|Signature|.
   Definition chMessage : choice_type := 'fin #|Message|.
   Definition chChallenge : choice_type := 'fin #|Challenge|.
-  Print chChallenge.
 
   Definition i_sk := #|SecKey|.
   Definition i_pk := #|SecKey|.
@@ -260,13 +261,60 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       ret sk
     }.
 
-  Lemma n_smaller_nn : r₀ <= r.
+  Lemma n_leq_nn : r₀ <= r.
   Proof.
-  Admitted.
+    rewrite /r/r₀ -addn1.
+    apply leq_pmull.
+    by rewrite addn1.
+  Qed.
+
+  Lemma yyy : forall a b,
+      prime a ->
+      prime b ->
+      0 < a * b.
+  Proof.
+    move => a b ap bp.
+    rewrite muln_gt0.
+    apply/andP.
+    split.
+    - exact: prime_gt0 ap.
+    - exact: prime_gt0 bp.
+  Qed.
+
+  Lemma ltn_R : forall (a b: R₀), a * b < (π1.n + (π1.n + (π1.n + π1.n * π1.n.+3).+3).+3).+3.
+  Proof.
+    rewrite /R₀/r₀ => a b.
+    rewrite (addnC π1.n (muln _ _)).
+    repeat rewrite -addSn.
+    rewrite -[X in _ < _ + (_ + X)]addn3.
+    rewrite -/Nat.add plusE.
+    rewrite -[X in _ < _ + (_ + X)]addnA.
+    rewrite addn3.
+    rewrite -mulSnr -mulSn -mulSn.
+    by rewrite ltn_mul.
+  Qed.
+
+  Lemma yyy' {a b:R₀} (ap: prime a) (bp: prime b) :
+    0 < ((widen_ord n_leq_nn a) * (widen_ord n_leq_nn b))%R.
+  Proof.
+    rewrite /widen_ord /=.
+    rewrite -/Nat.mul -/Nat.add.
+    rewrite plusE multE.
+    rewrite modn_small.
+    - by apply yyy.
+    - by apply ltn_R.
+  Qed.
 
 
-  Definition mult_cast (a b : R₀) : R :=
-     ((widen_ord n_smaller_nn a) * (widen_ord n_smaller_nn b))%R.
+  Definition mult_cast (a b : prime_num) : R' :=
+    match a,b with
+    | exist a' ap , exist b' bp =>
+        exist _
+          ((widen_ord n_leq_nn a') * (widen_ord n_leq_nn b'))%R
+          (yyy' ap bp)
+    end.
+
+  Locate sk_loc.
 
   Equations KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
@@ -277,8 +325,8 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       q ← sample uniform P ;;
       let q := enum_val q in
       (* #assert (p != q) ;; *)
-      let p := cast p in
-      let q := cast q in
+      (*let p := cast p in
+      let q := cast q in *)
 
       e ← sample uniform i_ss ;;
       d ← sample uniform i_ss ;;
@@ -304,16 +352,21 @@ Module RSA_SignatureAlgorithms
   Import KGC KGC.KGP KGC.KG KGC.
 
 
-  Lemma dec_smaller_n : forall (d pq m : R),  (decrypt'' d pq m) < r.
+  Lemma dec_smaller_n (d pq m : R) (H: 0 < pq) : (decrypt'' d pq m) < pq.
   Proof.
-    Admitted.
+    by rewrite /decrypt''; apply ltn_pmod.
+  Qed.
 
-  Lemma enc_smaller_n : forall (e pq m : R),  (encrypt'' e pq m) < r.
+  Lemma enc_smaller_n (e pq m : R) (H: 0 < pq) : (encrypt'' e pq m) < pq.
   Proof.
-    Admitted.
+    by rewrite /encrypt''; apply ltn_pmod.
+  Qed.
 
-  Definition dec_to_In  (d pq m : R) : R := Ordinal (dec_smaller_n d pq m).
-  Definition enc_to_In  (e pq m : R) : R := Ordinal (enc_smaller_n e pq m).
+
+  Definition dec_to_In  (d pq m : R) (H:0 < pq) : 'I_pq := Ordinal (dec_smaller_n d pq m H).
+  Definition enc_to_In  (e pq m : R) (H:0 < pq) : 'I_pq := Ordinal (enc_smaller_n e pq m H).
+
+  Lemma O_lt_pq :
 
   Definition Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature :=
     fun (sk : chSecKey) (m : chMessage) => fto ( enc_to_In (snd (otf sk)) (fst (otf sk)) (otf m )).
@@ -337,7 +390,7 @@ Module RSA_SignatureAlgorithms
      [Check mem_domm.]
    *)
 
-
+  
   (**
      Note this: Our function is total but our fmap is actually not.
      It may return None. This situation is expressed in the function with the comparison
@@ -766,6 +819,7 @@ Module RSA_SignatureAlgorithms
      *)
 
 
+    Check modn_small.
     move: Heqm₀; rewrite -(@modn_small _ r x₁).
     Check rsa_correct''.
     Fail rewrite [X in X = _ -> _]rsa_correct''.
@@ -815,6 +869,10 @@ Module RSA_SignatureAlgorithms
       rewrite /r₀ in p'_lt q'_lt.
 
       rewrite plusE multE.
+
+      by apply ltn_R.
+
+      (*
       rewrite (addnC π1.n (muln _ _)).
       repeat rewrite -addSn.
       rewrite -[X in _ < _ + (_ + X)]addn3.
@@ -823,6 +881,7 @@ Module RSA_SignatureAlgorithms
       rewrite addn3.
       rewrite -mulSnr -mulSn -mulSn.
       by rewrite ltn_mul.
+       *)
     }.
 
     rewrite (eq_enc (cast (enum_val p)) (cast (enum_val q))).
@@ -841,4 +900,11 @@ Module RSA_SignatureAlgorithms
     Print P.
     Print prime_num.
     Print R₀.
+
+    rewrite /cast/mult_cast /=.
+    move: (let (x, _) := enum_val p in x) => p₀.
+    move: (let (x, _) := enum_val q in x) => q₀.
+    Check rsa_correct.
+    
+
 End RSA_SignatureAlgorithms.
