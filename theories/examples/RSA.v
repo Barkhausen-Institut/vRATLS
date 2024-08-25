@@ -45,6 +45,10 @@ Local Open Scope package_scope.
 
 Module Type RSA_params <: SignatureParams.
 
+  (* Message space *)
+  Variable w : nat.
+
+  (* Sampling space *)
   Variable n : nat.
 
   Definition pos_n : nat := 2^n.
@@ -75,14 +79,14 @@ Module Type RSA_params <: SignatureParams.
       0 < pq, p.-1 %| pq, q.-1 %| pq &
                             e * d == 1 %[mod pq]].
 
-  Definition Z_n_prod : finType := prod_finType R' R.
+  Definition Z_n_prod : finType := prod_finType R' R₀.
 
   Definition SecKey := Z_n_prod.
   Definition PubKey : finType := Z_n_prod.
   Definition Signature : finType := R.
-  Definition Message : finType := R.
+  Definition Message : finType := R. (* TODO should just be [nat] *)
   Definition Challenge : finType := R.
-  Definition Sample_space : finType := R.
+  Definition Sample_space : finType := R₀.
 
 End RSA_params.
 
@@ -220,15 +224,12 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     rewrite -H. reflexivity.
   Qed.
 
-  Lemma two_smaller_three : 2 < r₀.
+  Lemma two_ltn_r₀ : 2 < r₀.
   Proof.
-    rewrite /r.
-    destruct π1.n.
-    - reflexivity.
-    - reflexivity.
+    by rewrite /r₀; case: π1.n.
   Qed.
 
-  Definition two : R₀ := Ordinal two_smaller_three.
+  Definition two : R₀ := Ordinal two_ltn_r₀.
 
   Definition p0 : prime_num := exist _ two (prime2 two eq_refl).
 
@@ -281,17 +282,21 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     - exact: prime_gt0 bp.
   Qed.
 
+  Lemma fold_R : (π1.n + (π1.n + (π1.n + π1.n * π1.n.+3).+3).+3).+3 = (π1.n.+3 * π1.n.+3)%nat.
+  Proof.
+    rewrite (addnC π1.n (muln _ _)).
+    repeat rewrite -addSn.
+    rewrite -[X in (_ + (_ + X))%nat = _]addn3.
+    rewrite -/Nat.add plusE.
+    rewrite -[X in (_ + (_ + X))%nat = _]addnA.
+    rewrite addn3.
+    by rewrite -mulSnr -mulSn -mulSn.
+  Qed.
+
   Lemma ltn_R : forall (a b: R₀), a * b < (π1.n + (π1.n + (π1.n + π1.n * π1.n.+3).+3).+3).+3.
   Proof.
     rewrite /R₀/r₀ => a b.
-    rewrite (addnC π1.n (muln _ _)).
-    repeat rewrite -addSn.
-    rewrite -[X in _ < _ + (_ + X)]addn3.
-    rewrite -/Nat.add plusE.
-    rewrite -[X in _ < _ + (_ + X)]addnA.
-    rewrite addn3.
-    rewrite -mulSnr -mulSn -mulSn.
-    by rewrite ltn_mul.
+    by rewrite fold_R ltn_mul.
   Qed.
 
   Lemma yyy' {a b:R₀} (ap: prime a) (bp: prime b) :
@@ -305,16 +310,35 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     - by apply ltn_R.
   Qed.
 
+  Lemma yyy'' {a b:R₀} (ap: prime a) (bp: prime b) :
+    0 < ((widen_ord n_leq_nn a) * (widen_ord n_leq_nn b))%nat.
+  Proof.
+    rewrite /widen_ord /=.
+    by apply yyy.
+  Qed.
 
   Definition mult_cast (a b : prime_num) : R' :=
     match a,b with
     | exist a' ap , exist b' bp =>
         exist _
-          ((widen_ord n_leq_nn a') * (widen_ord n_leq_nn b'))%R
+          ((widen_ord n_leq_nn a') * (widen_ord n_leq_nn b'))%R (* <-- This [R] is not our [R] but means the Ring. *)
           (yyy' ap bp)
     end.
 
-  Locate sk_loc.
+  Lemma zzz {a b:R₀} : (a * b)%nat < r.
+  Proof.
+    move: a b; rewrite /R₀/r.
+    case => [a a_ltn]; case => [b b_ltn].
+    apply ltn_mul; try apply ltn_ord.
+  Qed.
+
+  Definition mult_cast_nat (a b : prime_num) : R' :=
+    match a,b with
+    | exist a' ap , exist b' bp =>
+        exist _
+          (Ordinal zzz)
+          (yyy'' ap bp)
+    end.
 
   Equations KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
@@ -333,7 +357,7 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       let e := enum_val e in
       let d := enum_val d in
       (* assert ed = 1 (mod Phi(n)) *)
-      let n := mult_cast p q in
+      let n := mult_cast_nat p q in
       #put sk_loc := (fto (n,e)) ;;
       #put pk_loc := (fto (n,d)) ;;
       ret ( (fto (n,e)) , fto (n,d) )
@@ -352,29 +376,50 @@ Module RSA_SignatureAlgorithms
   Import KGC KGC.KGP KGC.KG KGC.
 
 
-  Lemma dec_smaller_n (d pq m : R) (H: 0 < pq) : (decrypt'' d pq m) < pq.
+  Lemma dec_smaller_n (d s pq : R) (H: 0 < pq) : (decrypt'' d pq s) < pq.
   Proof.
     by rewrite /decrypt''; apply ltn_pmod.
   Qed.
 
-  Lemma enc_smaller_n (e pq m : R) (H: 0 < pq) : (encrypt'' e pq m) < pq.
+  Lemma enc_smaller_n (e m pq : R) (H: 0 < pq) : (encrypt'' e pq m) < pq.
   Proof.
     by rewrite /encrypt''; apply ltn_pmod.
   Qed.
 
+  Definition dec_to_In  (d s pq : R) (H: 0 < pq) : 'I_pq :=
+    Ordinal (dec_smaller_n d s pq H).
+  Definition enc_to_In  (e m pq : R) (H: 0 < pq) : 'I_pq :=
+    Ordinal (enc_smaller_n e m pq H).
 
-  Definition dec_to_In  (d pq m : R) (H:0 < pq) : 'I_pq := Ordinal (dec_smaller_n d pq m H).
-  Definition enc_to_In  (e pq m : R) (H:0 < pq) : 'I_pq := Ordinal (enc_smaller_n e pq m H).
+  Lemma pq_leq_r:
+    forall (pq:fintype_ordinal__canonical__fintype_Finite r), pq <= r.
+  Proof.
+    case => pq pq_ltn_r /=.
+    exact: (ltnW pq_ltn_r).
+  Qed.
 
-  Lemma O_lt_pq :
+  Equations Sign (sk : chSecKey) (m : chMessage) : chSignature :=
+    Sign sk m :=
+      match otf sk with
+      | (exist pq O_ltn_pq, sk') =>
+          (* This may seem unnecessary because we are casting
+             from [R] to ['I_pq] and back to [R'].
+             It is important for the proof part though.
+           *)
+          fto (widen_ord
+                 (pq_leq_r pq)
+                 (enc_to_In (widen_ord n_leq_nn sk') (otf m) pq O_ltn_pq))
+      end.
 
-  Definition Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature :=
-    fun (sk : chSecKey) (m : chMessage) => fto ( enc_to_In (snd (otf sk)) (fst (otf sk)) (otf m )).
-
-  Definition Ver_sig : ∀ (pk :  chPubKey) (sig : chSignature) (m : chMessage), 'bool :=
-    fun (pk :  chPubKey) (sig : chSignature) (m : chMessage)
-       => ( dec_to_In (snd(otf pk)) (fst (otf pk)) (otf sig )) == (otf m).
-
+  Equations Ver_sig (pk :  chPubKey) (sig : chSignature) (m : chMessage) : 'bool :=
+    Ver_sig pk sig m :=
+      match otf pk with
+      | (exist pq O_ltn_pq, pk') =>
+          (widen_ord
+             (pq_leq_r pq)
+             (dec_to_In (widen_ord n_leq_nn pk') (otf sig) pq O_ltn_pq))
+          == (otf m)
+      end.
 
   (* Playground begin *)
 
@@ -756,10 +801,69 @@ Module RSA_SignatureAlgorithms
     Ver_sig pk (Sign sk msg) msg == true.
   Proof.
     rewrite /Run/Run_aux /=.
+
+    (* SSReflect style generalization: *)
+    move: (pkg_interpreter.sampler_obligation_4 seed {| pos := P; cond_pos := pos_i_P |}) => p.
+    move: (pkg_interpreter.sampler_obligation_4 (seed + 1) {| pos := P; cond_pos := pos_i_P |}) => q.
+    move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => sk₁.
+    move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => pk₁.
+
     case => pk_eq sk_eq. (* injectivity *)
 
-    rewrite /Ver_sig/Sign/dec_to_In/enc_to_In.
-    rewrite !otf_fto. simpl.
+    rewrite /Ver_sig/Sign/dec_to_In/enc_to_In /=.
+    rewrite sk_eq pk_eq /=.
+    rewrite !otf_fto /=.
+
+    case H: (mult_cast_nat (enum_val p) (enum_val q)) => [pq pq_gt_O] /=.
+    rewrite /widen_ord /=.
+    rewrite !otf_fto /=.
+
+    apply/eqP/eqP.
+    (* TODO this step is a bit strange. investigate. *)
+    case H₁: (Ordinal (n:=r) (m:=_) _) => [m i].
+    case: H₁.
+
+    move: H; rewrite /mult_cast_nat -/Nat.add -/Nat.mul /widen_ord.
+    case: (enum_val p); case => [p' p'_ltn_r₀ p'_prime].
+    case: (enum_val q); case => [q' q'_ltn_r₀ q'_prime].
+    case.
+
+    case H₂: (Ordinal (n:=r) (m:=p') _) => [p'' p''_ltn_r].
+    case: H₂ => p'_eq_p''.
+    case H₂: (Ordinal (n:=r) (m:=q') _) => [q'' q''_ltn_r].
+    case: H₂ => q'_eq_q''.
+
+    case XX: (Ordinal (n:=r) (m:=p'*q') _) => [p_mul_q pr].
+    case: XX. move/esym => [p_mul_q_eq].
+    move/esym => pq_spec.
+
+    rewrite -[X in X = _ -> _](@modn_small _ pq).
+    - rewrite -[X in _ = X -> _](@modn_small _ pq).
+      + rewrite pq_spec.
+        rewrite (rsa_correct'' p_mul_q_eq) /=.
+        * move => msg_eq. subst.
+          repeat rewrite modn_small in msg_eq.
+          ** subst.
+             Search nat_of_ord.
+             Check (otf msg).
+             move H: (Ordinal (n:=r) (m:=otf msg) _) => [a b].
+             rewrite -ord_inj.
+
+
+             rewrite /mult_cast /=.
+    rewrite -/Nat.add -/N => [a b]at.mul.
+
+    clear pk_eq sk_eq.
+
+    case: enum_val p => p p_prime q'.
+    case: enum_val q'.
+    1: exact: q.
+    move => q' q'_prime q''.
+
+
+    case: enum_val q''.
+
+
     apply/eqP/eqP.
 
     case H: (Ordinal (n:=r)
@@ -841,12 +945,6 @@ Module RSA_SignatureAlgorithms
 
     rewrite sk_eq pk_eq /=.
     rewrite !otf_fto.
-
-    (* SSReflect style generalization: *)
-    move: (pkg_interpreter.sampler_obligation_4 seed {| pos := P; cond_pos := pos_i_P |}) => p.
-    move: (pkg_interpreter.sampler_obligation_4 (seed + 1) {| pos := P; cond_pos := pos_i_P |}) => q.
-    move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => sk₁.
-    move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => pk₁.
 
     Check rsa_correct''.
     Fail rewrite [X in X = _ -> _]rsa_correct''.
