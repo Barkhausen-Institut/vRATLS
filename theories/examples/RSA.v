@@ -53,7 +53,7 @@ Module Type RSA_params <: SignatureParams.
 
   Definition pos_n : nat := 2^n.
 
-  Definition r₀ : nat := n.+3.
+  Definition r₀ : nat := n.+4. (* We need to have at least two primes [p] and [q]. *)
   Definition R₀ : Type := 'I_r₀.
   Definition r : nat := r₀ * r₀.
   Definition R : Type := 'I_r.
@@ -71,6 +71,40 @@ Module Type RSA_params <: SignatureParams.
     rewrite eqtype.eq_sym.
     apply proper_neq.
     exact H.
+  Qed.
+
+  Lemma two_ltn_r₀ : 2 < r₀.
+  Proof. by rewrite /r₀; case: n. Qed.
+
+  Definition two : R₀ := Ordinal two_ltn_r₀.
+  Lemma prime2ord : prime two. Proof. by []. Qed.
+  Definition two' : prime_num := exist _ two prime2ord.
+
+  Lemma three_ltn_r₀ : 3 < r₀.
+  Proof. by rewrite /r₀; case: n. Qed.
+
+  Definition three : R₀ := Ordinal three_ltn_r₀.
+  Lemma prime3ord : prime three. Proof. by []. Qed.
+  Definition three' : prime_num := exist _ three prime3ord.
+
+  Definition i_P := #|P|.
+  Instance pos_i_P : Positive i_P.
+  Proof.
+    apply /card_gt0P. by exists two'.
+  Qed.
+
+  #[export]Instance positive_P' `(p:prime_num) : Positive #|(P' p)|.
+  Proof.
+    apply/card_gt0P.
+    case H: (p == two'); move/eqP: H.
+    - move => H; rewrite H; exists three'.
+      rewrite /P' in_setD1 //=.
+      apply in_setT.
+    - move => H; exists two'.
+      rewrite /P' in_setD1 //=.
+      apply/andP; split.
+      + by apply/eqP/nesym.
+      + apply in_setT.
   Qed.
 
   Definition R' : finType := {x:R | 0 < x}.
@@ -219,25 +253,6 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
   Import PackageNotation.
   Local Open Scope package_scope.
 
-  Lemma prime2 (num : R₀) (H: 2 = num) : prime num.
-  Proof.
-    rewrite -H. reflexivity.
-  Qed.
-
-  Lemma two_ltn_r₀ : 2 < r₀.
-  Proof.
-    by rewrite /r₀; case: π1.n.
-  Qed.
-
-  Definition two : R₀ := Ordinal two_ltn_r₀.
-
-  Definition p0 : prime_num := exist _ two (prime2 two eq_refl).
-
-  Definition i_P := #|P|.
-  Instance pos_i_P : Positive i_P.
-  Proof.
-   apply /card_gt0P. exists p0. auto.
-  Qed.
 
   Fail Definition cast (p : Arit (uniform i_P) ) :=
     otf p.
@@ -282,15 +297,16 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     - exact: prime_gt0 bp.
   Qed.
 
-  Lemma fold_R : (π1.n + (π1.n + (π1.n + π1.n * π1.n.+3).+3).+3).+3 = (π1.n.+3 * π1.n.+3)%nat.
+  (* FIXME *)
+  Lemma fold_R : (π1.n + (π1.n + (π1.n + (π1.n + π1.n * π1.n.+4).+4).+4).+4).+4 = (π1.n.+4 * π1.n.+4)%nat.
   Proof.
     rewrite (addnC π1.n (muln _ _)).
     repeat rewrite -addSn.
-    rewrite -[X in (_ + (_ + X))%nat = _]addn3.
+    rewrite -[X in (_ + (_ + X))%nat = _]addn4.
     rewrite -/Nat.add plusE.
     rewrite -[X in (_ + (_ + X))%nat = _]addnA.
-    rewrite addn3.
-    by rewrite -mulSnr -mulSn -mulSn.
+    rewrite addn4.
+    rewrite -mulSnr. -mulSn -mulSn.
   Qed.
 
   Lemma ltn_R : forall (a b: R₀), a * b < (π1.n + (π1.n + (π1.n + π1.n * π1.n.+3).+3).+3).+3.
@@ -298,6 +314,7 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     rewrite /R₀/r₀ => a b.
     by rewrite fold_R ltn_mul.
   Qed.
+*)
 
   Lemma yyy' {a b:R₀} (ap: prime a) (bp: prime b) :
     0 < ((widen_ord n_leq_nn a) * (widen_ord n_leq_nn b))%R.
@@ -340,17 +357,15 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
           (yyy'' ap bp)
     end.
 
-  Equations KeyGen :
+  Equations? KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
     KeyGen :=
     {code
       p ← sample uniform P ;;
       let p := enum_val p in
-      q ← sample uniform P ;;
+      q ← sample uniform (P' p) ;;
       let q := enum_val q in
       (* #assert (p != q) ;; *)
-      (*let p := cast p in
-      let q := cast q in *)
 
       e ← sample uniform i_ss ;;
       d ← sample uniform i_ss ;;
