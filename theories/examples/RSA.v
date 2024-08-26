@@ -842,15 +842,27 @@ Module RSA_SignatureAlgorithms
       + rewrite pq_spec.
         rewrite (rsa_correct'' p_mul_q_eq) /=.
         * move => msg_eq. subst.
+          (*
+            Once more this raises an interesting point:
+            I cannot prove the below, i.e., [otf < p'' * q''].
+            The theorem here actually only talks about [msg].
+            But the correctness theorem of RSA talks about
+            [msg %% p'' * q'']!
+            So it seems that we are actually trying to show
+            something more general at this point.
+            That is, the correctness statement for signatures
+            is incompatible with the correctness statement for
+            RSA!
+           *)
           repeat rewrite modn_small in msg_eq.
-          ** subst.
-             Search nat_of_ord.
-             Check (otf msg).
-             move H: (Ordinal (n:=r) (m:=otf msg) _) => [a b].
-             rewrite -ord_inj.
+          ** subst. (* TODO Why does [subst] succeed and [rewrite] fail? *)
+             (* I need to add [nat_of_ord] on both sides before
+                [reflexivity] works.
+              *)
+             by apply ord_inj.
+          **
 
 
-             rewrite /mult_cast /=.
     rewrite -/Nat.add -/N => [a b]at.mul.
 
     clear pk_eq sk_eq.
