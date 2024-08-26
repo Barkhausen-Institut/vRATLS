@@ -386,6 +386,10 @@ Module RSA_SignatureAlgorithms
     by rewrite /encrypt''; apply ltn_pmod.
   Qed.
 
+  (*
+  Lemma dec_enc_ltn_pq: decrypt'' d pq (encrypt'' e pq (otf msg)) < pq
+   *)
+
   Definition dec_to_In  (d s pq : R) (H: 0 < pq) : 'I_pq :=
     Ordinal (dec_smaller_n d s pq H).
   Definition enc_to_In  (e m pq : R) (H: 0 < pq) : 'I_pq :=
@@ -860,161 +864,28 @@ Module RSA_SignatureAlgorithms
                 [reflexivity] works.
               *)
              by apply ord_inj.
-          **
+          ** admit. (* FIXME Cannot prove this: [m       < p'' * q''] *)
+          ** admit. (* FIXME Cannot prove this: [otf msg < p'' * q''] *)
+        * rewrite /wf_type.
+          apply/andP; split; try exact: p'_prime.
+          apply/andP; split; try exact: q'_prime.
+          apply/andP; split; [admit|]. (* TODO Missing pre-condition. *)
+          apply/andP; split; [rewrite pq_spec in pq_gt_O; exact: pq_gt_O|].
+          apply/andP; split.
+          1:{ rewrite p_mul_q_eq; apply dvdn_mulr.
+              rewrite /dvdn.
+              apply/eqP.
+              admit. (* FIXME Missing pre-condition. *)
+          }
+          apply/andP; split.
+          ** admit. (* FIXME Missing pre-condition. *)
+          ** admit. (* FIXME Missing pre-condition. *)
+      + admit. (* FIXME Cannot prove this: [m < pq] *)
+    - by rewrite /decrypt''; apply ltn_pmod.
 
-
-    rewrite -/Nat.add -/N => [a b]at.mul.
-
-    clear pk_eq sk_eq.
-
-    case: enum_val p => p p_prime q'.
-    case: enum_val q'.
-    1: exact: q.
-    move => q' q'_prime q''.
-
-
-    case: enum_val q''.
-
-
-    apply/eqP/eqP.
-
-    case H: (Ordinal (n:=r)
-             (m:=decrypt'' (otf pk).2 (otf pk).1
-                   (encrypt'' (otf sk).2
-                      (otf sk).1 (otf msg)))
-             (dec_smaller_n (otf pk).2 (otf pk).1
-                (Ordinal (n:=r)
-                   (m:=encrypt'' (otf sk).2 (otf sk).1 (otf msg))
-                   (enc_smaller_n (otf sk).2
-                      (otf sk).1 (otf msg)))) ) => [m i].
-
-    case H₁ : (Ordinal (n:=r) (m:=encrypt'' (otf sk).2 (otf sk).1 (otf msg))
-                 (enc_smaller_n (otf sk).2 (otf sk).1 (otf msg))) => [m₀ i₀].
-    move Heqm₂: (encrypt'' (otf sk).2 (otf sk).1 (otf msg)) => x₂.
-    move Heqm₃: (enc_smaller_n (otf sk).2 (otf sk).1 (otf msg)) => x₃.
-
-    move Heqm₀: (decrypt'' (otf pk).2 (otf pk).1
-                     (encrypt'' (otf sk).2
-                        (otf sk).1 (otf msg))) => x₀.
-(*
-    rewrite rsa_correct'' in Heqm₀.
-    Check dec_smaller_n.
-    move Heqm₁: (dec_smaller_n (otf pk).1 (otf pk).2
-                   x₂) => x₁.
-    (* Why does the message need to be in [R] instead of [nat]? *)
-*)
-    move Heqm₁: (dec_smaller_n (otf pk).2 (otf pk).1
-                   (Ordinal (n:=r) (m:=encrypt'' (otf sk).2 (otf sk).1 (otf msg))
-                      (enc_smaller_n (otf sk).2 (otf sk).1 (otf msg)))) => x₁.
-
-    Check Ordinal.
-    (* rewrite rsa_correct'' in Heqm₀. *)
-    Fail have xxx : forall a b c, Ordinal (n:=a) (m:=b) c = b %% a.
-    (* have xxx1 : forall a b c, nat_of_ord (Ordinal (n:=a) (m:=b) c) = b %% a. *)
-    Check modn_small.
-    (*
-      May be generalize in x1 and then have a more general lemma that show that the output of
-      [decrypt''] is always smaller than ...
-
-      Or maybe just unfold [encrypt''] and [decrypt''].
-     *)
-
-    (*
-    move: Heqm₀.
-    rewrite -(@modn_small _ (n * n).+3 x₃).
-    Fail rewrite -(@modn_small _ (n * n).+3 x₁).
-     *)
-
-    Check enc_smaller_n.
-    Check decrypt''.
-    simpl in x₁.
-    (* Of course I can just simplify away the ordinal
-       because [decrypt''] only requires a [nat]!
-       So this is nothing but the coercion function that unfolds to
-       taking the [m] out of the ordinal!
-     *)
-
-
-    Check modn_small.
-    move: Heqm₀; rewrite -(@modn_small _ r x₁).
-    Check rsa_correct''.
-    Fail rewrite [X in X = _ -> _]rsa_correct''.
-    (* This rewrite now fails because [rsa_correct''] requires that
-       [(otf pk).2 = (off sk).2].
-
-       Indeed [(pk,sk) = KeyGen] is a necessary precondition.
-       Because otherwise [(pk₁,sk₁) = KeyGen] and [(pk₂,sk₂) = KeyGen],
-       such that we could be talking about [pk₁] and [sk₂] or
-       [pk₂] and [sk₁].
-       Clearly [decrypt sk₁ (encrypt pk₂ m) != m].
-
-       The "Joy of Crypto" book is also vague about this aspect.
-       See construction 13.7.
-
-       The "Seems Legit" paper (https://eprint.iacr.org/2019/779.pdf)
-       has this right. See the very first property stated in Section 4.1.
-     *)
-
-    rewrite sk_eq pk_eq /=.
-    rewrite !otf_fto.
-
-    Check rsa_correct''.
-    Fail rewrite [X in X = _ -> _]rsa_correct''.
-    rewrite (eq_dec (cast (enum_val p)) (cast (enum_val q))).
-    2: {
-      (*
-         We need to establish a connection between [P]
-         and [n] such that we can say that the multiplication
-         never overflows.
-       *)
-      move: p q. rewrite /P/prime_num => p q.
-      move: (cast (enum_val p)) => p'.
-      move: (cast (enum_val q)) => q'.
-      case: p' => p' p'_lt.
-      case: q' => q' q'_lt.
-      simpl.
-      rewrite /r₀ /=.
-      rewrite modn_small //=.
-      rewrite -/Nat.add -/Nat.mul.
-      rewrite /r₀ in p'_lt q'_lt.
-
-      rewrite plusE multE.
-
-      by apply ltn_R.
-
-      (*
-      rewrite (addnC π1.n (muln _ _)).
-      repeat rewrite -addSn.
-      rewrite -[X in _ < _ + (_ + X)]addn3.
-      rewrite -/Nat.add plusE.
-      rewrite -[X in _ < _ + (_ + X)]addnA.
-      rewrite addn3.
-      rewrite -mulSnr -mulSn -mulSn.
-      by rewrite ltn_mul.
-       *)
-    }.
-
-    rewrite (eq_enc (cast (enum_val p)) (cast (enum_val q))).
-
-    2: {
-      (* similar to the proof above. *)
-      admit.
-    }
-
-    rewrite /r.
-    Check rsa_correct'.
-    Fail rewrite rsa_correct'.
-    (* This fails now because [%% (r₀ * r₀)]
-       is not the same as [%% (p * q)]
-     *)
-    Print P.
-    Print prime_num.
-    Print R₀.
-
-    rewrite /cast/mult_cast /=.
-    move: (let (x, _) := enum_val p in x) => p₀.
-    move: (let (x, _) := enum_val q in x) => q₀.
-    Check rsa_correct.
-    
+    Unshelve.
+      1: apply (leq_trans p'_ltn_r₀ n_leq_nn).
+      apply (leq_trans q'_ltn_r₀ n_leq_nn).
+  Admitted.
 
 End RSA_SignatureAlgorithms.
