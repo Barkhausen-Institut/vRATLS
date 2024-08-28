@@ -64,7 +64,7 @@ Module Type RSA_params <: SignatureParams.
 
   Definition P' (y : prime_num) := (P :\ y)%SET.
 
-  Lemma p_q_ineq : forall y, y \in P -> P :!=: P' y.
+  Lemma P_P'_neq : forall y, y \in P -> P :!=: P' y.
   Proof.
     unfold P'. intros.
     apply properD1 in H.
@@ -72,6 +72,13 @@ Module Type RSA_params <: SignatureParams.
     apply proper_neq.
     exact H.
   Qed.
+
+  Lemma p_q_neq p q (p_in_P: p \in P) : q \in P' p -> p <> q.
+  Proof.
+    by rewrite /P' in_setD1; move/andP; case; move/eqP/nesym.
+  Qed.
+
+  Fail Lemma p_q_neq' (p: 'fin P) (q: 'fin (P' (enum_val p))) : enum_val p <> enum_val q.
 
   Lemma two_ltn_r₀ : 2 < r₀.
   Proof. by rewrite /r₀; case: n. Qed.
@@ -93,7 +100,7 @@ Module Type RSA_params <: SignatureParams.
     apply /card_gt0P. by exists two'.
   Qed.
 
-  #[export]Instance positive_P' `(p:prime_num) : Positive #|(P' p)|.
+  #[export] Instance positive_P' `(p:prime_num) : Positive #|(P' p)|.
   Proof.
     apply/card_gt0P.
     case H: (p == two'); move/eqP: H.
@@ -262,21 +269,6 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     | exist x _ => x
     end.
 
-  (* TODO make this work *)
-  Fail Equations? KeyGen:
-    code Key_locs [interface] chChallenge :=
-    KeyGen :=
-    {code
-      p ← sample uniform P ;;
-      let p' := enum_val p in
-      q ← sample uniform (P' p') ;;
-      let q' := enum_val q in
-      let p2 := cast p' in
-      let q2 := cast q' in
-      let sk := fto (p2 * q2)%g in
-      ret sk
-    }.
-
   Lemma n_leq_nn : r₀ <= r.
   Proof.
     rewrite /r/r₀ -addn1.
@@ -297,24 +289,35 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     - exact: prime_gt0 bp.
   Qed.
 
-  (* FIXME *)
-  Lemma fold_R : (π1.n + (π1.n + (π1.n + (π1.n + π1.n * π1.n.+4).+4).+4).+4).+4 = (π1.n.+4 * π1.n.+4)%nat.
+  Lemma fold_R3 : (π1.n + (π1.n + (π1.n + π1.n * π1.n.+3).+3).+3).+3 = (π1.n.+3 * π1.n.+3)%nat.
   Proof.
     rewrite (addnC π1.n (muln _ _)).
     repeat rewrite -addSn.
-    rewrite -[X in (_ + (_ + X))%nat = _]addn4.
+    rewrite -[X in (_ + (_ + X))%nat = _]addn3.
     rewrite -/Nat.add plusE.
     rewrite -[X in (_ + (_ + X))%nat = _]addnA.
-    rewrite addn4.
-    rewrite -mulSnr. -mulSn -mulSn.
+    rewrite addn3.
+    by rewrite -mulSnr -mulSn -mulSn.
   Qed.
 
-  Lemma ltn_R : forall (a b: R₀), a * b < (π1.n + (π1.n + (π1.n + π1.n * π1.n.+3).+3).+3).+3.
+
+  Lemma fold_R4 : (π1.n + (π1.n + (π1.n + (π1.n + π1.n * π1.n.+4).+4).+4).+4).+4 = (π1.n.+4 * π1.n.+4)%nat.
+  Proof.
+    rewrite (addnC π1.n (muln _ _)).
+    repeat rewrite -addSn.
+    rewrite -[X in (_ + (_ + (_ + X)))%nat = _]addn4.
+    rewrite -/Nat.add plusE.
+    rewrite -[X in (_ + (_ + (_ + X)))%nat = _]addnA.
+    rewrite addn4.
+    by rewrite -mulSnr -mulSn -mulSn -mulSn.
+  Qed.
+
+  Lemma ltn_R : forall (a b: R₀), a * b < (π1.n + (π1.n + (π1.n + (π1.n + π1.n * π1.n.+4).+4).+4).+4).+4.
   Proof.
     rewrite /R₀/r₀ => a b.
-    by rewrite fold_R ltn_mul.
+    by rewrite fold_R4 ltn_mul.
   Qed.
-*)
+
 
   Lemma yyy' {a b:R₀} (ap: prime a) (bp: prime b) :
     0 < ((widen_ord n_leq_nn a) * (widen_ord n_leq_nn b))%R.
@@ -357,7 +360,7 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
           (yyy'' ap bp)
     end.
 
-  Equations? KeyGen :
+  Equations KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
     KeyGen :=
     {code
@@ -400,10 +403,6 @@ Module RSA_SignatureAlgorithms
   Proof.
     by rewrite /encrypt''; apply ltn_pmod.
   Qed.
-
-  (*
-  Lemma dec_enc_ltn_pq: decrypt'' d pq (encrypt'' e pq (otf msg)) < pq
-   *)
 
   Definition dec_to_In  (d s pq : R) (H: 0 < pq) : 'I_pq :=
     Ordinal (dec_smaller_n d s pq H).
