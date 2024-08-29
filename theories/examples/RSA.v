@@ -114,13 +114,9 @@ Module Type RSA_params <: SignatureParams.
 
   Lemma p_q_neq' (p: 'fin P) (q: 'fin (P' (enum_val p))) : enum_val p != enum_val q.
   Proof.
-    Search enum_val.
     apply/eqP.
-    case.
-    case: (enum_val q) => [p' p_prime].
-    case: (enum_val p) => [q' q_prime].
-    move => H.
-    injection H.
+    apply p_q_neq; try apply/enum_valP.
+  Qed.
 
   Definition R' : finType := {x:R | 0 < x}.
 
@@ -832,8 +828,8 @@ Module RSA_SignatureAlgorithms
     move: (pkg_interpreter.sampler_obligation_4 seed {| pos := P; cond_pos := pos_i_P |}) => p.
     move: (pkg_interpreter.sampler_obligation_4 (seed + 1) {| pos := P' (enum_val p); cond_pos := _ |}) => q.
 
-    have xxx: (enum_val p != enum_val q). { admit. }
     rewrite /assert.
+    have p_q_neq'' : enum_val p != enum_val q. 1: { by apply p_q_neq'. }.
     rewrite ifT //=.
 
     move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => sk₁.
@@ -855,13 +851,7 @@ Module RSA_SignatureAlgorithms
     case: H₁.
 
     move: H; rewrite /mult_cast_nat -/Nat.add -/Nat.mul /widen_ord.
-
-    (* case: (enum_val q). case => [q' q'_ltn_r₀ q'_prime]. *)
-    (* case Hq₀: q => [q'₀ q'_ltn_r₀]. rewrite -Hq₀. *)
     case Hq: (enum_val q) => [q' q'_prime].
-
-    (* case Hp: (enum_val p); case => [p' p'_ltn_r₀ p'_prime]. *)
-    (* case Hp₀: p => [p'₀ p'_ltn_r₀]. rewrite -Hp₀. *)
     case Hp: (enum_val p) => [p' p'_prime].
 
     case.
@@ -903,7 +893,7 @@ Module RSA_SignatureAlgorithms
         * rewrite /wf_type.
           apply/andP; split; try exact: p'_prime.
           apply/andP; split; try exact: q'_prime.
-          apply/andP; split; [move: xxx; rewrite Hq Hp |].
+          apply/andP; split; [ by move: p_q_neq''; rewrite Hq Hp |].
           apply/andP; split; [rewrite pq_spec in pq_gt_O; exact: pq_gt_O|].
           apply/andP; split.
           1:{ rewrite p_mul_q_eq; apply dvdn_mulr.
@@ -918,8 +908,8 @@ Module RSA_SignatureAlgorithms
     - by rewrite /decrypt''; apply ltn_pmod.
 
     Unshelve.
-      1: apply (leq_trans p'_ltn_r₀ n_leq_nn).
-      apply (leq_trans q'_ltn_r₀ n_leq_nn).
+      1: { clear p'_prime Hp; case: p' => [p' p'_ltn_r₀]; apply (leq_trans p'_ltn_r₀ n_leq_nn). }
+      clear q'_prime Hq; case: q' => [q' q'_ltn_r₀]; apply (leq_trans q'_ltn_r₀ n_leq_nn).
   Admitted.
 
 End RSA_SignatureAlgorithms.
