@@ -120,9 +120,9 @@ Module Type RSA_params <: SignatureParams.
 
   Definition R' : finType := {x:R | 0 < x}.
 
-  Definition wf_type p q pq e d := [&& prime p, prime q, p != q,
-      0 < pq, p.-1 %| pq, q.-1 %| pq &
-                            e * d == 1 %[mod pq]].
+  Definition wf_type p q phi_N e d := [&& prime p, prime q, p != q,
+      0 < phi_N, p.-1 %| phi_N, q.-1 %| phi_N &
+                            e * d == 1 %[mod phi_N]].
 
   Definition Z_n_prod : finType := prod_finType R' R₀.
 
@@ -184,15 +184,19 @@ Module RSA_KeyGen (π1  : RSA_params)
      by rewrite /encrypt''/encrypt' H.
    Qed.
 
-   Theorem rsa_correct'' {p q pq d e : nat} (H: pq = (p * q)%nat) (wf : wf_type p q pq d e) w :
+   Theorem rsa_correct'' {p q pq d e : nat} (H: pq = (p * q)%nat) (wf : wf_type p q (p.-1 * q.-1) d e) w :
     let r := Build_rsa wf in
     decrypt'' e pq (encrypt'' d pq w)  = w %[mod pq].
   Proof.
     rewrite (eq_dec p q _ _ _ H).
     rewrite (eq_enc p q _ _ _ H).
-    rewrite (enc_eq wf) (dec_eq wf) /=.
-    rewrite [X in _ %% X = _ %% X]H.
+    rewrite (enc_eq wf) (dec_eq wf) /=.    rewrite [X in _ %% X = _ %% X]H.
     apply rsa_correct.
+  Qed.
+
+  Lemma pq_phi_gt_0 : forall p q, prime p -> prime q -> 0 < p.-1 * q.-1.
+  Proof.
+    by case => [] // [] // p1; case => [] // [].
   Qed.
 
   Definition sk0 : SecKey := (exist _ 1%R (ltn0Sn 0), 1)%g.
@@ -894,16 +898,10 @@ Module RSA_SignatureAlgorithms
           apply/andP; split; try exact: p'_prime.
           apply/andP; split; try exact: q'_prime.
           apply/andP; split; [ by move: p_q_neq''; rewrite Hq Hp |].
-          apply/andP; split; [rewrite pq_spec in pq_gt_O; exact: pq_gt_O|].
-          apply/andP; split.
-          1:{ rewrite p_mul_q_eq; apply dvdn_mulr.
-              rewrite /dvdn.
-              apply/eqP.
-              admit. (* FIXME Missing pre-condition. *)
-          }
-          apply/andP; split.
-          ** admit. (* FIXME Missing pre-condition. *)
-          ** admit. (* FIXME Missing pre-condition. *)
+          apply/andP; split; [ by apply pq_phi_gt_0 |].
+          apply/andP; split; [ by apply dvdn_mulr |].
+          apply/andP; split; [ by apply dvdn_mull |].
+          admit. (* FIXME Missing pre-condition: e * d == 1 mod ... *)
       + admit. (* FIXME Cannot prove this: [m < pq] *)
     - by rewrite /decrypt''; apply ltn_pmod.
 
