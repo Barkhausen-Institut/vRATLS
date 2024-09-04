@@ -143,12 +143,7 @@ Module Type SignatureAlgorithms
 
   Parameter Ver_sig : ∀ (pk :  chPubKey) (sig : chSignature) (m : chMessage),
    'bool.
-(*
-  Parameter Signature_prop:
-    ∀ (l: {fmap (chSignature  * chMessage ) -> 'unit})
-      (s : chSignature) (pk : chPubKey) (m  : chMessage),
-      Ver_sig pk s m = ((s,m) \in domm l).
-*)
+
   (* Functional correctness property for signatures *)
   Parameter Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
 
@@ -277,6 +272,25 @@ Module Type SignaturePrimitives
       rewrite !fset_cons -fset0E.
       apply fsub0set.
   Qed.
+
+
+  (*
+    This axiom cannot be instantiated.
+    The problem is the missing link between [l] and the LHS of the
+    equality.
+    Even if [Ver_sig] is instantiated, this axiom remains unprovable.
+    See [RSA] for reference.
+
+    This is a key finding in our development:
+    The proof of existential unforgability can only be done on the
+    protocol itself but __not__ on the library level.
+    Please see [Sig_prot] for an axiom-free proof of existential
+    unforgability.
+   *)
+  Axiom Signature_prop:
+    ∀ (l: {fmap (chSignature  * chMessage ) -> 'unit})
+      (s : chSignature) (pk : chPubKey) (m  : chMessage),
+      Ver_sig pk s m = ((s,m) \in domm l).
 
   Lemma ext_unforge:
   Sig_real_c ≈₀ Sig_ideal_c.
