@@ -22,6 +22,11 @@ Require Import List.
 Set Equations With UIP.
 
 (*
+The paper:
+https://web.archive.org/web/20220121005133id_/https://eprint.iacr.org/2019/779.pdf
+*)
+
+(*
   This is needed to make definitions with Equations transparent.
   Otherwise they are opaque and code simplifications in the
   proofs with [ssprove_code_simpl] does not resolve properly.

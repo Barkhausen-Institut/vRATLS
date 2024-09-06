@@ -833,7 +833,7 @@ Module RSA_SignatureAlgorithms
     move: (pkg_interpreter.sampler_obligation_4 (seed + 1) {| pos := P' (enum_val p); cond_pos := _ |}) => q.
 
     rewrite /assert.
-    have p_q_neq'' : enum_val p != enum_val q. 1: { by apply p_q_neq'. }.
+    have p_q_neq'' : enum_val p != enum_val q. 1: { by apply p_q_neq'. }
     rewrite ifT //=.
 
     move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => sk₁.
