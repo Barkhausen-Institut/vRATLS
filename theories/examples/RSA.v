@@ -822,6 +822,12 @@ Module RSA_SignatureAlgorithms
      *)
   Abort.
 
+  (*Lemma rsa_mod_inv : forall (pk sk p' q' e d : nat), prime p' -> prime q' -> ().
+  Proof.
+    
+  Qed.*)
+  
+
   Theorem Signature_correct pk sk msg seed :
     Some (pk,sk) = Run sampler KeyGen seed ->
     Ver_sig pk (Sign sk msg) msg == true.
@@ -877,7 +883,7 @@ Module RSA_SignatureAlgorithms
           repeat rewrite modn_small in msg_eq.
           ** by apply ord_inj.
           ** exact: i.
-          ** by [].
+          ** by []. Print wf_type. 
         * rewrite /wf_type.
           apply/andP; split; try exact: p'_prime.
           apply/andP; split; try exact: q'_prime.
