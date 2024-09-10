@@ -133,6 +133,8 @@ Module Type RSA_params <: SignatureParams.
   Definition Challenge : finType := R.
   Definition Sample_space : finType := R₀.
 
+  Parameter padd : forall (pq:nat) (m:Message), 'I_pq.
+
 End RSA_params.
 
 Module RSA_KeyGen (π1  : RSA_params)
@@ -391,6 +393,7 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
 
 End RSA_KeyGen_code.
 
+
 Module RSA_SignatureAlgorithms
   (π1  : RSA_params)
   (π2 : KeyGenParams π1)
@@ -407,15 +410,15 @@ Module RSA_SignatureAlgorithms
     by rewrite /decrypt''; apply ltn_pmod.
   Qed.
 
-  Lemma enc_smaller_n (e m pq : R) (H: 0 < pq) : (encrypt'' e pq m) < pq.
+  Lemma enc_smaller_n (e pq : R) (m : 'I_pq) (H: 0 < pq) : (encrypt'' e pq m) < pq.
   Proof.
     by rewrite /encrypt''; apply ltn_pmod.
   Qed.
 
   Definition dec_to_In  (d s pq : R) (H: 0 < pq) : 'I_pq :=
     Ordinal (dec_smaller_n d s pq H).
-  Definition enc_to_In  (e m pq : R) (H: 0 < pq) : 'I_pq :=
-    Ordinal (enc_smaller_n e m pq H).
+  Definition enc_to_In  (e pq:R) (m:'I_pq) (H: 0 < pq) : 'I_pq :=
+    Ordinal (enc_smaller_n e pq m H).
 
   Lemma pq_leq_r:
     forall (pq:fintype_ordinal__canonical__fintype_Finite r), pq <= r.
@@ -434,17 +437,14 @@ Module RSA_SignatureAlgorithms
            *)
           fto (widen_ord
                  (pq_leq_r pq)
-                 (enc_to_In (widen_ord n_leq_nn sk') (otf m) pq O_ltn_pq))
+                 (enc_to_In (widen_ord n_leq_nn sk') pq (padd pq (otf m)) O_ltn_pq))
       end.
 
   Equations Ver_sig (pk :  chPubKey) (sig : chSignature) (m : chMessage) : 'bool :=
     Ver_sig pk sig m :=
       match otf pk with
       | (exist pq O_ltn_pq, pk') =>
-          (widen_ord
-             (pq_leq_r pq)
-             (dec_to_In (widen_ord n_leq_nn pk') (otf sig) pq O_ltn_pq))
-          == (otf m)
+          (dec_to_In (widen_ord n_leq_nn pk') (otf sig) pq O_ltn_pq) == padd pq (otf m)
       end.
 
   (* Playground begin *)
@@ -851,7 +851,7 @@ Module RSA_SignatureAlgorithms
 
     apply/eqP/eqP.
     (* TODO this step is a bit strange. investigate. *)
-    case H₁: (Ordinal (n:=r) (m:=_) _) => [m i].
+    case H₁: (Ordinal (n:=pq) (m:=_) _) => [m i].
     case: H₁.
 
     move: H; rewrite /mult_cast_nat -/Nat.add -/Nat.mul /widen_ord.
@@ -866,34 +866,18 @@ Module RSA_SignatureAlgorithms
     case: H₂ => q'_eq_q''.
 
     case XX: (Ordinal (n:=r) (m:=p'*q') _) => [p_mul_q pr].
-    case: XX. move/esym => [p_mul_q_eq].
+    case: XX. move/esym => p_mul_q_eq.
     move/esym => pq_spec.
 
     rewrite -[X in X = _ -> _](@modn_small _ pq).
     - rewrite -[X in _ = X -> _](@modn_small _ pq).
-      + rewrite pq_spec.
-        rewrite (rsa_correct'' p_mul_q_eq) /=.
+      + have eee : nat_of_ord pq = (p' * q')%N by subst.
+        rewrite (rsa_correct'' eee) /=.
         * move => msg_eq. subst.
-          (*
-            Once more this raises an interesting point:
-            I cannot prove the below, i.e., [otf < p'' * q''].
-            The theorem here actually only talks about [msg].
-            But the correctness theorem of RSA talks about
-            [msg %% p'' * q'']!
-            So it seems that we are actually trying to show
-            something more general at this point.
-            That is, the correctness statement for signatures
-            is incompatible with the correctness statement for
-            RSA!
-           *)
           repeat rewrite modn_small in msg_eq.
-          ** subst. (* TODO Why does [subst] succeed and [rewrite] fail? *)
-             (* I need to add [nat_of_ord] on both sides before
-                [reflexivity] works.
-              *)
-             by apply ord_inj.
-          ** admit. (* FIXME Cannot prove this: [m       < p'' * q''] *)
-          ** admit. (* FIXME Cannot prove this: [otf msg < p'' * q''] *)
+          ** by apply ord_inj.
+          ** exact: i.
+          ** by [].
         * rewrite /wf_type.
           apply/andP; split; try exact: p'_prime.
           apply/andP; split; try exact: q'_prime.
@@ -902,7 +886,7 @@ Module RSA_SignatureAlgorithms
           apply/andP; split; [ by apply dvdn_mulr |].
           apply/andP; split; [ by apply dvdn_mull |].
           admit. (* FIXME Missing pre-condition: e * d == 1 mod ... *)
-      + admit. (* FIXME Cannot prove this: [m < pq] *)
+      + by [].
     - by rewrite /decrypt''; apply ltn_pmod.
 
     Unshelve.
