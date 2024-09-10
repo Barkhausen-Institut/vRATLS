@@ -1,5 +1,8 @@
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
+Require Import Coq.ZArith.ZArith.
+
+
 Set Warnings "-notation-overridden,-ambiguous-paths".
 
 From mathcomp Require Import all_ssreflect all_algebra reals distr realsum
@@ -822,14 +825,19 @@ Module RSA_SignatureAlgorithms
      *)
   Abort.
 
-  (*Lemma rsa_mod_inv : forall (pk sk p' q' e d : nat), prime p' -> prime q' -> ().
+ Lemma rsa_mod_inv : forall (e d p' q': nat), 
+                              prime p' -> 
+                              prime q' -> 
+                              (e * d) mod ((p'.-1) * (q'.-1)) = 1.
   Proof.
-    
-  Qed.*)
+    Admitted.
+  
   
 
   Theorem Signature_correct pk sk msg seed :
     Some (pk,sk) = Run sampler KeyGen seed ->
+    (* Adding precond *)
+    (*(exist e d p' q', ) *)
     Ver_sig pk (Sign sk msg) msg == true.
   Proof.
     rewrite /Run/Run_aux /=.
