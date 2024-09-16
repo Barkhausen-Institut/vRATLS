@@ -1,7 +1,5 @@
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
-
-Require Import Coq.ZArith.ZArith.
-
+From mathcomp Require Import all_ssreflect.
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
 
@@ -67,6 +65,8 @@ Module Type RSA_params <: SignatureParams.
 
   Definition P' (y : prime_num) := (P :\ y)%SET.
 
+  Definition X (m:nat) : finType := 'I_m.+3. 
+
   Lemma P_P'_neq : forall y, y \in P -> P :!=: P' y.
   Proof.
     unfold P'. intros.
@@ -119,6 +119,16 @@ Module Type RSA_params <: SignatureParams.
   Proof.
     apply/eqP.
     apply p_q_neq; try apply/enum_valP.
+  Qed.
+
+  Lemma two_ltn_X: forall (m:nat), 2 < m.+3. (*'I_m.+2 represents no in the range 0..(m+1) *)
+  Proof. by []. Qed.
+
+  Definition x0 (m:nat) : (X m) := Ordinal (two_ltn_X m).
+
+  #[export] Instance positive_X `(n:nat) : Positive #|(X n)|.
+  Proof.
+    apply/card_gt0P. by exists x0.
   Qed.
 
   Definition R' : finType := {x:R | 0 < x}.
@@ -373,7 +383,13 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
           (yyy'' ap bp)
     end.
 
-  Equations KeyGen :
+  Definition mult_cast_nat' (a b : prime_num) : nat :=
+    match a,b with
+    | exist a' ap , exist b' bp => a'.-1 * b'.-1
+    end.
+  
+
+  Equations? KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
     KeyGen :=
     {code
@@ -383,11 +399,14 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       let q := enum_val q in
       assert (p != q) ;;
 
-      e ← sample uniform i_ss ;;
+      let phiN := mult_cast_nat' p q in
+      e ← sample uniform (X phiN) ;;
       d ← sample uniform i_ss ;;
       let e := otf e in
       let d := otf d in
-      (* assert ed = 1 (mod Phi(n)) *)
+      let ed := (e * d %% phiN) in
+      assert (ed == 1 %% phiN) ;; 
+
       let n := mult_cast_nat p q in
       #put sk_loc := (fto (n,e)) ;;
       #put pk_loc := (fto (n,d)) ;;
@@ -832,12 +851,85 @@ Module RSA_SignatureAlgorithms
   Proof.
     Admitted.
   
-  
+  (*Lemma rsa_mod_inv2 : forall (e d p' q': Z), (* Z Scope???*)
+    prime p' -> 
+    prime q' -> 
+    e <> 0 ->
+    d <> 0 ->
+    (e * d) mod ((p' - 1) * (q' - 1)) = 1 -> True.
+Proof.
+Admitted. *)
 
-  Theorem Signature_correct pk sk msg seed :
+(**There was error of otf pk ...
+So, this Def converts the output of otf to nat for the context. **)
+Definition nat_of_otf {T : finType} (x : T) : nat :=
+  enum_rank x. (*This fun from mathcomp lib converts elements of finite types to nat numbers.
+  It just assigns a nat no to each element of finite type. *)
+
+
+(** Goal: otf pk * otf sk = 1 %[mod (p'.-1) * (q'.-1)] which is the modular inverse condition 
+that ensures pk and sk are valid RSA keys.
+p' & q' are nat. 
+We ensure they satisfy the prime predicate from library.
+For (p'-1) * (q'-1), kept them nat but including Prime predicate in our precond to ensure they're primes.
+**)
+
+
+(*
+Theorem Signature_correct pk sk msg seed p' q':
+  Some (pk,sk) = Run sampler KeyGen seed ->
+  Ver_sig pk (Sign sk msg) msg == true.
+Proof.
+
+rewrite /Run/Run_aux /=.
+
+(* SSReflect style generalization: *)
+move: (pkg_interpreter.sampler_obligation_4 seed {| pos := P; cond_pos := pos_i_P |}) => p.
+move: (pkg_interpreter.sampler_obligation_4 (seed + 1) {| pos := P' (enum_val p); cond_pos := _ |}) => q.
+rewrite /assert.
+have p_q_neq'' : enum_val p != enum_val q. 1: { by apply p_q_neq'. }
+rewrite ifT //=.
+move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => sk₁.
+move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => pk₁.
+
+intros Hmd H1 H2.
+
+case => pk_eq sk_eq. (* injectivity *)
+rewrite /Ver_sig/Sign/dec_to_In/enc_to_In /=.
+rewrite sk_eq pk_eq /=.
+rewrite !otf_fto /=.
+case H: (mult_cast_nat (enum_val p) (enum_val q)) => [pq pq_gt_O] /=.
+rewrite /widen_ord /=.
+rewrite !otf_fto /=.
+apply/eqP/eqP.
+(* TODO this step is a bit strange. investigate. *)
+case H₁: (Ordinal (n:=pq) (m:=_) _) => [m i].
+case: H₁.
+
+move: H; rewrite /mult_cast_nat -/Nat.add -/Nat.mul /widen_ord.
+case Hq: (enum_val q) => [q'' q'_prime].
+case Hp: (enum_val p) => [p'' p'_prime].
+case.
+case H₂: (Ordinal (n:=r) (m:=p') _) => [p''' p''_ltn_r].
+case: H₂ => p'_eq_p''.
+case H₂: (Ordinal (n:=r) (m:=q') _) => [q''' q''_ltn_r].
+case: H₂ => q'_eq_q''.
+
+case XX: (Ordinal (n:=r) (m:=p'*q') _) => [p_mul_q pr].
+case: XX. move/esym => p_mul_q_eq.
+move/esym => pq_spec.
+
+rewrite -[X in X = _ -> _](@modn_small _ pq).
+- rewrite -[X in _ = X -> _](@modn_small _ pq).
+  + have eee : nat_of_ord pq = (p' * q')%N.  subst. 
+
+*)
+
+
+
+
+  Theorem Signature_correct pk sk msg seed (* e d p' q'*):
     Some (pk,sk) = Run sampler KeyGen seed ->
-    (* Adding precond *)
-    (*(exist e d p' q', ) *)
     Ver_sig pk (Sign sk msg) msg == true.
   Proof.
     rewrite /Run/Run_aux /=.
@@ -852,6 +944,10 @@ Module RSA_SignatureAlgorithms
 
     move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => sk₁.
     move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => pk₁.
+
+    have ed_mod : otf sk₁ * otf pk₁ == 1 %[mod mult_cast_nat' (enum_val p) (enum_val q)].
+    1:{ admit. }
+    rewrite ifT //=.
 
     case => pk_eq sk_eq. (* injectivity *)
 
@@ -869,8 +965,10 @@ Module RSA_SignatureAlgorithms
     case: H₁.
 
     move: H; rewrite /mult_cast_nat -/Nat.add -/Nat.mul /widen_ord.
+    move: ed_mod.
     case Hq: (enum_val q) => [q' q'_prime].
     case Hp: (enum_val p) => [p' p'_prime].
+    move => ed_mod.
 
     case.
 
@@ -885,13 +983,14 @@ Module RSA_SignatureAlgorithms
 
     rewrite -[X in X = _ -> _](@modn_small _ pq).
     - rewrite -[X in _ = X -> _](@modn_small _ pq).
-      + have eee : nat_of_ord pq = (p' * q')%N by subst.
+
+    + have eee : nat_of_ord pq = (p' * q')%N by subst.
         rewrite (rsa_correct'' eee) /=.
         * move => msg_eq. subst.
           repeat rewrite modn_small in msg_eq.
           ** by apply ord_inj.
           ** exact: i.
-          ** by []. Print wf_type. 
+          ** by []. 
         * rewrite /wf_type.
           apply/andP; split; try exact: p'_prime.
           apply/andP; split; try exact: q'_prime.
@@ -899,7 +998,8 @@ Module RSA_SignatureAlgorithms
           apply/andP; split; [ by apply pq_phi_gt_0 |].
           apply/andP; split; [ by apply dvdn_mulr |].
           apply/andP; split; [ by apply dvdn_mull |].
-          admit. (* FIXME Missing pre-condition: e * d == 1 mod ... *)
+          move: ed_mod; rewrite mulnC /mult_cast_nat' => ed_mod.
+          exact: ed_mod.
       + by [].
     - by rewrite /decrypt''; apply ltn_pmod.
 
