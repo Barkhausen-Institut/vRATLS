@@ -144,6 +144,9 @@ Module Type RSA_params <: SignatureParams.
   Definition Signature : finType := R.
   Definition Message : finType := R. (* TODO should just be [nat] *)
   Definition Challenge : finType := R.
+  (* FIXME This definition is insufficient because the
+           sampled values [e] and [d] have properties!
+   *)
   Definition Sample_space : finType := R₀.
 
   Parameter padd : forall (pq:nat) (m:Message), 'I_pq.
@@ -387,7 +390,6 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     match a,b with
     | exist a' ap , exist b' bp => a'.-1 * b'.-1
     end.
-  
 
   Equations? KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
@@ -844,89 +846,6 @@ Module RSA_SignatureAlgorithms
      *)
   Abort.
 
- Lemma rsa_mod_inv : forall (e d p' q': nat), 
-                              prime p' -> 
-                              prime q' -> 
-                              (e * d) mod ((p'.-1) * (q'.-1)) = 1.
-  Proof.
-    Admitted.
-  
-  (*Lemma rsa_mod_inv2 : forall (e d p' q': Z), (* Z Scope???*)
-    prime p' -> 
-    prime q' -> 
-    e <> 0 ->
-    d <> 0 ->
-    (e * d) mod ((p' - 1) * (q' - 1)) = 1 -> True.
-Proof.
-Admitted. *)
-
-(**There was error of otf pk ...
-So, this Def converts the output of otf to nat for the context. **)
-Definition nat_of_otf {T : finType} (x : T) : nat :=
-  enum_rank x. (*This fun from mathcomp lib converts elements of finite types to nat numbers.
-  It just assigns a nat no to each element of finite type. *)
-
-
-(** Goal: otf pk * otf sk = 1 %[mod (p'.-1) * (q'.-1)] which is the modular inverse condition 
-that ensures pk and sk are valid RSA keys.
-p' & q' are nat. 
-We ensure they satisfy the prime predicate from library.
-For (p'-1) * (q'-1), kept them nat but including Prime predicate in our precond to ensure they're primes.
-**)
-
-
-(*
-Theorem Signature_correct pk sk msg seed p' q':
-  Some (pk,sk) = Run sampler KeyGen seed ->
-  Ver_sig pk (Sign sk msg) msg == true.
-Proof.
-
-rewrite /Run/Run_aux /=.
-
-(* SSReflect style generalization: *)
-move: (pkg_interpreter.sampler_obligation_4 seed {| pos := P; cond_pos := pos_i_P |}) => p.
-move: (pkg_interpreter.sampler_obligation_4 (seed + 1) {| pos := P' (enum_val p); cond_pos := _ |}) => q.
-rewrite /assert.
-have p_q_neq'' : enum_val p != enum_val q. 1: { by apply p_q_neq'. }
-rewrite ifT //=.
-move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => sk₁.
-move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => pk₁.
-
-intros Hmd H1 H2.
-
-case => pk_eq sk_eq. (* injectivity *)
-rewrite /Ver_sig/Sign/dec_to_In/enc_to_In /=.
-rewrite sk_eq pk_eq /=.
-rewrite !otf_fto /=.
-case H: (mult_cast_nat (enum_val p) (enum_val q)) => [pq pq_gt_O] /=.
-rewrite /widen_ord /=.
-rewrite !otf_fto /=.
-apply/eqP/eqP.
-(* TODO this step is a bit strange. investigate. *)
-case H₁: (Ordinal (n:=pq) (m:=_) _) => [m i].
-case: H₁.
-
-move: H; rewrite /mult_cast_nat -/Nat.add -/Nat.mul /widen_ord.
-case Hq: (enum_val q) => [q'' q'_prime].
-case Hp: (enum_val p) => [p'' p'_prime].
-case.
-case H₂: (Ordinal (n:=r) (m:=p') _) => [p''' p''_ltn_r].
-case: H₂ => p'_eq_p''.
-case H₂: (Ordinal (n:=r) (m:=q') _) => [q''' q''_ltn_r].
-case: H₂ => q'_eq_q''.
-
-case XX: (Ordinal (n:=r) (m:=p'*q') _) => [p_mul_q pr].
-case: XX. move/esym => p_mul_q_eq.
-move/esym => pq_spec.
-
-rewrite -[X in X = _ -> _](@modn_small _ pq).
-- rewrite -[X in _ = X -> _](@modn_small _ pq).
-  + have eee : nat_of_ord pq = (p' * q')%N.  subst. 
-
-*)
-
-
-
 
   Theorem Signature_correct pk sk msg seed (* e d p' q'*):
     Some (pk,sk) = Run sampler KeyGen seed ->
@@ -981,6 +900,7 @@ rewrite -[X in X = _ -> _](@modn_small _ pq).
     case: XX. move/esym => p_mul_q_eq.
     move/esym => pq_spec.
 
+    (* TODO remember this hypothesis for [decrypt] and [ecnrypt]. *)
     rewrite -[X in X = _ -> _](@modn_small _ pq).
     - rewrite -[X in _ = X -> _](@modn_small _ pq).
 
