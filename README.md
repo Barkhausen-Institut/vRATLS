@@ -5,9 +5,6 @@ We are using [SSProve](https://github.com/SSProve), a framework for security pro
 
 ## Setup
 
-Do not forget to clone this project with recursive submodules:
-```git clone --recurse-submodules```
-
 Please use [`nix`](https://nixos.org/download.html) to get all the setup you need for this project.
 Please [enable `flake` support in `nix`](https://nixos.wiki/wiki/Flakes). 
 If the `~/.config/nix/` folder and/or the `~/.config/nix/nix.conf` file do not exist then just create them.
