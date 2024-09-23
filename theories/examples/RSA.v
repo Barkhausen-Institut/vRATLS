@@ -65,8 +65,6 @@ Module Type RSA_params <: SignatureParams.
 
   Definition P' (y : prime_num) := (P :\ y)%SET.
 
-  Definition X (m:nat) : finType := 'I_m.+3. 
-
   Lemma P_P'_neq : forall y, y \in P -> P :!=: P' y.
   Proof.
     unfold P'. intros.
@@ -121,15 +119,39 @@ Module Type RSA_params <: SignatureParams.
     apply p_q_neq; try apply/enum_valP.
   Qed.
 
-  Lemma two_ltn_X: forall (m:nat), 2 < m.+3. (*'I_m.+2 represents no in the range 0..(m+1) *)
-  Proof. by []. Qed.
+  (*
+  Definition X (m:nat) : finType := 'I_m.+3.
+   The above is insufficient. I want to sample an [e] from a space
+     such that [1 < e < phi_N] where
+     [phi_N = lcm p.-1 q.-1] for Carmichael's totient function or
+     [phi_N = p.-1 * q.-1] for Euler's totient function.
+     That is [phi_N = totient p * totient q] by [totient_prime].
+     And [phi_N = totient (p * q)] by [totient coprime] given [coprime p q].
+     That is [phi_N = totient n].
+  Search "totient".
+  Search coprime prime.
+   *)
+  Definition E' {m:R} (H:2<m) : finType := { x: 'Z_m | 1 < x  }.
+  Definition E  {m:R} (H:2<m) : {set (E' H)} := [set : E' H].
 
-  Definition x0 (m:nat) : (X m) := Ordinal (two_ltn_X m).
+  Lemma two_ltn_E {m:R} (H:2<m) : 2 < m. Proof. exact:H. Qed.
 
-  #[export] Instance positive_X `(n:nat) : Positive #|(X n)|.
+  Definition two_Zp (m:R): 'Z_m := inZp 2.
+  Lemma two_gt1 {m:R} (H:2<m) : (1 < two_Zp m)%Z.
   Proof.
-    apply/card_gt0P. by exists x0.
+    move => //=.
+    case: m H; case => [|m0] _ //=.
+    rewrite ltnS /Zp_trunc //=.
+    case: m0 => [|m1] //=.
+    rewrite ltnS.
+    by case: m1.
   Qed.
+
+  Definition two_E {m:R} (H:2<m) : (E' H) :=
+    exist _ (two_Zp m) (two_gt1 H).
+
+  #[export] Instance positive_E {m:R} (H:2<m): Positive #|(E H)|.
+  Proof. apply/card_gt0P; by exists (two_E H). Qed.
 
   Definition R' : finType := {x:R | 0 < x}.
 
@@ -137,18 +159,18 @@ Module Type RSA_params <: SignatureParams.
       0 < phi_N, p.-1 %| phi_N, q.-1 %| phi_N &
                             e * d == 1 %[mod phi_N]].
 
-  Definition Z_n_prod : finType := prod_finType R' R₀.
+  Definition Z_n_prod : finType := prod_finType R' R.
 
   Definition SecKey := Z_n_prod.
   Definition PubKey : finType := Z_n_prod.
   Definition Signature : finType := R.
-  Definition Message : finType := R. (* TODO should just be [nat] *)
+  Definition Message : finType := R. (* TODO should just be a space that is bounded by another bound *)
   Definition Challenge : finType := R.
-  (* FIXME This definition is insufficient because the
-           sampled values [e] and [d] have properties!
-   *)
-  Definition Sample_space : finType := R₀.
+(*  Definition E_space : finType := E. *)
 
+  (**
+     We need to tanslate a message into the "RSA" space.
+   *)
   Parameter padd : forall (pq:nat) (m:Message), 'I_pq.
 
 End RSA_params.
@@ -202,7 +224,12 @@ Module RSA_KeyGen (π1  : RSA_params)
      by rewrite /encrypt''/encrypt' H.
    Qed.
 
-   Theorem rsa_correct'' {p q pq d e : nat} (H: pq = (p * q)%nat) (wf : wf_type p q (p.-1 * q.-1) d e) w :
+   Theorem rsa_correct''
+     {p q pq d e : nat}
+     (H: pq = (p * q)%nat)
+     (wf : wf_type p q
+             (p.-1 * q.-1) (* phi_N based on Euler totien function instead of lcm *)
+             d e) w :
     let r := Build_rsa wf in
     decrypt'' e pq (encrypt'' d pq w)  = w %[mod pq].
   Proof.
@@ -222,7 +249,7 @@ Module RSA_KeyGen (π1  : RSA_params)
   Definition sig0 : Signature := 1%g.
   Definition m0 : Message := 1%g.
   Definition chal0 : Challenge := 1%g.
-  Definition ss0 :Sample_space := 1%g.
+(*  Definition ss0 :Sample_space := 1%g. *)
 
 
   #[export] Instance positive_SecKey : Positive #|SecKey|.
@@ -255,12 +282,13 @@ Module RSA_KeyGen (π1  : RSA_params)
   Qed.
   Definition Challenge_pos : Positive #|Challenge| := _.
 
+  (*
   #[export] Instance positive_Sample : Positive #|Sample_space|.
   Proof.
     apply /card_gt0P. exists ss0. auto.
   Qed.
   Definition Sample_pos : Positive #|Sample_space| := _.
-
+   *)
 
   Definition chSecKey  : choice_type := 'fin #|SecKey|.
   Definition chPubKey : choice_type := 'fin #|PubKey|.
@@ -271,7 +299,7 @@ Module RSA_KeyGen (π1  : RSA_params)
   Definition i_sk := #|SecKey|.
   Definition i_pk := #|SecKey|.
   Definition i_sig := #|Signature|.
-  Definition i_ss := #|Sample_space|.
+  (* Definition i_ss := #|Sample_space|.*)
 
 End RSA_KeyGen.
 
@@ -285,7 +313,6 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
 
   Import PackageNotation.
   Local Open Scope package_scope.
-
 
   Fail Definition cast (p : Arit (uniform i_P) ) :=
     otf p.
@@ -383,13 +410,53 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     | exist a' ap , exist b' bp =>
         exist _
           (Ordinal zzz)
-          (yyy'' ap bp)
+     (yyy'' ap bp)
     end.
 
-  Definition mult_cast_nat' (a b : prime_num) : nat :=
+  Definition phi_N (a b : prime_num) : nat :=
     match a,b with
     | exist a' ap , exist b' bp => a'.-1 * b'.-1
     end.
+
+  Lemma sub_r_gt_r {r:R₀} (H:0 < r) : r.-1 < r₀.
+  Proof.
+    case: r H; case => r r_lt_r₀ // => H //=.
+    exact: ltnW.
+  Qed.
+
+  Definition sub_r {r:R₀} (H:0 < r) : R₀ :=
+    Ordinal (sub_r_gt_r H).
+
+  Lemma phi_N_lt_r (a b : prime_num) : phi_N a b < r.
+  Proof.
+    rewrite /phi_N //.
+    case: a => a a_prim; case: b => b b_prim //.
+    rewrite /r.
+    apply ltn_mul; [move: a_prim | move: b_prim];
+    move/prime_gt1/ltnW; exact: sub_r_gt_r.
+  Qed.
+
+  Definition phi_N_ord (a b : prime_num) : R :=
+    Ordinal (phi_N_lt_r a b).
+
+  Lemma e_inv_gt2 {m:R} (H:2<m) (e:'Z_m) : 1 <  Zp_inv e.
+  Proof.
+    Admitted.
+
+  Equations calc_d {m:R} (H:2<m) (e:E' H) : E' H :=
+    calc_d H (@exist e' ep) := exist _ (Zp_inv e') (e_inv_gt2 H e').
+
+  Equations? e_widen {m:R} (H:2<m) (e:E' H) : R :=
+    e_widen H e := widen_ord _ (proj1_sig e).
+  Proof.
+    move: m H e.
+    rewrite /R/r/E'/Zp_trunc //.
+    move => [m m_lt_r] H [e e_gt1] //=.
+    repeat rewrite prednK.
+    - exact: (ltnW m_lt_r).
+    - admit.
+    - admit.
+  Admitted.
 
   Equations? KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
@@ -399,15 +466,18 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       let p := enum_val p in
       q ← sample uniform (P' p) ;;
       let q := enum_val q in
-      assert (p != q) ;;
+      #assert (p != q) ;;
 
-      let phiN := mult_cast_nat' p q in
-      e ← sample uniform (X phiN) ;;
-      d ← sample uniform i_ss ;;
-      let e := otf e in
-      let d := otf d in
-      let ed := (e * d %% phiN) in
-      assert (ed == 1 %% phiN) ;; 
+      let phiN := phi_N_ord p q in
+      #assert (2 < phiN) as phiN_gt2 ;;
+
+      e ← sample uniform (E phiN_gt2) ;;
+      let e := enum_val e in
+      let d := calc_d phiN_gt2 e in
+      let ed := ((proj1_sig e) * (proj1_sig d) %% phiN) in
+      #assert (ed == 1 %% phiN) ;;
+      let e := e_widen phiN_gt2 e in
+      let d := e_widen phi_gt2 d in
 
       let n := mult_cast_nat p q in
       #put sk_loc := (fto (n,e)) ;;
