@@ -153,6 +153,15 @@ Module Type RSA_params <: SignatureParams.
   #[export] Instance positive_E {m:R} (H:2<m): Positive #|(E H)|.
   Proof. apply/card_gt0P; by exists (two_E H). Qed.
 
+  Equations D' (H:{m:R | 2<m}) : finType := D' (exist H) := E' H.
+  Definition D (H:{m:R | 2<m}) : {set (D' H)} := [set : D' H].
+
+  Equations two_D (H:{m:R | 2<m}) : (D' H) :=
+    two_D (exist H0) := two_E H0.
+
+  #[export] Instance positive_D (H :{m:R | 2<m}) : Positive #|(D H)|.
+  Proof. apply/card_gt0P; by exists (two_D H). Qed.
+
   Definition R' : finType := {x:R | 0 < x}.
 
   Definition wf_type p q phi_N e d := [&& prime p, prime q, p != q,
@@ -446,19 +455,104 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
   Equations calc_d {m:R} (H:2<m) (e:E' H) : E' H :=
     calc_d H (@exist e' ep) := exist _ (Zp_inv e') (e_inv_gt2 H e').
 
-  Equations? e_widen {m:R} (H:2<m) (e:E' H) : R :=
+  Equations e_widen {m:R} (H:2<m) (e:E' H) : R :=
     e_widen H e := widen_ord _ (proj1_sig e).
-  Proof.
-    move: m H e.
+  Next Obligation.
     rewrite /R/r/E'/Zp_trunc //.
     move => [m m_lt_r] H [e e_gt1] //=.
     repeat rewrite prednK.
     - exact: (ltnW m_lt_r).
-    - admit.
-    - admit.
+    - exact: ltnW (ltnW H).
+    - rewrite -ltnS prednK.
+      + exact: ltnW H.
+      + exact: ltnW (ltnW H).
+  Qed.
+
+  Lemma phi_N_ord_gt2 (a b : prime_num) : 2 < phi_N_ord a b.
+  Proof.
+    case: a => a a_prime; case: b => b b_prime.
+    rewrite /phi_N_ord //.
+    case: a a_prime.
+    case => //.
   Admitted.
 
+  Definition phi_N_ord' (a b: prime_num) : {x:R | 2 < x} :=
+    exist _ (phi_N_ord a b) (phi_N_ord_gt2 a b).
+
+  (*
+  Equations calc_d (phi: {m:R | 2<m}) (e:E' H) : E' H :=
+    calc_d (exist H) (@exist e' ep) := exist _ (Zp_inv e') (e_inv_gt2 H e').
+   *)
+
+  (*
   Equations? KeyGen :
+    code Key_locs [interface] 'unit :=
+    KeyGen :=
+      {code
+         p ← sample uniform P ;;
+         let p := enum_val p in
+         q ← sample uniform (P' p) ;;
+         let q := enum_val q in
+         #assert (p != q) ;;
+
+         let phiN := phi_N_ord p q in
+         #assert (2 < phiN) as phiN_gt2 ;;
+
+         e ← sample uniform (E phiN_gt2) ;;
+         let e := enum_val e in
+         let d := calc_d phiN_gt2 e in
+         let ed := ((proj1_sig e) * (proj1_sig d) %% phiN) in
+         #assert (ed == 1 %% phiN) ;;
+         let e := e_widen phiN_gt2 e in
+         let d := e_widen phiN_gt2 d in
+
+         let n := mult_cast_nat p q in
+         let pub_key := fto (n,e) in
+         let sec_key := fto (n,d) in
+         #put pk_loc := pub_key ;;
+         #put sk_loc := sec_key ;;
+         ret '( pub_key, sub_key )
+      }.
+*)
+
+  (*
+    REPORT ME:
+    This is a bug in SSProve: [#assert] vs. [assert]
+    When using [#assert], I get this error.
+    This is a pity because [assert P as k] only works as [#assert P as k].
+    All is good when I use [assert P].
+   *)
+ Fail Equations? KeyGen :
+    code Key_locs [interface] (chPubKey × chSecKey) :=
+    KeyGen :=
+      {code
+         p ← sample uniform P ;;
+       let p := enum_val p in
+       q ← sample uniform (P' p) ;;
+       let q := enum_val q in
+       #assert (p != q) ;;
+
+       let phiN' := phi_N_ord' p q in
+       let phiN  := proj1_sig phiN' in
+       let phiN_gt2 := proj2_sig phiN' in
+
+       e ← sample uniform (D phiN') ;;
+       let e := enum_val e in
+       let d := calc_d phiN_gt2 e in
+       let ed := ((proj1_sig e) * (proj1_sig d) %% phiN) in
+       #assert (ed == 1 %% phiN) ;;
+       let e := e_widen phiN_gt2 e in
+       let d := e_widen phiN_gt2 d in
+
+       let n := mult_cast_nat p q in
+       let pub_key := fto (n,e) in
+       let sec_key := fto (n,d) in
+       #put pk_loc := pub_key ;;
+       #put sk_loc := sec_key ;;
+       ret ( pub_key , sec_key )
+      }.
+
+  Equations KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
     KeyGen :=
     {code
@@ -466,23 +560,26 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       let p := enum_val p in
       q ← sample uniform (P' p) ;;
       let q := enum_val q in
-      #assert (p != q) ;;
+      assert (p != q) ;;
 
-      let phiN := phi_N_ord p q in
-      #assert (2 < phiN) as phiN_gt2 ;;
+      let phiN' := phi_N_ord' p q in
+      let phiN  := proj1_sig phiN' in
+      let phiN_gt2 := proj2_sig phiN' in
 
-      e ← sample uniform (E phiN_gt2) ;;
+      e ← sample uniform (D phiN') ;;
       let e := enum_val e in
       let d := calc_d phiN_gt2 e in
       let ed := ((proj1_sig e) * (proj1_sig d) %% phiN) in
-      #assert (ed == 1 %% phiN) ;;
+      assert (ed == 1 %% phiN) ;;
       let e := e_widen phiN_gt2 e in
-      let d := e_widen phi_gt2 d in
+      let d := e_widen phiN_gt2 d in
 
       let n := mult_cast_nat p q in
-      #put sk_loc := (fto (n,e)) ;;
-      #put pk_loc := (fto (n,d)) ;;
-      ret ( (fto (n,e)) , fto (n,d) )
+      let pub_key := fto (n,e) in
+      let sec_key := fto (n,d) in
+      #put pk_loc := pub_key ;;
+      #put sk_loc := sec_key ;;
+      ret ( pub_key , sec_key )
     }.
 
 End RSA_KeyGen_code.
