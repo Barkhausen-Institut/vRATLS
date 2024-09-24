@@ -628,14 +628,14 @@ Module RSA_SignatureAlgorithms
            *)
           fto (widen_ord
                  (pq_leq_r pq)
-                 (enc_to_In (widen_ord n_leq_nn sk') pq (padd pq (otf m)) O_ltn_pq))
+                 (enc_to_In sk' pq (padd pq (otf m)) O_ltn_pq))
       end.
 
   Equations Ver_sig (pk :  chPubKey) (sig : chSignature) (m : chMessage) : 'bool :=
     Ver_sig pk sig m :=
       match otf pk with
       | (exist pq O_ltn_pq, pk') =>
-          (dec_to_In (widen_ord n_leq_nn pk') (otf sig) pq O_ltn_pq) == padd pq (otf m)
+          (dec_to_In pk' (otf sig) pq O_ltn_pq) == padd pq (otf m)
       end.
 
   (* Playground begin *)
