@@ -131,7 +131,7 @@ Module Type RSA_params <: SignatureParams.
   Search "totient".
   Search coprime prime.
    *)
-  Definition E' {m:R} (H:2<m) : finType := { x: 'Z_m | 1 < x  }.
+  Definition E' {m:R} (H:2<m) : finType := { x: 'Z_m | 1 < x }.
   Definition E  {m:R} (H:2<m) : {set (E' H)} := [set : E' H].
 
   Lemma two_ltn_E {m:R} (H:2<m) : 2 < m. Proof. exact:H. Qed.
@@ -153,7 +153,8 @@ Module Type RSA_params <: SignatureParams.
   #[export] Instance positive_E {m:R} (H:2<m): Positive #|(E H)|.
   Proof. apply/card_gt0P; by exists (two_E H). Qed.
 
-  Equations D' (H:{m:R | 2<m}) : finType := D' (exist H) := E' H.
+  Equations D' (H:{m:R | 2<m}) : finType :=
+    D' (exist H) := E' H.
   Definition D (H:{m:R | 2<m}) : {set (D' H)} := [set : D' H].
 
   Equations two_D (H:{m:R | 2<m}) : (D' H) :=
@@ -161,6 +162,45 @@ Module Type RSA_params <: SignatureParams.
 
   #[export] Instance positive_D (H :{m:R | 2<m}) : Positive #|(D H)|.
   Proof. apply/card_gt0P; by exists (two_D H). Qed.
+
+  Equations C' (H:{m:R | 2<m}) : finType :=
+    C' (@exist m H) := { x:(E' H) | coprime (proj1_sig x) m }.
+  Definition C (H:{m:R | 2<m}) : {set (C' H)} := [set : C' H].
+
+  Definition m_pred (m:R) : 'Z_m := inZp m.-1.
+  Lemma m_pred_gt1 (H:{m:R | 2<m}) : (1 < m_pred (proj1_sig H))%Z.
+  Proof.
+    case: H => m m_gt2.
+    rewrite /m_pred/sval.
+    case: m m_gt2; case => n0 n0_lt_r //.
+    move => H.
+    apply/ltnSE => //.
+    simpl. (* removes [inZp] *)
+    rewrite prednK.
+    - simpl.
+      rewrite modn_small //.
+    - rewrite -pred_Sn.
+      move/ltnSE/ltnW:H.
+      exact: id.
+Qed.
+
+  Lemma m_pred_coprime (H:{m:R | 2<m}) : coprime (proj1_sig H) (m_pred (proj1_sig H)).
+  Proof.
+    rewrite /sval/m_pred.
+    case: H => m m_gt2.
+    simpl.
+    rewrite prednK.
+    - rewrite modn_small.
+      + apply coprimenP. move/ltnW/ltnW: m_gt2. exact: id.
+      + exact: ltnSn.
+    - exact: is_positive.
+  Qed.
+
+  Equations m_C (H:{m:R | 2<m}) : (C' H) :=
+    m_C (@exist m H0) := two_D H0.
+
+  #[export] Instance positive_D (H :{m:R | 2<m}) : Positive #|(C H)|.
+  Proof. apply/card_gt0P; by exists (m_C H). Qed.
 
   Definition R' : finType := {x:R | 0 < x}.
 
@@ -569,8 +609,8 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       e ← sample uniform (D phiN') ;;
       let e := enum_val e in
       let d := calc_d phiN_gt2 e in
-      let ed := ((proj1_sig e) * (proj1_sig d) %% phiN) in
-      assert (ed == 1 %% phiN) ;;
+      let ed := Zp_mul (proj1_sig e) (proj1_sig d) in
+      assert (ed == Zp1) ;;
       let e := e_widen phiN_gt2 e in
       let d := e_widen phiN_gt2 d in
 
@@ -1021,18 +1061,37 @@ Module RSA_SignatureAlgorithms
     rewrite /Run/Run_aux /=.
 
     (* SSReflect style generalization: *)
-    move: (pkg_interpreter.sampler_obligation_4 seed {| pos := P; cond_pos := pos_i_P |}) => p.
-    move: (pkg_interpreter.sampler_obligation_4 (seed + 1) {| pos := P' (enum_val p); cond_pos := _ |}) => q.
+    move: (pkg_interpreter.sampler_obligation_4 seed {| pos := P; cond_pos := pos_i_P |}) => p₀.
+    move: (pkg_interpreter.sampler_obligation_4 (seed + 1) {| pos := P' (enum_val p₀); cond_pos := _ |}) => q₀.
 
     rewrite /assert.
-    have p_q_neq'' : enum_val p != enum_val q. 1: { by apply p_q_neq'. }
+    have p_q_neq'' : enum_val p₀ != enum_val q₀. 1: { by apply p_q_neq'. }
     rewrite ifT //=.
 
-    move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => sk₁.
-    move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1 + 1) {| pos := i_ss; cond_pos := positive_Sample |}) => pk₁.
+    move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := _; cond_pos := _ |}) => e. (* [sk₁] *)
 
-    have ed_mod : otf sk₁ * otf pk₁ == 1 %[mod mult_cast_nat' (enum_val p) (enum_val q)].
-    1:{ admit. }
+    have ed_mod :
+      Zp_mul (sval (enum_val e)) (sval (calc_d (phi_N_ord_gt2 (enum_val p₀) (enum_val q₀)) (enum_val e))) == Zp1.
+    1:{
+      rewrite /calc_d /sval //.
+      case: (enum_val e) => [e' e_gt1].
+      apply/eqP.
+      Check Zp_mulzV.
+      apply Zp_mulzV.
+      clear e.
+      move: e' e_gt1. rewrite /phi_N_ord'/phi_N_ord/D/D'/E'.
+      rewrite Zp_cast.
+      - move => e' e_gt1.
+        rewrite /coprime.
+        move: p_q_neq'' e' e_gt1.
+        rewrite /phi_N.
+        case: (enum_val q₀) => [q₀' q₀_gt1].
+        case: (enum_val p₀) q₀ => [p₀' p₀_gt1].
+        move => q₀ p_q_neq'' e' e_gt1 //.
+      Search Zp_mul muln.
+      Search Zp_inv.
+
+    }
     rewrite ifT //=.
 
     case => pk_eq sk_eq. (* injectivity *)
@@ -1041,7 +1100,7 @@ Module RSA_SignatureAlgorithms
     rewrite sk_eq pk_eq /=.
     rewrite !otf_fto /=.
 
-    case H: (mult_cast_nat (enum_val p) (enum_val q)) => [pq pq_gt_O] /=.
+    case H: (mult_cast_nat (enum_val p₀) (enum_val q₀)) => [pq pq_gt_O] /=.
     rewrite /widen_ord /=.
     rewrite !otf_fto /=.
 
@@ -1051,10 +1110,11 @@ Module RSA_SignatureAlgorithms
     case: H₁.
 
     move: H; rewrite /mult_cast_nat -/Nat.add -/Nat.mul /widen_ord.
-    move: ed_mod.
-    case Hq: (enum_val q) => [q' q'_prime].
-    case Hp: (enum_val p) => [p' p'_prime].
-    move => ed_mod.
+    clear sk_eq pk_eq.
+    move: e ed_mod.
+    case Hq: (enum_val q₀) => [q' q'_prime].
+    case Hp: (enum_val p₀) => [p' p'_prime].
+    move => e ed_mod.
 
     case.
 
@@ -1085,14 +1145,14 @@ Module RSA_SignatureAlgorithms
           apply/andP; split; [ by apply pq_phi_gt_0 |].
           apply/andP; split; [ by apply dvdn_mulr |].
           apply/andP; split; [ by apply dvdn_mull |].
-          move: ed_mod; rewrite mulnC /mult_cast_nat' => ed_mod.
+          move: ed_mod; rewrite mulnC => ed_mod.
           exact: ed_mod.
       + by [].
     - by rewrite /decrypt''; apply ltn_pmod.
 
     Unshelve.
-      1: { clear p'_prime Hp; case: p' => [p' p'_ltn_r₀]; apply (leq_trans p'_ltn_r₀ n_leq_nn). }
-      clear q'_prime Hq; case: q' => [q' q'_ltn_r₀]; apply (leq_trans q'_ltn_r₀ n_leq_nn).
+      1: { clear ed_mod e p'_prime Hp; case: p' => [p' p'_ltn_r₀]; apply (leq_trans p'_ltn_r₀ n_leq_nn). }
+      clear ed_mod e q'_prime Hq; case: q' => [q' q'_ltn_r₀]; apply (leq_trans q'_ltn_r₀ n_leq_nn).
   Admitted.
 
 End RSA_SignatureAlgorithms.
