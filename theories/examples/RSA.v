@@ -519,9 +519,23 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     | exist a' ap , exist b' bp => a'.-1 * b'.-1
     end.
 
-  Lemma phi_N_gt1 (a b: prime_num) : 1 < phi_N a b.
-  Proof.
-    Admitted.
+  (* Lemma phi_N_gt1 (a b: prime_num) (H: a != b) : 1 < phi_N a b. *)
+  (* Proof. *)
+  (*   rewrite /phi_N. *)
+  (*   case: a H => a a_prime; case: b => b b_prime. *)
+  (*   Search exist. *)
+  (*   move/negP/eqP. *)
+  (*   move/EqdepFacts.eq_sig_fst. *)
+  (*   move: a b a_prime b_prime. *)
+  (*   case => [] // [] // [] // [] // a //=. *)
+  (*   Check prime2ord. *)
+  (*   Compute (prime 2). *)
+  (*   case => [] // [] // [] // [] // b b_ltn_r₀. *)
+  (*   move => //=. *)
+  (*   Search Nat.pred muln. *)
+  (*   Search (_ < _ * _). *)
+  (*   apply (ltnW (pq_phi_gt_0 _ _ a_prime b_prime)). *)
+  (*   Admitted. *)
 
   Lemma sub_r_gt_r {r:R₀} (H:0 < r) : r.-1 < r₀.
   Proof.
@@ -1137,26 +1151,20 @@ Module RSA_SignatureAlgorithms
     move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := _; cond_pos := _ |}) => e. (* [sk₁] *)
 
     rewrite /sval.
-    have ed_mod :
-      Zp_mul (let (a, _) := let (a, _) := enum_val e in a in a)
-        (let (a, _) :=
-           let (x, _) := let (a, _) := enum_val e in a in
-           exist (λ x0 : 'Z_(phi_N (enum_val p₀) (enum_val q₀)), 1 < x0) (Zp_inv x)
-             (e_inv_gt2 (phi_N_ord_gt2 (enum_val p₀) (enum_val q₀)) x) in
-         a) == Zp1.
+    case: (enum_val e) => [[e' e_gt1]].
+    rewrite /sval => coprime_e_phiN //.
+    Check phi_N_ord_gt2.
+    have ed_mod : Zp_mul e' (Zp_inv e') == Zp1.
     1:{
-      case: (enum_val e) => [[e' e_gt1]].
-      rewrite /sval => coprime_e_phiN //.
       apply/eqP.
       apply Zp_mulzV.
       rewrite coprime_sym.
-      Check Zp_cast.
       clear e.
       move: e' e_gt1 coprime_e_phiN; rewrite /phi_N_ord'/phi_N_ord/D/D'/E' //=.
       rewrite Zp_cast.
       - move => e' e_gt1 coprime_e_phiN.
         exact: coprime_e_phiN.
-      - exact: phi_N_gt1.
+      - apply/ltnW/phi_N_ord_gt2.
     }
     rewrite ifT //=.
 
@@ -1177,10 +1185,10 @@ Module RSA_SignatureAlgorithms
 
     move: H; rewrite /mult_cast_nat -/Nat.add -/Nat.mul /widen_ord.
     clear sk_eq pk_eq.
-    move: e ed_mod.
+    move: e e' e_gt1 ed_mod coprime_e_phiN.
     case Hq: (enum_val q₀) => [q' q'_prime].
     case Hp: (enum_val p₀) => [p' p'_prime].
-    move => e ed_mod.
+    move => e e' e_gt1 ed_mod coprime_e_phiN.
 
     case.
 
@@ -1211,14 +1219,32 @@ Module RSA_SignatureAlgorithms
           apply/andP; split; [ by apply pq_phi_gt_0 |].
           apply/andP; split; [ by apply dvdn_mulr |].
           apply/andP; split; [ by apply dvdn_mull |].
-          move: ed_mod; rewrite mulnC => ed_mod.
-          exact: ed_mod.
+          move: ed_mod; rewrite mulnC.
+
+          (* TODO should be a separate lemma! *)
+          rewrite /Zp_mul/inZp //=.
+          move/eqP.
+          case.
+          move: e' e_gt1 coprime_e_phiN.
+          rewrite /Zp_trunc/phi_N_ord/phi_N.
+          move => e' e_gt1 coprime_e_phiN.
+          Fail rewrite prednK. (* TODO How do I deal with dependent type errors? *)
+          move => ed_mod.
+          apply/eqP.
+          rewrite -[X in _ = 1 %[mod X]]prednK.
+          ** rewrite -[X in _ = 1 %[mod X.+1]]prednK.
+             *** exact: ed_mod.
+             *** apply ltnSE.
+                 rewrite prednK.
+                 **** apply/ltnW/(phi_N_ord_gt2 (exist _ p' p'_prime) (exist _ q' q'_prime)).
+                 **** apply/ltnW/ltnW/(phi_N_ord_gt2 (exist _ p' p'_prime) (exist _ q' q'_prime)).
+          ** apply/ltnW/ltnW/(phi_N_ord_gt2 (exist _ p' p'_prime) (exist _ q' q'_prime)).
       + by [].
     - by rewrite /decrypt''; apply ltn_pmod.
 
     Unshelve.
-      1: { clear ed_mod e p'_prime Hp; case: p' => [p' p'_ltn_r₀]; apply (leq_trans p'_ltn_r₀ n_leq_nn). }
-      clear ed_mod e q'_prime Hq; case: q' => [q' q'_ltn_r₀]; apply (leq_trans q'_ltn_r₀ n_leq_nn).
-  Admitted.
+      1: { clear ed_mod e p'_prime e' e_gt1 coprime_e_phiN Hp; case: p' => [p' p'_ltn_r₀]; apply (leq_trans p'_ltn_r₀ n_leq_nn). }
+      clear ed_mod e e' e_gt1 coprime_e_phiN q'_prime Hq; case: q' => [q' q'_ltn_r₀]; apply (leq_trans q'_ltn_r₀ n_leq_nn).
+  Qed.
 
 End RSA_SignatureAlgorithms.
