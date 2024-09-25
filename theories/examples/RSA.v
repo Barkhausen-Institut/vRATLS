@@ -153,8 +153,15 @@ Module Type RSA_params <: SignatureParams.
   #[export] Instance positive_E {m:R} (H:2<m): Positive #|(E H)|.
   Proof. apply/card_gt0P; by exists (two_E H). Qed.
 
+  (*
   Equations D' (H:{m:R | 2<m}) : finType :=
     D' (exist H) := E' H.
+   *)
+  Definition D' (H:{m:R | 2<m}) : finType :=
+    match H with
+      | exist _ H₀ => E' H₀
+    end.
+
   Definition D (H:{m:R | 2<m}) : {set (D' H)} := [set : D' H].
 
   Equations two_D (H:{m:R | 2<m}) : (D' H) :=
@@ -163,15 +170,29 @@ Module Type RSA_params <: SignatureParams.
   #[export] Instance positive_D (H :{m:R | 2<m}) : Positive #|(D H)|.
   Proof. apply/card_gt0P; by exists (two_D H). Qed.
 
+
+  Fail Equations C' (H:{m:R | 2<m}) : finType :=
+    C' H with H => {
+        | (@exist m H₀) := { x:(D' H) | coprime (proj1_sig x) m }
+      }.
+
   Equations C' (H:{m:R | 2<m}) : finType :=
-    C' (@exist m H) := { x:(E' H) | coprime (proj1_sig x) m }.
+    C' H with H => {
+      | (@exist m H₀) := { x:(D' H) | coprime _ m }
+      }.
+  Next Obligation.
+    move => H m P_m.
+    rewrite /D'.
+    case: H => x H₀.
+    exact: proj1_sig.
+  Defined.
+
   Definition C (H:{m:R | 2<m}) : {set (C' H)} := [set : C' H].
 
   Definition m_pred (m:R) : 'Z_m := inZp m.-1.
-  Lemma m_pred_gt1 (H:{m:R | 2<m}) : (1 < m_pred (proj1_sig H))%Z.
+  Lemma m_pred_gt1' {m:R} (m_gt2:2<m) : (1 < m_pred m)%Z.
   Proof.
-    case: H => m m_gt2.
-    rewrite /m_pred/sval.
+    rewrite /m_pred.
     case: m m_gt2; case => n0 n0_lt_r //.
     move => H.
     apply/ltnSE => //.
@@ -182,12 +203,18 @@ Module Type RSA_params <: SignatureParams.
     - rewrite -pred_Sn.
       move/ltnSE/ltnW:H.
       exact: id.
-Qed.
+  Qed.
 
-  Lemma m_pred_coprime (H:{m:R | 2<m}) : coprime (proj1_sig H) (m_pred (proj1_sig H)).
+  Lemma m_pred_gt1 (H:{m:R | 2<m}) : (1 < m_pred (proj1_sig H))%Z.
+  Proof.
+    case: H => m m_gt2.
+    rewrite /sval.
+    by apply m_pred_gt1'.
+  Qed.
+
+  Lemma m_pred_coprime' {m:R} (m_gt2: 2<m) : coprime m (m_pred m).
   Proof.
     rewrite /sval/m_pred.
-    case: H => m m_gt2.
     simpl.
     rewrite prednK.
     - rewrite modn_small.
@@ -196,11 +223,36 @@ Qed.
     - exact: is_positive.
   Qed.
 
-  Equations m_C (H:{m:R | 2<m}) : (C' H) :=
-    m_C (@exist m H0) := two_D H0.
+  Lemma m_pred_coprime (H:{m:R | 2<m}) : coprime (proj1_sig H) (m_pred (proj1_sig H)).
+  Proof.
+    case: H => m m_gt2.
+    by apply m_pred_coprime'.
+  Qed.
 
-  #[export] Instance positive_D (H :{m:R | 2<m}) : Positive #|(C H)|.
-  Proof. apply/card_gt0P; by exists (m_C H). Qed.
+  Equations m_pred_C' (H:{m:R | 2<m}) : (D' H) :=
+    m_pred_C' H with H => {
+      | (@exist m H₀) := exist _ (m_pred m) (m_pred_gt1' H₀)
+      }.
+
+  Fail Equations m_pred_C (H:{m:R | 2<m}) : (C' H) :=
+    m_red_C H := exist _ (m_pred_C' H) (m_pred_coprime H).
+
+  Equations m_pred_C (H:{m:R | 2<m}) : (C' H) :=
+    m_pred_C H := _ .
+  Next Obligation.
+    move => H.
+    rewrite /C'/C'_clause_1.
+    case: H => x x_gt2.
+    exists (m_pred_C' (exist _ x x_gt2)).
+    rewrite /m_pred_C'/m_pred_C'_clause_1.
+    rewrite /C'_obligations_obligation_1.
+    rewrite /sval.
+    rewrite coprime_sym.
+    exact: m_pred_coprime'.
+  Qed.
+
+  #[export] Instance positive_C (H :{m:R | 2<m}) : Positive #|(C H)|.
+  Proof. apply/card_gt0P; by exists (m_pred_C H). Qed.
 
   Definition R' : finType := {x:R | 0 < x}.
 
