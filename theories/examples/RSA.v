@@ -519,6 +519,10 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     | exist a' ap , exist b' bp => a'.-1 * b'.-1
     end.
 
+  Lemma phi_N_gt1 (a b: prime_num) : 1 < phi_N a b.
+  Proof.
+    Admitted.
+
   Lemma sub_r_gt_r {r:R₀} (H:0 < r) : r.-1 < r₀.
   Proof.
     case: r H; case => r r_lt_r₀ // => H //=.
@@ -571,10 +575,8 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
   Definition phi_N_ord' (a b: prime_num) : {x:R | 2 < x} :=
     exist _ (phi_N_ord a b) (phi_N_ord_gt2 a b).
 
-  (*
-  Equations calc_d (phi: {m:R | 2<m}) (e:E' H) : E' H :=
-    calc_d (exist H) (@exist e' ep) := exist _ (Zp_inv e') (e_inv_gt2 H e').
-   *)
+  Equations calc_d' (phi: {m:R | 2<m}) (e:E' (proj2_sig phi)) : E' (proj2_sig phi) :=
+    calc_d' (exist H) (@exist e' ep) := exist _ (Zp_inv e') (e_inv_gt2 H e').
 
   (*
   Equations? KeyGen :
@@ -644,6 +646,17 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
        ret ( pub_key , sec_key )
       }.
 
+
+   Equations cast_D_E {H : {m:R | 2<m}} (x: D' H) : E' (proj2_sig H) :=
+     cast_D_E x := _.
+   Next Obligation.
+     move => H.
+     rewrite /D'.
+     case: H => m m_gt2.
+     rewrite /proj2_sig.
+     exact: id.
+   Defined.
+
   Equations KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
     KeyGen :=
@@ -658,12 +671,13 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       let phiN  := proj1_sig phiN' in
       let phiN_gt2 := proj2_sig phiN' in
 
-      e ← sample uniform (D phiN') ;;
+      e ← sample uniform (C phiN') ;;
       let e := enum_val e in
-      let d := calc_d phiN_gt2 e in
-      let ed := Zp_mul (proj1_sig e) (proj1_sig d) in
+      let e_in_d := (cast_D_E (proj1_sig e)) in
+      let d := calc_d' phiN' e_in_d in
+      let ed := Zp_mul (proj1_sig e_in_d) (proj1_sig d) in
       assert (ed == Zp1) ;;
-      let e := e_widen phiN_gt2 e in
+      let e := e_widen phiN_gt2 e_in_d in
       let d := e_widen phiN_gt2 d in
 
       let n := mult_cast_nat p q in
@@ -1122,27 +1136,27 @@ Module RSA_SignatureAlgorithms
 
     move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := _; cond_pos := _ |}) => e. (* [sk₁] *)
 
+    rewrite /sval.
     have ed_mod :
-      Zp_mul (sval (enum_val e)) (sval (calc_d (phi_N_ord_gt2 (enum_val p₀) (enum_val q₀)) (enum_val e))) == Zp1.
+      Zp_mul (let (a, _) := let (a, _) := enum_val e in a in a)
+        (let (a, _) :=
+           let (x, _) := let (a, _) := enum_val e in a in
+           exist (λ x0 : 'Z_(phi_N (enum_val p₀) (enum_val q₀)), 1 < x0) (Zp_inv x)
+             (e_inv_gt2 (phi_N_ord_gt2 (enum_val p₀) (enum_val q₀)) x) in
+         a) == Zp1.
     1:{
-      rewrite /calc_d /sval //.
-      case: (enum_val e) => [e' e_gt1].
+      case: (enum_val e) => [[e' e_gt1]].
+      rewrite /sval => coprime_e_phiN //.
       apply/eqP.
-      Check Zp_mulzV.
       apply Zp_mulzV.
+      rewrite coprime_sym.
+      Check Zp_cast.
       clear e.
-      move: e' e_gt1. rewrite /phi_N_ord'/phi_N_ord/D/D'/E'.
+      move: e' e_gt1 coprime_e_phiN; rewrite /phi_N_ord'/phi_N_ord/D/D'/E' //=.
       rewrite Zp_cast.
-      - move => e' e_gt1.
-        rewrite /coprime.
-        move: p_q_neq'' e' e_gt1.
-        rewrite /phi_N.
-        case: (enum_val q₀) => [q₀' q₀_gt1].
-        case: (enum_val p₀) q₀ => [p₀' p₀_gt1].
-        move => q₀ p_q_neq'' e' e_gt1 //.
-      Search Zp_mul muln.
-      Search Zp_inv.
-
+      - move => e' e_gt1 coprime_e_phiN.
+        exact: coprime_e_phiN.
+      - exact: phi_N_gt1.
     }
     rewrite ifT //=.
 
