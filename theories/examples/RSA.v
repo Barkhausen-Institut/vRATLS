@@ -54,7 +54,11 @@ Module Type RSA_params <: SignatureParams.
 
   Definition pos_n : nat := 2^n.
 
-  Definition r₀ : nat := n.+4. (* We need to have at least two primes [p] and [q]. *)
+  Definition r₀ : nat := n.+4.+2.
+  (* We need to have at least two primes [p] and [q].
+     Indeed, the conditions for phi_N force us to have
+     at least prime numbers 2,3 and 5!
+   *)
   Definition R₀ : Type := 'I_r₀.
   Definition r : nat := r₀ * r₀.
   Definition R : Type := 'I_r.
@@ -78,6 +82,12 @@ Module Type RSA_params <: SignatureParams.
   Definition three : R₀ := Ordinal three_ltn_r₀.
   Lemma prime3ord : prime three. Proof. by []. Qed.
   Definition three' : prime_num := exist _ three prime3ord.
+  Lemma five_ltn_r₀ : 5 < r₀.
+  Proof. by rewrite /r₀; case: n. Qed.
+
+  Definition five : R₀ := Ordinal five_ltn_r₀.
+  Lemma prime5ord : prime five. Proof. by []. Qed.
+  Definition five' : prime_num := exist _ five prime5ord.
 
   (*
     This definition accounts for two properties:
@@ -121,7 +131,8 @@ Module Type RSA_params <: SignatureParams.
     - by apply properD1.
   Qed.
 
-  Lemma p_q_neq p q (p_in_P: p \in P) : q \in P' p -> p <> q.
+  Lemma p_q_neq p q (p_in_P: p \in P) :
+    q \in P' p -> p <> q.
   Proof.
     rewrite /P'.
     case: (p == two');
@@ -139,8 +150,12 @@ Module Type RSA_params <: SignatureParams.
   Proof.
     apply/card_gt0P.
     case H: (p == two'); move/eqP: H.
-    - move => H; rewrite H; exists three'.
-      rewrite /P' in_setD1 //=.
+    - move => H; rewrite H; exists five'.
+      rewrite /P'.
+      Search (_ \in _) reflect.
+      Unset Printing Notations.
+      rewrite [X in in_mem _ (mem X)]ifT. in_setD1 //=.
+      Check in_setD1.
       apply in_setT.
     - move => H; exists two'.
       rewrite /P' in_setD1 //=.
