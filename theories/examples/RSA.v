@@ -90,23 +90,43 @@ Module Type RSA_params <: SignatureParams.
        [e=3] when [p=2] and [q=5] because
        [2.-1 * 5.-1 = 1 * 4 = 4].
    *)
-  Definition P' (y : prime_num) :=
+  Definition P' (y : prime_num) := (* (P :\ y)%SET. *)
     let P_no_y := (P :\ y)%SET in
     if y == two' then (P_no_y :\ three')%SET
     else P_no_y.
 
+  Lemma notin_m {T:finType} (a b:T) (Q:{set T}):
+    a \notin Q -> a \notin (Q :\ b)%SET.
+  Proof.
+    move => a_notin_Q.
+    rewrite in_setD.
+    by apply/nandP; right.
+  Qed.
+
   Lemma P_P'_neq : forall y, y \in P -> P :!=: P' y.
   Proof.
-    unfold P'. intros.
-    apply properD1 in H.
+    rewrite /P' => y y_in_P.
     rewrite eqtype.eq_sym.
     apply proper_neq.
-    exact H.
+    case: (y == two').
+    - apply/properP.
+      split.
+      * by [].
+      * exists y => //=.
+        apply notin_m.
+        rewrite in_setD.
+        apply/nandP; left.
+        rewrite negbK.
+        exact: set11.
+    - by apply properD1.
   Qed.
 
   Lemma p_q_neq p q (p_in_P: p \in P) : q \in P' p -> p <> q.
   Proof.
-    by rewrite /P' in_setD1; move/andP; case; move/eqP/nesym.
+    rewrite /P'.
+    case: (p == two');
+      [rewrite in_setD1; move/andP; case => _|];
+      by rewrite in_setD1; move/andP; case; move/eqP/nesym.
   Qed.
 
   Definition i_P := #|P|.
@@ -1238,7 +1258,12 @@ Module RSA_SignatureAlgorithms
           apply/andP; split; [ by apply dvdn_mull |].
           move: ed_mod; rewrite mulnC.
 
-          (* TODO should be a separate lemma! *)
+          (* TODO should be a separate lemma!
+             [
+               Zp_mul e' (Zp_inv e') == Zp1 ->
+               e' * Zp_inv e' == 1 %[mod p'.-1 * q'.-1]
+             ]
+           *)
           rewrite /Zp_mul/inZp //=.
           move/eqP.
           case.
