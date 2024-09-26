@@ -60,24 +60,10 @@ Module Type RSA_params <: SignatureParams.
   Definition R : Type := 'I_r.
 
   (* the set of prime numbers. *)
-  Definition prime_num : finType := {x: R₀  | prime x}.
+  Definition prime_num : finType := {x: R₀  | prime x
+                                              (* &  odd x (* --> excludes prime 2 and gives e=7 (smallest)  *) *)
+    }.
   Definition P : {set prime_num} := [set : prime_num].
-
-  Definition P' (y : prime_num) := (P :\ y)%SET.
-
-  Lemma P_P'_neq : forall y, y \in P -> P :!=: P' y.
-  Proof.
-    unfold P'. intros.
-    apply properD1 in H.
-    rewrite eqtype.eq_sym.
-    apply proper_neq.
-    exact H.
-  Qed.
-
-  Lemma p_q_neq p q (p_in_P: p \in P) : q \in P' p -> p <> q.
-  Proof.
-    by rewrite /P' in_setD1; move/andP; case; move/eqP/nesym.
-  Qed.
 
   Lemma two_ltn_r₀ : 2 < r₀.
   Proof. by rewrite /r₀; case: n. Qed.
@@ -92,6 +78,36 @@ Module Type RSA_params <: SignatureParams.
   Definition three : R₀ := Ordinal three_ltn_r₀.
   Lemma prime3ord : prime three. Proof. by []. Qed.
   Definition three' : prime_num := exist _ three prime3ord.
+
+  (*
+    This definition accounts for two properties:
+    1. [p <> q] such that the primes are not equal and
+    2. [2 < p.-1 * q.-1] such that we at the very least draw
+       one number [e] from this space.
+       Since, in this new space [phi_N = p.-1 * q.-1] we also
+       require that [e] is coprime to the space itself, i.e.,
+       [coprime e phi_N] we arrive that smallest possible
+       [e=3] when [p=2] and [q=5] because
+       [2.-1 * 5.-1 = 1 * 4 = 4].
+   *)
+  Definition P' (y : prime_num) :=
+    let P_no_y := (P :\ y)%SET in
+    if y == two' then (P_no_y :\ three')%SET
+    else P_no_y.
+
+  Lemma P_P'_neq : forall y, y \in P -> P :!=: P' y.
+  Proof.
+    unfold P'. intros.
+    apply properD1 in H.
+    rewrite eqtype.eq_sym.
+    apply proper_neq.
+    exact H.
+  Qed.
+
+  Lemma p_q_neq p q (p_in_P: p \in P) : q \in P' p -> p <> q.
+  Proof.
+    by rewrite /P' in_setD1; move/andP; case; move/eqP/nesym.
+  Qed.
 
   Definition i_P := #|P|.
   Instance pos_i_P : Positive i_P.
@@ -557,6 +573,7 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
 
   Definition phi_N_ord (a b : prime_num) : R :=
     Ordinal (phi_N_lt_r a b).
+
 
   Lemma e_inv_gt2 {m:R} (H:2<m) (e:'Z_m) : 1 <  Zp_inv e.
   Proof.
