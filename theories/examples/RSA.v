@@ -152,16 +152,17 @@ Module Type RSA_params <: SignatureParams.
     case H: (p == two'); move/eqP: H.
     - move => H; rewrite H; exists five'.
       rewrite /P'.
-      Search (_ \in _) reflect.
-      Unset Printing Notations.
-      rewrite [X in in_mem _ (mem X)]ifT. in_setD1 //=.
-      Check in_setD1.
+      case: (two' == two');
+        try repeat rewrite in_setD1 //=.
       apply in_setT.
     - move => H; exists two'.
-      rewrite /P' in_setD1 //=.
-      apply/andP; split.
-      + by apply/eqP/nesym.
-      + apply in_setT.
+      rewrite /P'.
+      rewrite ifF.
+      + repeat rewrite in_setD1 //=.
+        apply/andP; split.
+        * by apply/eqP/nesym.
+        * apply in_setT.
+      + by apply/eqP.
   Qed.
 
   Lemma p_q_neq' (p: 'fin P) (q: 'fin (P' (enum_val p))) : enum_val p != enum_val q.
@@ -517,10 +518,45 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     by rewrite -mulSnr -mulSn -mulSn -mulSn.
   Qed.
 
-  Lemma ltn_R : forall (a b: R₀), a * b < (π1.n + (π1.n + (π1.n + (π1.n + π1.n * π1.n.+4).+4).+4).+4).+4.
+  Lemma fold_R6 :
+    (π1.n +
+       (π1.n +
+          (π1.n +
+             (π1.n +
+                (π1.n +
+                   (π1.n + π1.n * r₀).+2.+4).+2.+4).+2.+4).+2.+4).+2.+4).+2.+4  = (π1.n.+2.+4 * π1.n.+2.+4)%nat.
+  Proof.
+    rewrite /r₀.
+    rewrite (addnC π1.n (muln _ _)).
+    repeat rewrite -addSn.
+    rewrite -[X in
+        (_ + (_ + (_ + (_ + (_ + X)))))%nat = _]addn4.
+    rewrite -/Nat.add plusE.
+    rewrite -[X in
+        (_ + (_ + (_ + (_ + (_ + X)))))%nat = _]addn2.
+    rewrite -/Nat.add plusE.
+    rewrite -[X in
+        (_ + (_ + (_ + (_ + (_ + X)))))%nat = _]addnA.
+    rewrite -[X in
+        (_ + (_ + (_ + (_ + (_ + X)))))%nat = _]addnA.
+    rewrite (addnC 4 2).
+    rewrite (addnA _  2 4).
+    rewrite addn2.
+    rewrite addn4.
+    by rewrite -mulSnr -mulSn -mulSn -mulSn.
+  Qed.
+
+  Lemma ltn_R : forall (a b: R₀),
+      a * b <
+        (π1.n +
+           (π1.n +
+              (π1.n +
+                 (π1.n +
+                    (π1.n +
+                       (π1.n + π1.n * r₀).+2.+4).+2.+4).+2.+4).+2.+4).+2.+4).+2.+4.
   Proof.
     rewrite /R₀/r₀ => a b.
-    by rewrite fold_R4 ltn_mul.
+    by rewrite fold_R6 ltn_mul.
   Qed.
 
 
