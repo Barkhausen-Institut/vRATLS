@@ -253,6 +253,8 @@ Module Type SignatureProt
              rewrite setmE.
              rewrite ifT //=.
              apply/eqP.
+             (* FIXME: even this is not correct.
+                       the correctness property needs evidence that [(pk,sk) = KeyGen] *)
              exact: Signature_correct.
          --- rewrite set_s1.
              rewrite /heap_ignore => l l_notin_sign_loc.

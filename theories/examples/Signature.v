@@ -145,6 +145,10 @@ Module Type SignatureAlgorithms
    'bool.
 
   (* Functional correctness property for signatures *)
+  (* FIXME
+     This is still insufficient!
+     It misses the key generation evidence.
+   *)
   Parameter Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
 
 End SignatureAlgorithms.
