@@ -326,9 +326,8 @@ Module Type RSA_params <: SignatureParams.
   Definition m_pred_E {m:R} (H:2<m) : (E' H) :=
     exist _ (m_pred m) (m_pred_all H).
 
-  (* #[export] Instance positive_E {m:R} (H:2<m): Positive #|(E H)|. *)
-  (* Proof. apply/card_gt0P; by exists (two_E H). Qed. *)
-
+  #[export] Instance positive_E {m:R} (H:2<m): Positive #|(E H)|.
+  Proof. apply/card_gt0P; by exists (m_pred_E H). Qed.
 
   Definition R' : finType := {x:R | 0 < x}.
 
@@ -669,41 +668,38 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
   Definition phi_N_ord (a b : prime_num) : R :=
     Ordinal (phi_N_lt_r a b).
 
-  Equations CC' (H:{m:R | 2<m}) : { x:((D' H),m) | coprime (proj1_sig x) m } :=
-    CC' H := C' H.
+  (* Lemma e_inv_gt2 {phi:{m:R | 2<m}} (e: C' phi) : 1 <  Zp_inv (proj1_sig e). *)
+  (* (* Lemma e_inv_gt2 (m:R) (H:2<m) (e: C' (@exist R H)) : 1 <  Zp_inv (proj1_sig e). *) *)
+  (* Proof. *)
+  (*   move: e. rewrite /C' //=. *)
+  (*   rewrite /C'_clause_1. *)
 
-  Lemma e_inv_gt2 {phi:{m:R | 2<m}} (e: C' phi) : 1 <  Zp_inv (proj1_sig e).
-  (* Lemma e_inv_gt2 (m:R) (H:2<m) (e: C' (@exist R H)) : 1 <  Zp_inv (proj1_sig e). *)
-  Proof.
-    move: e. rewrite /C' //=.
-    rewrite /C'_clause_1.
+  (*   (* *)
+  (*   have coprime_m : coprime (proj1_sig phi) (m_pred (proj1_sig phi)) by exact: (m_pred_coprime phi). *)
+  (*    *) *)
+  (*   case: phi e (* coprime_m *); rewrite /sval => m m_ltn2. *)
+  (*   rewrite /m_pred. *)
+  (*   rewrite /C' //=. *)
+  (*   case; case => x one_ltn_x. *)
+  (*   rewrite /sval. *)
+  (*   Search Zp_inv. *)
+  (*   Print Zp_inv. *)
 
-    (*
-    have coprime_m : coprime (proj1_sig phi) (m_pred (proj1_sig phi)) by exact: (m_pred_coprime phi).
-     *)
-    case: phi e (* coprime_m *); rewrite /sval => m m_ltn2.
-    rewrite /m_pred.
-    rewrite /C' //=.
-    case; case => x one_ltn_x.
-    rewrite /sval.
-    Search Zp_inv.
-    Print Zp_inv.
-
-    rewrite /sval //.
+  (*   rewrite /sval //. *)
 
 
-    case: m H e e_ltn;
-      do 3! (case => //=).
-    Search Zp_inv.
+  (*   case: m H e e_ltn; *)
+  (*     do 3! (case => //=). *)
+  (*   Search Zp_inv. *)
 
-    Admitted.
+  (*   Admitted. *)
 
   (* Equations calc_d {m:R} (H:2<m) (e:C' H) : E' H := *)
   (*   calc_d H (@exist e' ep) := *)
   (*     exist _ (Zp_inv e') (e_inv_gt2 H e'). *)
 
-  Equations e_widen {m:R} (H:2<m) (e:E' H) : R :=
-    e_widen H e := widen_ord _ (proj1_sig e).
+  Equations e_widen {m:R} (H:2<m) (e:'Z_m) : R :=
+    e_widen _ e := widen_ord _ e.
   Next Obligation.
     rewrite /R/r/E'/Zp_trunc //.
     move => [m m_lt_r] H [e e_gt1] //=.
@@ -713,43 +709,124 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     - rewrite -ltnS prednK.
       + exact: ltnW H.
       + exact: ltnW (ltnW H).
-  Qed.
+  Defined.
 
-  Lemma phi_N_ord_gt2 (a b : prime_num) : 2 < phi_N_ord a b.
-  Proof.
-    case: a => a a_prime; case: b => b b_prime.
-    rewrite /phi_N_ord //.
-    case: a a_prime.
-    case => //.
-  Admitted.
+  Equations calc_d (phi: {m:R | 2<m}) (e:E' (proj2_sig phi)) : 'Z_(proj1_sig phi) :=
+    calc_d (exist H) (@exist e' ep) := Zp_inv e' .
 
-  Definition phi_N_ord' (a b: prime_num) : {x:R | 2 < x} :=
-    exist _ (phi_N_ord a b) (phi_N_ord_gt2 a b).
+  (* Lemma phi_N_ord_gt2 (a b : prime_num) : 2 < phi_N_ord a b. *)
+  (* Proof. *)
+  (*   case: a => a a_prime; case: b => b b_prime. *)
+  (*   rewrite /phi_N_ord //. *)
+  (*   case: a a_prime. *)
+  (*   case => //. *)
+  (* Admitted. *)
 
-  Equations calc_d' (phi: {m:R | 2<m}) (e:C' (proj2_sig phi)) : E' (proj2_sig phi) :=
-    calc_d' (exist H) (@exist e' ep) := exist _ (Zp_inv e') (e_inv_gt2 H e' ep).
+  Equations phi_N_ord' (p: 'fin P) (q: 'fin (P' (enum_val p))) : {m:R | 2 < m} :=
+    phi_N_ord' p q := exist _ (phi_N_ord (enum_val p) (enum_val q)) _.
+  Next Obligation.
+    move => p' q'.
+    rewrite /phi_N_ord/phi_N //=.
+
+    (* case H: (enum_val p' == two') q'. *)
+    (* - move/eqP: H => H; rewrite H. *)
+    (*   rewrite /P' //= => q'. *)
+    (*   case: q'. *)
+    (*   case H₁: (enum_val q') => [q'' q_prime]. (* How do I iterate over q now? *) *)
+    (*   rewrite /P //=. *)
+
+    (*   Search leq. *)
+    (*   Unset Printing All. *)
+    (*           case => //=. *)
+    (* case: (enum_val p) q => //= => p' p_prime. *)
+    (* rewrite /P' //=. *)
+
+    have p_in_P : enum_val p' \in P := enum_valP p'.
+    have q_in_P' : enum_val q' \in (P' (enum_val p')) := enum_valP q'.
+    have p_q_neq: enum_val p' \in P -> enum_val q' \in P' (enum_val p') -> enum_val p' <> enum_val q' := (p_q_neq (enum_val p') (enum_val q')).
+    move:p_q_neq p_in_P q_in_P'.
+
+    case: (enum_val q') => /= => q'' q_prime.
+    case: (enum_val p') => /= => p'' p_prime.
+
+    case: p'' p_prime => //=; case => //=; case => //=.
+    case.
+    - (* [p = 2] *)
+      case: q'' q_prime => //=; case => //=; case => //=.
+      case.
+      + (* [q = 2] => discard by [P'] *)
+        move => q_lt_r₀ q_prime.
+        move => p_lt_r₀ p_prime.
+        move => p_q_neq p_in_P q_in_P'.
+
+        specialize (p_q_neq p_in_P q_in_P').
+
+        have p_q_eq: Ordinal (n:=r₀) (m:=2) p_lt_r₀ = Ordinal (n:=r₀) (m:=2) q_lt_r₀ by
+          clear; apply/eqP; exact: eq_refl. (* <- eqType (proof irrelevance) *)
+
+        have prime_p: prime (Ordinal (n:=r₀) (m:=2) p_lt_r₀) by [].
+        have prime_q: prime (Ordinal (n:=r₀) (m:=2) q_lt_r₀) by [].
+
+        have p_q_eq':
+          exist (λ x : 'I_r₀, prime x) (Ordinal (n:=r₀) (m:=2) p_lt_r₀) prime_p
+            = exist (λ x : 'I_r₀, prime x) (Ordinal (n:=r₀) (m:=2) q_lt_r₀) prime_q :=
+          @boolp.eq_exist _ (λ x : 'I_r₀, prime x) _ _ prime_p prime_q p_q_eq.
+
+        have p_prime_eq : prime_p = p_prime by [].
+        have q_prime_eq : prime_q = q_prime by [].
+
+        move: p_q_neq p_q_eq'.
+
+        by rewrite p_prime_eq q_prime_eq.
+
+      + (* [q = n.+3] *)
+        case.
+        * (* [q = 3] => [2 < 1 * 2] => discard by [P'] *)
+
+          move => q_lt_r₀ q_prime.
+          move => p_lt_r₀ p_prime.
+          move => p_q_neq p_in_P.
+
+          rewrite /P'/three'/three  //=.
+          have prime3_eq: q_prime = prime3ord by [].
+          rewrite prime3_eq.
+          rewrite in_setD.
+          move/andP; case.
+          have three_ltn_r₀_eq : q_lt_r₀ = three_ltn_r₀ by [].
+          rewrite three_ltn_r₀_eq.
+          move/negP
+          .
+          by rewrite in_set1.
+
+        * (* [q = n.+3] => [2 < 1 * n.+3] => solve *)
+          by [].
+    - (* [p = n.+3] *)
+      (* discard non-prime cases *)
+      case: q'' q_prime => //=; case => //=; case => //=.
+      (* now solve *)
+
 
   (*
-  Equations? KeyGen :
-    code Key_locs [interface] 'unit :=
-    KeyGen :=
+  equations? keygen :
+    code key_locs [interface] 'unit :=
+    keygen :=
       {code
-         p ← sample uniform P ;;
+         p ← sample uniform p ;;
          let p := enum_val p in
-         q ← sample uniform (P' p) ;;
+         q ← sample uniform (p' p) ;;
          let q := enum_val q in
          #assert (p != q) ;;
 
-         let phiN := phi_N_ord p q in
-         #assert (2 < phiN) as phiN_gt2 ;;
+         let phin := phi_n_ord p q in
+         #assert (2 < phin) as phin_gt2 ;;
 
-         e ← sample uniform (E phiN_gt2) ;;
+         e ← sample uniform (e phin_gt2) ;;
          let e := enum_val e in
-         let d := calc_d phiN_gt2 e in
-         let ed := ((proj1_sig e) * (proj1_sig d) %% phiN) in
-         #assert (ed == 1 %% phiN) ;;
-         let e := e_widen phiN_gt2 e in
-         let d := e_widen phiN_gt2 d in
+         let d := calc_d phin_gt2 e in
+         let ed := ((proj1_sig e) * (proj1_sig d) %% phin) in
+         #assert (ed == 1 %% phin) ;;
+         let e := e_widen phin_gt2 e in
+         let d := e_widen phin_gt2 d in
 
          let n := mult_cast_nat p q in
          let pub_key := fto (n,e) in
@@ -761,52 +838,42 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
 *)
 
   (*
-    REPORT ME:
+    report me:
     This is a bug in SSProve: [#assert] vs. [assert]
     When using [#assert], I get this error.
     This is a pity because [assert P as k] only works as [#assert P as k].
     All is good when I use [assert P].
    *)
- Fail Equations? KeyGen :
-    code Key_locs [interface] (chPubKey × chSecKey) :=
-    KeyGen :=
-      {code
-         p ← sample uniform P ;;
-       let p := enum_val p in
-       q ← sample uniform (P' p) ;;
-       let q := enum_val q in
-       #assert (p != q) ;;
+ (* Fail Equations? KeyGen : *)
+ (*    code Key_locs [interface] (chPubKey × chSecKey) := *)
+ (*    KeyGen := *)
+ (*      {code *)
+ (*         p ← sample uniform P ;; *)
+ (*       let p := enum_val p in *)
+ (*       q ← sample uniform (P' p) ;; *)
+ (*       let q := enum_val q in *)
+ (*       #assert (p != q) ;; *)
 
-       let phiN' := phi_N_ord' p q in
-       let phiN  := proj1_sig phiN' in
-       let phiN_gt2 := proj2_sig phiN' in
+ (*       let phiN' := phi_N_ord' p q in *)
+ (*       let phiN  := proj1_sig phiN' in *)
+ (*       let phiN_gt2 := proj2_sig phiN' in *)
 
-       e ← sample uniform (C phiN') ;;
-       let e := enum_val e in
-       let d := calc_d phiN_gt2 e in
-       let ed := ((proj1_sig e) * (proj1_sig d) %% phiN) in
-       #assert (ed == 1 %% phiN) ;;
-       let e := e_widen phiN_gt2 e in
-       let d := e_widen phiN_gt2 d in
+ (*       e ← sample uniform (C phiN') ;; *)
+ (*       let e := enum_val e in *)
+ (*       let d := calc_d phiN e in *)
+ (*       let ed := ((proj1_sig e) * (proj1_sig d) %% phiN) in *)
+ (*       #assert (ed == 1 %% phiN) ;; *)
+ (*       let e := e_widen phiN_gt2 e in *)
+ (*       let d := e_widen phiN_gt2 d in *)
 
-       let n := mult_cast_nat p q in
-       let pub_key := fto (n,e) in
-       let sec_key := fto (n,d) in
-       #put pk_loc := pub_key ;;
-       #put sk_loc := sec_key ;;
-       ret ( pub_key , sec_key )
-      }.
+ (*       let n := mult_cast_nat p q in *)
+ (*       let pub_key := fto (n,e) in *)
+ (*       let sec_key := fto (n,d) in *)
+ (*       #put pk_loc := pub_key ;; *)
+ (*       #put sk_loc := sec_key ;; *)
+ (*       ret ( pub_key , sec_key ) *)
+ (*      }. *)
 
-
-   Equations cast_D_E {H : {m:R | 2<m}} (x: D' H) : E' (proj2_sig H) :=
-     cast_D_E x := _.
-   Next Obligation.
-     move => H.
-     rewrite /D'.
-     case: H => m m_gt2.
-     rewrite /proj2_sig.
-     exact: id.
-   Defined.
 
   Equations KeyGen :
     code Key_locs [interface] (chPubKey × chSecKey) :=
@@ -819,17 +886,16 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       assert (p != q) ;;
 
       let phiN' := phi_N_ord' p q in
-      let phiN  := proj1_sig phiN' in
-      let phiN_gt2 := proj2_sig phiN' in
+      let phiN₁  := proj1_sig phiN' in
+      let phiN₂ := proj2_sig phiN' in
 
-      e ← sample uniform (C phiN') ;;
+      e ← sample uniform (E phiN₂) ;;
       let e := enum_val e in
-      let e_in_d := (cast_D_E (proj1_sig e)) in
-      let d := calc_d' phiN' e_in_d in
-      let ed := Zp_mul (proj1_sig e_in_d) (proj1_sig d) in
+      let d := calc_d phiN' e in
+      let ed := Zp_mul (proj1_sig e) d in
       assert (ed == Zp1) ;;
-      let e := e_widen phiN_gt2 e_in_d in
-      let d := e_widen phiN_gt2 d in
+      let e := e_widen phiN₂ (proj1_sig e) in
+      let d := e_widen phiN₂ d in
 
       let n := mult_cast_nat p q in
       let pub_key := fto (n,e) in
