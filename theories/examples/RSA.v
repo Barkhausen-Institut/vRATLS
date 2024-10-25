@@ -39,8 +39,6 @@ From vRATLS Require Import Signature.
 
 Import PackageNotation.
 
-Obligation Tactic := idtac.
-
 Local Open Scope package_scope.
 
 
@@ -203,72 +201,6 @@ Module Type RSA_params <: SignatureParams.
   Definition E' {m:R} (H:2<m) : finType := { x: 'Z_m | (1 < x) && (coprime m x)}.
   Definition E  {m:R} (H:2<m) : {set (E' H)} := [set : E' H].
 
-  (* Lemma two_ltn_E {m:R} (H:2<m) : 2 < m. Proof. exact:H. Qed. *)
-
-  (* Definition two_Zp (m:R): 'Z_m := inZp 2. *)
-  (* Lemma two_gt1 {m:R} (H:2<m) : (1 < two_Zp m)%Z. *)
-  (* Proof. *)
-  (*   move => //=. *)
-  (*   case: m H; case => [|m0] _ //=. *)
-  (*   rewrite ltnS /Zp_trunc //=. *)
-  (*   case: m0 => [|m1] //=. *)
-  (*   rewrite ltnS. *)
-  (*   by case: m1. *)
-  (* Qed. *)
-
-  (* Definition two_E {m:R} (H:2<m) : (E' H) := *)
-  (*   exist _ (two_Zp m) (two_gt1 H). *)
-
-  (* #[export] Instance positive_E {m:R} (H:2<m): Positive #|(E H)|. *)
-  (* Proof. apply/card_gt0P; by exists (two_E H). Qed. *)
-
-  (* (* *)
-  (* Equations D' (H:{m:R | 2<m}) : finType := *)
-  (*   D' (exist H) := E' H. *)
-  (*  *) *)
-  (* Definition D' (H:{m:R | 2<m}) : finType := *)
-  (*   match H with *)
-  (*     | exist _ H₀ => E' H₀ *)
-  (*   end. *)
-
-  (* Definition D (H:{m:R | 2<m}) : {set (D' H)} := [set : D' H]. *)
-
-  (* Equations two_D (H:{m:R | 2<m}) : (D' H) := *)
-  (*   two_D (exist H0) := two_E H0. *)
-
-  (* #[export] Instance positive_D (H :{m:R | 2<m}) : Positive #|(D H)|. *)
-  (* Proof. apply/card_gt0P; by exists (two_D H). Qed. *)
-
-
-  (* Fail Equations C' (H:{m:R | 2<m}) : finType := *)
-  (*   C' H with H => { *)
-  (*       | (@exist m H₀) := { x:(D' H) | coprime (proj1_sig x) m } *)
-  (*     }. *)
-
-
-  (* (* *)
-  (* Definition A₀ {m:nat} (H:2<m) : finType := {x: 'Z_m | 1 < x}. *)
-  (* Definition A₁ {m:nat} (H:2<m) : finType := {x: 'Z_m | coprime x m}. *)
-  (* Fail Definition A₂ {m:nat} (H:2<m) : finType := {x: 'Z_m | coprime x m ∧ 1 < x}. *)
-  (* Definition A₂ {m:nat} (H:2<m) : finType := {x: 'Z_m | coprime x m && (1 < x)}. *)
-  (* *) *)
-  (* Definition A₀ {m:R} (H:2<m) : finType := {x: 'Z_m | 1 < x}. *)
-  (* Definition A₁ {m:R} (H:2<m) : finType := {x: 'Z_m | coprime x m}. *)
-  (* Definition C' {m:R} (H:2<m) : finType := {x: 'Z_m | coprime x m && (1 < x)}. *)
-
-  (* Equations C' (H:{m:R | 2<m}) : finType := *)
-  (*   C' H with H => { *)
-  (*     | (@exist m H₀) := { x:(D' H) | coprime _ m } *)
-  (*     }. *)
-  (* Next Obligation. *)
-  (*   move => H m P_m. *)
-  (*   rewrite /D'. *)
-  (*   case: H => x H₀. *)
-  (*   exact: proj1_sig. *)
-  (* Defined. *)
-
-  (* Definition C (H:{m:R | 2<m}) : {set (C' H)} := [set : C' H]. *)
-
   Definition m_pred (m:R) : 'Z_m := inZp m.-1.
   Lemma m_pred_gt1' {m:R} (m_gt2:2<m) : (1 < m_pred m)%Z.
   Proof.
@@ -309,31 +241,6 @@ Module Type RSA_params <: SignatureParams.
     by apply m_pred_coprime'.
   Qed.
 
-  (* Equations m_pred_C' (H:{m:R | 2<m}) : (D' H) := *)
-  (*   m_pred_C' H with H => { *)
-  (*     | (@exist m H₀) := exist _ (m_pred m) (m_pred_gt1' H₀) *)
-  (*     }. *)
-
-  (* Fail Equations m_pred_C (H:{m:R | 2<m}) : (C' H) := *)
-  (*   m_red_C H := exist _ (m_pred_C' H) (m_pred_coprime H). *)
-
-  (* Equations m_pred_C (H:{m:R | 2<m}) : (C' H) := *)
-  (*   m_pred_C H := _ . *)
-  (* Next Obligation. *)
-  (*   move => H. *)
-  (*   rewrite /C'/C'_clause_1. *)
-  (*   case: H => x x_gt2. *)
-  (*   exists (m_pred_C' (exist _ x x_gt2)). *)
-  (*   rewrite /m_pred_C'/m_pred_C'_clause_1. *)
-  (*   rewrite /C'_obligations_obligation_1. *)
-  (*   rewrite /sval. *)
-  (*   rewrite coprime_sym. *)
-  (*   exact: m_pred_coprime'. *)
-  (* Qed. *)
-
-  (* #[export] Instance positive_C (H :{m:R | 2<m}) : Positive #|(E H)|. *)
-  (* Proof. apply/card_gt0P; by exists (m_pred_C H). Qed. *)
-
   Lemma m_pred_all {m:R} (m_gt2: 2<m) : (1 < m_pred m)%Z && coprime m (m_pred m).
   Proof.
     apply/andP.
@@ -359,7 +266,6 @@ Module Type RSA_params <: SignatureParams.
   Definition Signature : finType := R.
   Definition Message : finType := R. (* TODO should just be a space that is bounded by another bound *)
   Definition Challenge : finType := R.
-(*  Definition E_space : finType := E. *)
 
   (**
      We need to tanslate a message into the "RSA" space.
@@ -474,14 +380,6 @@ Module RSA_KeyGen (π1  : RSA_params)
     apply /card_gt0P. exists chal0. auto.
   Qed.
   Definition Challenge_pos : Positive #|Challenge| := _.
-
-  (*
-  #[export] Instance positive_Sample : Positive #|Sample_space|.
-  Proof.
-    apply /card_gt0P. exists ss0. auto.
-  Qed.
-  Definition Sample_pos : Positive #|Sample_space| := _.
-   *)
 
   Definition chSecKey  : choice_type := 'fin #|SecKey|.
   Definition chPubKey : choice_type := 'fin #|PubKey|.
@@ -646,24 +544,6 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     | exist a' ap , exist b' bp => a'.-1 * b'.-1
     end.
 
-  (* Lemma phi_N_gt1 (a b: prime_num) (H: a != b) : 1 < phi_N a b. *)
-  (* Proof. *)
-  (*   rewrite /phi_N. *)
-  (*   case: a H => a a_prime; case: b => b b_prime. *)
-  (*   Search exist. *)
-  (*   move/negP/eqP. *)
-  (*   move/EqdepFacts.eq_sig_fst. *)
-  (*   move: a b a_prime b_prime. *)
-  (*   case => [] // [] // [] // [] // a //=. *)
-  (*   Check prime2ord. *)
-  (*   Compute (prime 2). *)
-  (*   case => [] // [] // [] // [] // b b_ltn_r₀. *)
-  (*   move => //=. *)
-  (*   Search Nat.pred muln. *)
-  (*   Search (_ < _ * _). *)
-  (*   apply (ltnW (pq_phi_gt_0 _ _ a_prime b_prime)). *)
-  (*   Admitted. *)
-
   Lemma sub_r_gt_r {r:R₀} (H:0 < r) : r.-1 < r₀.
   Proof.
     case: r H; case => r r_lt_r₀ // => H //=.
@@ -684,36 +564,6 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
 
   Definition phi_N_ord (a b : prime_num) : R :=
     Ordinal (phi_N_lt_r a b).
-
-  (* Lemma e_inv_gt2 {phi:{m:R | 2<m}} (e: C' phi) : 1 <  Zp_inv (proj1_sig e). *)
-  (* (* Lemma e_inv_gt2 (m:R) (H:2<m) (e: C' (@exist R H)) : 1 <  Zp_inv (proj1_sig e). *) *)
-  (* Proof. *)
-  (*   move: e. rewrite /C' //=. *)
-  (*   rewrite /C'_clause_1. *)
-
-  (*   (* *)
-  (*   have coprime_m : coprime (proj1_sig phi) (m_pred (proj1_sig phi)) by exact: (m_pred_coprime phi). *)
-  (*    *) *)
-  (*   case: phi e (* coprime_m *); rewrite /sval => m m_ltn2. *)
-  (*   rewrite /m_pred. *)
-  (*   rewrite /C' //=. *)
-  (*   case; case => x one_ltn_x. *)
-  (*   rewrite /sval. *)
-  (*   Search Zp_inv. *)
-  (*   Print Zp_inv. *)
-
-  (*   rewrite /sval //. *)
-
-
-  (*   case: m H e e_ltn; *)
-  (*     do 3! (case => //=). *)
-  (*   Search Zp_inv. *)
-
-  (*   Admitted. *)
-
-  (* Equations calc_d {m:R} (H:2<m) (e:C' H) : E' H := *)
-  (*   calc_d H (@exist e' ep) := *)
-  (*     exist _ (Zp_inv e') (e_inv_gt2 H e'). *)
 
   Equations e_widen {m:R} (H:2<m) (e:'Z_m) : R :=
     e_widen _ e := widen_ord _ e.
@@ -829,36 +679,7 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
           exact: iH.
   Defined.
 
-  (*
-  equations? keygen :
-    code key_locs [interface] 'unit :=
-    keygen :=
-      {code
-         p ← sample uniform p ;;
-         let p := enum_val p in
-         q ← sample uniform (p' p) ;;
-         let q := enum_val q in
-         #assert (p != q) ;;
 
-         let phin := phi_n_ord p q in
-         #assert (2 < phin) as phin_gt2 ;;
-
-         e ← sample uniform (e phin_gt2) ;;
-         let e := enum_val e in
-         let d := calc_d phin_gt2 e in
-         let ed := ((proj1_sig e) * (proj1_sig d) %% phin) in
-         #assert (ed == 1 %% phin) ;;
-         let e := e_widen phin_gt2 e in
-         let d := e_widen phin_gt2 d in
-
-         let n := mult_cast_nat p q in
-         let pub_key := fto (n,e) in
-         let sec_key := fto (n,d) in
-         #put pk_loc := pub_key ;;
-         #put sk_loc := sec_key ;;
-         ret '( pub_key, sub_key )
-      }.
-*)
 
   (*
     report me:
