@@ -902,13 +902,13 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
     code Key_locs [interface] (chPubKey × chSecKey) :=
     KeyGen :=
     {code
-      p ← sample uniform P ;;
-      let p := enum_val p in
-      q ← sample uniform (P' p) ;;
-      let q := enum_val q in
+      p₀ ← sample uniform P ;;
+      let p := enum_val p₀ in
+      q₀ ← sample uniform (P' p) ;;
+      let q := enum_val q₀ in
       assert (p != q) ;;
 
-      let phiN' := phi_N_ord' p q in
+      let phiN' := phi_N_ord' p₀ q₀ in
       let phiN₁  := proj1_sig phiN' in
       let phiN₂ := proj2_sig phiN' in
 
