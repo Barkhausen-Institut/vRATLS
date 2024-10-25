@@ -103,7 +103,8 @@ Module Type RSA_params <: SignatureParams.
   Definition P' (y : prime_num) := (* (P :\ y)%SET. *)
     let P_no_y := (P :\ y)%SET in
     if y == two' then (P_no_y :\ three')%SET
-    else P_no_y.
+    else if y == three' then (P_no_y :\ two')%SET
+         else P_no_y.
 
   Lemma notin_m {T:finType} (a b:T) (Q:{set T}):
     a \notin Q -> a \notin (Q :\ b)%SET.
@@ -128,16 +129,29 @@ Module Type RSA_params <: SignatureParams.
         apply/nandP; left.
         rewrite negbK.
         exact: set11.
-    - by apply properD1.
+    - case: (y == three').
+      * apply/properP.
+        split.
+        + by [].
+        + exists y => //=.
+          apply notin_m.
+          rewrite in_setD.
+          apply/nandP; left.
+          rewrite negbK.
+          exact: set11.
+      * by apply properD1.
   Qed.
 
   Lemma p_q_neq p q (p_in_P: p \in P) :
     q \in P' p -> p <> q.
   Proof.
     rewrite /P'.
-    case: (p == two');
-      [rewrite in_setD1; move/andP; case => _|];
+    case: (p == two').
+    - rewrite in_setD1; move/andP; case => _.
       by rewrite in_setD1; move/andP; case; move/eqP/nesym.
+    - case: (p == three');
+        [rewrite in_setD1; move/andP; case => _|];
+        by rewrite in_setD1; move/andP; case; move/eqP/nesym.
   Qed.
 
   Definition i_P := #|P|.
@@ -155,13 +169,16 @@ Module Type RSA_params <: SignatureParams.
       case: (two' == two');
         try repeat rewrite in_setD1 //=.
       apply in_setT.
-    - move => H; exists two'.
+    - move => H₂.
       rewrite /P'.
       rewrite ifF.
-      + repeat rewrite in_setD1 //=.
-        apply/andP; split.
-        * by apply/eqP/nesym.
-        * apply in_setT.
+      + case H₃: (p == three'); move/eqP: H₃ => H₃.
+        * rewrite H₃.
+          exists five'.
+          repeat rewrite in_setD1 //=; apply/andP; split.
+        * exists two'.
+          rewrite in_setD1.
+          apply/andP; split; [by apply/eqP/nesym | apply in_setT].
       + by apply/eqP.
   Qed.
 
@@ -804,6 +821,18 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
       (* discard non-prime cases *)
       case: q'' q_prime => //=; case => //=; case => //=.
       (* now solve *)
+      case.
+      + (* [q = 2] => [2 < n.+2 * 1]  *)
+        move => q_lt_r₀ q_prime.
+        case.
+        * (* [p = 3] => [2 < 2 * 1] => discard by [P']  *)
+          move => p_lt_r₀ p_prime.
+          move => p_q_neq p_in_P.
+
+         
+        * (* [p = n.+4] => [2 < n.+3 * 1] => solve *)
+          by [].
+      + (* solve *)
 
 
   (*
