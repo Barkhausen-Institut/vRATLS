@@ -1377,20 +1377,18 @@ Module RSA_SignatureAlgorithms
     move: (pkg_interpreter.sampler_obligation_4 (seed + 1 + 1) {| pos := _; cond_pos := _ |}) => e. (* [sk₁] *)
 
     rewrite /sval.
-    case: (enum_val e) => [[e' e_gt1]].
-    rewrite /sval => coprime_e_phiN //.
-    Check phi_N_ord_gt2.
+    case: (enum_val e) => [e']; move/andP; case => [e_gt1 coprime_e_phiN] //.
     have ed_mod : Zp_mul e' (Zp_inv e') == Zp1.
     1:{
       apply/eqP.
       apply Zp_mulzV.
-      rewrite coprime_sym.
+      (* rewrite coprime_sym. *)
       clear e.
-      move: e' e_gt1 coprime_e_phiN; rewrite /phi_N_ord'/phi_N_ord/D/D'/E' //=.
+      move: e' e_gt1 coprime_e_phiN; rewrite /phi_N_ord'/phi_N_ord/E' //=.
       rewrite Zp_cast.
       - move => e' e_gt1 coprime_e_phiN.
         exact: coprime_e_phiN.
-      - apply/ltnW/phi_N_ord_gt2.
+      - apply/ltnW/KGC.phi_N_ord'_obligations_obligation_1.
     }
     rewrite ifT //=.
 
@@ -1411,10 +1409,13 @@ Module RSA_SignatureAlgorithms
 
     move: H; rewrite /mult_cast_nat -/Nat.add -/Nat.mul /widen_ord.
     clear sk_eq pk_eq.
-    move: e e' e_gt1 ed_mod coprime_e_phiN.
+
+    have phi_N_ord_gt2 : 2 < phi_N_ord (enum_val p₀) (enum_val q₀) := KGC.phi_N_ord'_obligations_obligation_1 p₀ q₀.
+
+    move: e' ed_mod e_gt1 coprime_e_phiN phi_N_ord_gt2.
     case Hq: (enum_val q₀) => [q' q'_prime].
     case Hp: (enum_val p₀) => [p' p'_prime].
-    move => e e' e_gt1 ed_mod coprime_e_phiN.
+    move => e' ed_mod e_gt1 coprime_e_phiN phi_N_ord_gt2.
 
     case.
 
@@ -1467,15 +1468,15 @@ Module RSA_SignatureAlgorithms
              *** exact: ed_mod.
              *** apply ltnSE.
                  rewrite prednK.
-                 **** apply/ltnW/(phi_N_ord_gt2 (exist _ p' p'_prime) (exist _ q' q'_prime)).
-                 **** apply/ltnW/ltnW/(phi_N_ord_gt2 (exist _ p' p'_prime) (exist _ q' q'_prime)).
-          ** apply/ltnW/ltnW/(phi_N_ord_gt2 (exist _ p' p'_prime) (exist _ q' q'_prime)).
+                 **** apply/ltnW/phi_N_ord_gt2.
+                 **** apply/ltnW/ltnW/phi_N_ord_gt2.
+          ** apply/ltnW/ltnW/phi_N_ord_gt2.
       + by [].
     - by rewrite /decrypt''; apply ltn_pmod.
 
     Unshelve.
-      1: { clear ed_mod e p'_prime e' e_gt1 coprime_e_phiN Hp; case: p' => [p' p'_ltn_r₀]; apply (leq_trans p'_ltn_r₀ n_leq_nn). }
-      clear ed_mod e e' e_gt1 coprime_e_phiN q'_prime Hq; case: q' => [q' q'_ltn_r₀]; apply (leq_trans q'_ltn_r₀ n_leq_nn).
+      1: { clear ed_mod e phi_N_ord_gt2 p'_prime e' e_gt1 coprime_e_phiN Hp; case: p' => [p' p'_ltn_r₀]; apply (leq_trans p'_ltn_r₀ n_leq_nn). }
+      clear ed_mod e e' e_gt1 coprime_e_phiN phi_N_ord_gt2 q'_prime Hq; case: q' => [q' q'_ltn_r₀]; apply (leq_trans q'_ltn_r₀ n_leq_nn).
   Qed.
 
 End RSA_SignatureAlgorithms.
