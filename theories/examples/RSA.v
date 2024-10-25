@@ -731,32 +731,11 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
   Equations calc_d (phi: {m:R | 2<m}) (e:E' (proj2_sig phi)) : 'Z_(proj1_sig phi) :=
     calc_d (exist H) (@exist e' ep) := Zp_inv e' .
 
-  (* Lemma phi_N_ord_gt2 (a b : prime_num) : 2 < phi_N_ord a b. *)
-  (* Proof. *)
-  (*   case: a => a a_prime; case: b => b b_prime. *)
-  (*   rewrite /phi_N_ord //. *)
-  (*   case: a a_prime. *)
-  (*   case => //. *)
-  (* Admitted. *)
-
   Equations phi_N_ord' (p: 'fin P) (q: 'fin (P' (enum_val p))) : {m:R | 2 < m} :=
     phi_N_ord' p q := exist _ (phi_N_ord (enum_val p) (enum_val q)) _.
   Next Obligation.
     move => p' q'.
     rewrite /phi_N_ord/phi_N //=.
-
-    (* case H: (enum_val p' == two') q'. *)
-    (* - move/eqP: H => H; rewrite H. *)
-    (*   rewrite /P' //= => q'. *)
-    (*   case: q'. *)
-    (*   case H₁: (enum_val q') => [q'' q_prime]. (* How do I iterate over q now? *) *)
-    (*   rewrite /P //=. *)
-
-    (*   Search leq. *)
-    (*   Unset Printing All. *)
-    (*           case => //=. *)
-    (* case: (enum_val p) q => //= => p' p_prime. *)
-    (* rewrite /P' //=. *)
 
     have p_in_P : enum_val p' \in P := enum_valP p'.
     have q_in_P' : enum_val q' \in (P' (enum_val p')) := enum_valP q'.
@@ -811,8 +790,8 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
           move/andP; case.
           have three_ltn_r₀_eq : q_lt_r₀ = three_ltn_r₀ by [].
           rewrite three_ltn_r₀_eq.
-          move/negP
-          .
+          move/negP.
+
           by rewrite in_set1.
 
         * (* [q = n.+3] => [2 < 1 * n.+3] => solve *)
@@ -829,11 +808,26 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
           move => p_lt_r₀ p_prime.
           move => p_q_neq p_in_P.
 
-         
+          rewrite /P'/three'/three/two'/two  //=.
+          have prime2_eq: q_prime = prime2ord by [].
+          rewrite prime2_eq.
+          rewrite in_setD.
+          move/andP; case.
+          have two_ltn_r₀_eq : q_lt_r₀ = two_ltn_r₀ by [].
+          rewrite two_ltn_r₀_eq.
+          move/negP.
+
+          by rewrite in_set1.
+
         * (* [p = n.+4] => [2 < n.+3 * 1] => solve *)
           by [].
       + (* solve *)
-
+        intros; clear.
+        elim: n => [|n' iH].
+        * by case: n0.
+        * rewrite mulnS; apply ltn_addl.
+          exact: iH.
+  Defined.
 
   (*
   equations? keygen :
