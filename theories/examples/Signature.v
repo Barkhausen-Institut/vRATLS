@@ -139,6 +139,8 @@ Module Type SignatureAlgorithms
   Module KG := KeyGen π1 π2 π3.
   Import  π3.KGP KG.
 
+  Parameter KGen : (chSecKey * chPubKey).
+
   Parameter Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature.
 
   Parameter Ver_sig : ∀ (pk :  chPubKey) (sig : chSignature) (m : chMessage),
@@ -149,7 +151,19 @@ Module Type SignatureAlgorithms
      This is still insufficient!
      It misses the key generation evidence.
    *)
-  Parameter Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
+  (* Parameter Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true. *)
+  
+  Parameter Signature_correct: 
+    forall (pk : chPubKey) (sk : chSecKey) (msg : chMessage),
+      (sk, pk) = KGen ->
+      Ver_sig pk (Sign sk msg) msg = true. 
+
+  (*Definition Signature_correct: 
+  forall (msg : chMessage),
+  match KGen with
+  | (pk, sk) =>
+  Ver_sig pk (Sign sk msg) msg = true
+  end. *)
 
 End SignatureAlgorithms.
 
