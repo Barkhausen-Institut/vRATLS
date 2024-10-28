@@ -41,7 +41,7 @@ Import Num.Def.
 Import Num.Theory.
 Import Order.POrderTheory.
 
-From vRATLS Require Import examples.Signature.
+From vRATLS Require Import examples.Signature. 
 
 Import PackageNotation.
 
@@ -56,7 +56,8 @@ Notation " 'set t " := (chSet t) (at level 2): package_scope.
 
 Definition tt := Datatypes.tt.
 
-Module Type SignatureProt
+
+Module SignatureProt
   (π1 : SignatureParams)
   (π2 : SignatureConstraints)
   (KG : KeyGeneration π1 π2)
@@ -67,9 +68,13 @@ Module Type SignatureProt
 
   Definition protocol := 30.
   Definition Sig_prot_ifce :=
-    [interface #val #[protocol] : 'message → 'pubkey × ('signature × 'bool) ].
+    [interface #val #[protocol] : 'message → 'pubkey × ('signature × 'bool) ]. Print Sig_prot_ifce. Print opsig.
 
-  Definition Sig_prot : package Sig_locs_real Sig_ifce Sig_prot_ifce
+  Definition Sig_prot : 
+  package 
+  Sig_locs_real 
+  Sig_ifce 
+  Sig_prot_ifce
     := [package
       #def  #[protocol] (msg : 'message) : 'pubkey × ('signature × 'bool)
       {
@@ -95,7 +100,7 @@ Module Type SignatureProt
       apply fsetUS.
       rewrite fset_cons.
       apply fsetUS.
-      apply fsubsetxx.
+      apply fsubsetxx. Print fsubsetxx.
     - rewrite /Key_locs/Sig_locs_real/Key_locs.
       rewrite fset_cons.
       apply fsetUS.
