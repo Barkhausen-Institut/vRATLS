@@ -99,14 +99,17 @@ Module Type KeyGen_code (π1 : SignatureParams) (π2 : KeyGenParams π1).
   Import π1 π2.
   Module KGP := KeyGenParams_extended π1 π2.
   Import KGP.
-  
+
   Parameter KeyGen :
       code Key_locs [interface] (chPubKey × chSecKey).
 
 End KeyGen_code.
 
-Module KeyGen (π1 : SignatureParams) (π2 : KeyGenParams π1) 
-                      (π3 : KeyGen_code π1 π2).
+Module KeyGen
+  (π1 : SignatureParams)
+  (π2 : KeyGenParams π1)
+  (π3 : KeyGen_code π1 π2).
+
   Import π1 π2 π3.
   Import π3.KGP.
 
@@ -132,14 +135,12 @@ End KeyGen.
 
 Module Type SignatureAlgorithms
     (π1 : SignatureParams)
-    (π2 : KeyGenParams π1) 
+    (π2 : KeyGenParams π1)
     (π3 : KeyGen_code π1 π2).
 
-  Import π1 π2 π3.
-  Module KG := KeyGen π1 π2 π3.
-  Import  π3.KGP KG.
-
-  Parameter KGen : (chSecKey * chPubKey).
+  (* Import π1 π2 π3. *)
+  (* Module KG := KeyGen π1 π2 π3. *)
+  Import π3 π3.KGP (* KG *).
 
   Parameter Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature.
 
@@ -147,34 +148,23 @@ Module Type SignatureAlgorithms
    'bool.
 
   (* Functional correctness property for signatures *)
-  (* FIXME
-     This is still insufficient!
-     It misses the key generation evidence.
-   *)
-  (* Parameter Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true. *)
-  
-  Parameter Signature_correct: 
-    forall (pk : chPubKey) (sk : chSecKey) (msg : chMessage),
-      (sk, pk) = KGen ->
-      Ver_sig pk (Sign sk msg) msg = true. 
-
-  (*Definition Signature_correct: 
-  forall (msg : chMessage),
-  match KGen with
-  | (pk, sk) =>
-  Ver_sig pk (Sign sk msg) msg = true
-  end. *)
+  Parameter Signature_correct : ∀ pk sk msg seed,
+    Some (pk,sk) = Run sampler KeyGen seed ->
+    Ver_sig pk (Sign sk msg) msg == true.
 
 End SignatureAlgorithms.
 
-Module Type SignaturePrimitives
+Module SignaturePrimitives
   (π1 : SignatureParams)
-  (π2 : KeyGenParams π1) 
+  (π2 : KeyGenParams π1)
   (π3 : KeyGen_code π1 π2)
   (π4 : SignatureAlgorithms π1 π2 π3).
 
   Import π1 π2 π3 π4.
-  Import  π3.KGP  π4.KG.
+  Import π3.KGP.
+
+  Module KG := KeyGen π1 π2 π3.
+  Import KG.
 
   Notation " 'signature " := chSignature   (in custom pack_type at level 2).
   Notation " 'signature " := chSignature   (at level 2): package_scope.

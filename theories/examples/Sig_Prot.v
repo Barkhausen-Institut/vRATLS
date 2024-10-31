@@ -64,7 +64,7 @@ Module Type SignatureProt
   (π5 : SignaturePrimitives π1 π2 π3 π4).
 
   Import π1 π2 π3 π4 π5.
-  Import π3.KGP π4.KG.
+  Import π3.KGP π5.KG.
 
   Definition protocol := 30.
   Definition Sig_prot_ifce :=
@@ -193,6 +193,11 @@ Module Type SignatureProt
              ---- by [move: H; rewrite /inv_conj; repeat case].
   Qed.
 
+  (* FIXME
+     This is still insufficient!
+     It misses the key generation evidence.
+   *)
+  Axiom Signature_correct_fail: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
 
   Lemma ext_unforge_sig_prot_full:
     Sig_prot_real ≈₀ Sig_prot_ideal.
@@ -255,7 +260,7 @@ Module Type SignatureProt
              apply/eqP.
              (* FIXME: even this is not correct.
                        the correctness property needs evidence that [(pk,sk) = KeyGen] *)
-             exact: Signature_correct.
+             exact: Signature_correct_fail.
          --- rewrite set_s1.
              rewrite /heap_ignore => l l_notin_sign_loc.
              specialize (h_ignore l l_notin_sign_loc).
@@ -378,7 +383,7 @@ Module Type SignatureProt
            ssprove_sync_eq => sk.
            ssprove_sync_eq => pk2.
            rewrite /tt_.
-           rewrite (Signature_correct pk2 sk x) /=.
+           rewrite (Signature_correct_fail pk2 sk x) /=.
            apply r_ret => s2 s1 s0_eq_s1 //=.
     Qed.
 
@@ -386,4 +391,4 @@ Module Type SignatureProt
 
 End SignatureProt.
 
-  
+

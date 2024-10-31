@@ -42,7 +42,7 @@ Import PackageNotation.
 Local Open Scope package_scope.
 
 
-Module Type RSA_params <: SignatureParams.
+Module RSA_params <: SignatureParams.
 
   (* Message space *)
   Variable w : nat.
@@ -267,17 +267,26 @@ Module Type RSA_params <: SignatureParams.
   Definition Message : finType := R. (* TODO should just be a space that is bounded by another bound *)
   Definition Challenge : finType := R.
 
+End RSA_params.
+
+(*
+TODO Turn this into a module type
+ *)
+Module Padding.
+
+  Import RSA_params.
+
   (**
      We need to tanslate a message into the "RSA" space.
    *)
   Parameter padd : forall (pq:nat) (m:Message), 'I_pq.
 
-End RSA_params.
+End Padding.
 
-Module RSA_KeyGen (π1  : RSA_params)
-    <: KeyGenParams π1.
 
-  Import π1.
+Module RSA_func.
+
+  Import RSA_params.
 
   (* Encryption *)
   Definition encrypt' e p q w : nat := w ^ e %% (p * q ).
@@ -343,6 +352,14 @@ Module RSA_KeyGen (π1  : RSA_params)
     by case => [] // [] // p1; case => [] // [].
   Qed.
 
+End RSA_func.
+
+
+
+Module RSA_KeyGen <: KeyGenParams RSA_params.
+
+  Import RSA_params RSA_func.
+
   Definition sk0 : SecKey := (exist _ 1%R (ltn0Sn 0), 1)%g.
   Definition pk0 : PubKey := (exist _ 1%R (ltn0Sn 0), 1)%g.
   Definition sig0 : Signature := 1%g.
@@ -351,35 +368,35 @@ Module RSA_KeyGen (π1  : RSA_params)
 (*  Definition ss0 :Sample_space := 1%g. *)
 
 
-  #[export] Instance positive_SecKey : Positive #|SecKey|.
+  #[export] Instance SecKey_pos : Positive #|SecKey|.
   Proof.
     apply /card_gt0P. exists sk0. auto.
   Qed.
-  Definition SecKey_pos : Positive #|SecKey| := _ .
+  (* Definition SecKey_pos : Positive #|SecKey| := _ . *)
 
-  #[export] Instance positive_PubKey : Positive #|PubKey|.
+  #[export] Instance PubKey_pos : Positive #|PubKey|.
   Proof.
     apply /card_gt0P. exists pk0. auto.
   Qed.
-  Definition PubKey_pos : Positive #|PubKey| := _.
+  (* Definition PubKey_pos : Positive #|PubKey| := _. *)
 
-  #[export] Instance positive_Sig : Positive #|Signature|.
+  #[export] Instance Signature_pos : Positive #|Signature|.
   Proof.
     apply /card_gt0P. exists sig0. auto.
   Qed.
-  Definition Signature_pos: Positive #|Signature| := _.
+  (* Definition Signature_pos: Positive #|Signature| := _. *)
 
-  #[export] Instance positive_Message : Positive #|Message|.
+  #[export] Instance Message_pos : Positive #|Message|.
   Proof.
     apply /card_gt0P. exists m0. auto.
   Qed.
-  Definition Message_pos : Positive #|Message| := _.
+  (* Definition Message_pos : Positive #|Message| := _. *)
 
-  #[export] Instance positive_Chal : Positive #|Challenge|.
+  #[export] Instance Challenge_pos : Positive #|Challenge|.
   Proof.
     apply /card_gt0P. exists chal0. auto.
   Qed.
-  Definition Challenge_pos : Positive #|Challenge| := _.
+  (* Definition Challenge_pos : Positive #|Challenge| := _. *)
 
   Definition chSecKey  : choice_type := 'fin #|SecKey|.
   Definition chPubKey : choice_type := 'fin #|PubKey|.
@@ -388,19 +405,22 @@ Module RSA_KeyGen (π1  : RSA_params)
   Definition chChallenge : choice_type := 'fin #|Challenge|.
 
   Definition i_sk := #|SecKey|.
-  Definition i_pk := #|SecKey|.
+  Definition i_pk := #|PubKey|.
   Definition i_sig := #|Signature|.
   (* Definition i_ss := #|Sample_space|.*)
 
 End RSA_KeyGen.
 
-Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
-    <: KeyGen_code π1 π2.
 
-  Import π1 π2.
-  Module KGP := KeyGenParams_extended π1 π2.
-  Module KG := RSA_KeyGen π1.
-  Import KGP KG.
+
+Module RSA_KeyGen_code <: KeyGen_code RSA_params RSA_KeyGen.
+
+  Import Padding.
+  Import RSA_params RSA_KeyGen.
+  Module KGP := KeyGenParams_extended RSA_params RSA_KeyGen.
+  (* Module KG := RSA_KeyGen π1. *)
+  Import KGP (* KG *).
+  Module π1 := RSA_params.
 
   Import PackageNotation.
   Local Open Scope package_scope.
@@ -752,15 +772,62 @@ Module RSA_KeyGen_code (π1  : RSA_params) (π2 : KeyGenParams π1)
 End RSA_KeyGen_code.
 
 
+(* Module Type A. *)
+(*   Parameter some_F_on_A: nat. *)
+(* End A. *)
+
+(* Module Type B (π:A). *)
+(*   Import π. *)
+(*   Parameter some_F_on_B: some_F_on_A == 5. *)
+(* End B. *)
+
+(* Module Type C. *)
+(*   Parameter some_F: nat. *)
+(* End C. *)
+
+(* Module A1 (π:C) <: A. *)
+(*   Definition some_F_on_A := 5. *)
+(* End A1. *)
+
+
+(* Module B1 <: B (A1 C). *)
+
+(* Module B1 <: B. *)
+
+
+Module RSA_SignatureAlgorithms <: SignatureAlgorithms
+                                    RSA_params
+                                    RSA_KeyGen
+                                    RSA_KeyGen_code.
+
+(*
+
+
 Module RSA_SignatureAlgorithms
-  (π1  : RSA_params)
+  (π1 : RSA_params)
   (π2 : KeyGenParams π1)
   (π3 : KeyGen_code π1 π2)
-<: SignatureAlgorithms π1 π2 π3.
+<:
+  (* FIXME This only gets the abstract definitions and hence creates the correctness
+           property based on that.
+           But I need the concrete implementations in order to create the proof!
 
-  Import π1 π2 π3.
-  Module KGC := RSA_KeyGen_code π1 π2.
-  Import KGC KGC.KGP KGC.KG KGC.
+           I would like to give a dedicated instance to derive from
+           [SignatureAlgorithms π1 (RSA_KeyGen π1) (RSA_KeyGen_code π1 π2)]
+           but Coq does not allow me to do so.
+
+           At the same time, Coq does not allow me to make the module parameters
+           more concrete because appartently only a module type can be a parameter.
+           (This makes a lot of sense because modules can just be imported.)
+   *)
+  SignatureAlgorithms π1 (RSA_KeyGen π1) (RSA_KeyGen_code π1 π2).
+
+  Import π1 π2 π3 π3.KGP.
+*)
+
+  Import RSA_params RSA_func RSA_KeyGen RSA_KeyGen_code RSA_KeyGen_code.KGP Padding.
+
+  Module KG := RSA_KeyGen_code.
 
 
   Lemma dec_smaller_n (d s pq : R) (H: 0 < pq) : (decrypt'' d pq s) < pq.
@@ -1209,7 +1276,7 @@ Module RSA_SignatureAlgorithms
       rewrite Zp_cast.
       - move => e' e_gt1 coprime_e_phiN.
         exact: coprime_e_phiN.
-      - apply/ltnW/KGC.phi_N_ord'_obligations_obligation_1.
+      - apply/ltnW/KG.phi_N_ord'_obligations_obligation_1.
     }
     rewrite ifT //=.
 
@@ -1231,7 +1298,7 @@ Module RSA_SignatureAlgorithms
     move: H; rewrite /mult_cast_nat -/Nat.add -/Nat.mul /widen_ord.
     clear sk_eq pk_eq.
 
-    have phi_N_ord_gt2 : 2 < phi_N_ord (enum_val p₀) (enum_val q₀) := KGC.phi_N_ord'_obligations_obligation_1 p₀ q₀.
+    have phi_N_ord_gt2 : 2 < phi_N_ord (enum_val p₀) (enum_val q₀) := KG.phi_N_ord'_obligations_obligation_1 p₀ q₀.
 
     move: e' ed_mod e_gt1 coprime_e_phiN phi_N_ord_gt2.
     case Hq: (enum_val q₀) => [q' q'_prime].
