@@ -60,9 +60,9 @@ Module Type SignatureProt
   (π1 : SignatureParams)
   (π2 : KeyGenParams π1)
   (π3 : KeyGen_code π1 π2)
-  (π4 : SignatureAlgorithms π1 π2 π3)
-  (π5 : SignaturePrimitives π1 π2 π3 π4).
+  (π4 : SignatureAlgorithms π1 π2 π3).
 
+  Module π5 := SignaturePrimitives π1 π2 π3 π4.
   Import π1 π2 π3 π4 π5.
   Import π3.KGP π5.KG.
 

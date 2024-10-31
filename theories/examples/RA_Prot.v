@@ -45,25 +45,25 @@ From vRATLS Require Import examples.Signature.
 From vRATLS Require Import examples.RA.
 
 Module Protocol
-  (π1 : SignatureParams) 
+  (π1 : SignatureParams)
   (π2 : KeyGenParams π1)
-  (π3 : RemoteAttestationParams π1)
   (KGc : KeyGen_code π1 π2)
-  (Alg : SignatureAlgorithms π1 π2 KGc)  
-  (RAA : RemoteAttestationAlgorithms π1 π2 π3 KGc Alg)
-  (SP : SignaturePrimitives π1 π2 KGc Alg)
-  (RAH : RemoteAttestationHash π1 π2 π3 KGc Alg RAA SP).
+  (Alg : SignatureAlgorithms π1 π2 KGc)
+  (RAA : RemoteAttestationAlgorithms π1 π2  KGc)
+  (RAH : RemoteAttestationHash π1 π2 KGc Alg RAA).
 
+  Module π3 := RemoteAttestationParams π1.
+  Module SP := SignaturePrimitives π1 π2 KGc Alg.
   Import π1 π2 π3 KGc Alg RAA SP RAH.
-  Import KGc.KGP Alg.KG.
+  Import KGc.KGP SP.KG.
 
   Definition i_chal := #|Challenge|.
   Definition att : nat := 50.
 
-  Definition RA_prot_interface := 
+  Definition RA_prot_interface :=
     [interface #val #[att] : 'unit → 'pubkey × ('signature × 'bool) ].
 
-  Definition Att_prot : package Attestation_locs_real 
+  Definition Att_prot : package Attestation_locs_real
      Att_interface RA_prot_interface
   := [package
     #def  #[att] ( _ : 'unit) : 'pubkey × ('signature × 'bool)
@@ -71,7 +71,7 @@ Module Protocol
       #import {sig #[get_pk_att] : 'unit →  'pubkey } as get_pk_att ;;
       #import {sig #[attest] : 'challenge → ('signature × 'message)  } as attest ;;
       #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
-  
+
       (* Protocol *)
       pk ← get_pk_att tt ;;
       chal ← sample uniform i_chal ;;

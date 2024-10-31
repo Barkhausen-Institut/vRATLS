@@ -7,9 +7,9 @@ cryptography. It is like the version used on the RATLS paper.
     VERIFIER                             PROVER
 Generates a chal-
   lenge 'chal'
-                   -----chal----->    
+                   -----chal----->
                                        Attestation
-                                       (using TPM) 
+                                       (using TPM)
                    <-----res------
 Validity check
   of proof
@@ -60,7 +60,7 @@ From vRATLS Require Import extructurespp.ord.
 From vRATLS Require Import extructurespp.fmap.
 From vRATLS Require Import extructurespp.fset.
 
-Module Type RemoteAttestationParams (π2 : SignatureParams).
+Module RemoteAttestationParams (π2 : SignatureParams).
 
   Import π2.
 
@@ -74,12 +74,12 @@ End RemoteAttestationParams.
 Module Type RemoteAttestationAlgorithms
   (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
   (π2 : KeyGenParams π1)
-  (π3 : RemoteAttestationParams π1)
   (KGc : KeyGen_code π1 π2)
-  (Alg : SignatureAlgorithms π1 π2 KGc).
+  (* (Alg : SignatureAlgorithms π1 π2 KGc) *).
 
-  Import π1 π2 π3 KGc Alg.
-  Import KGc.KGP Alg.KG.
+  Module π3 := RemoteAttestationParams π1.
+  Import π1 π2 π3 KGc (* Alg *).
+  Import KGc.KGP (* Alg.KG *).
 
   Local Open Scope package_scope.
 
@@ -103,17 +103,14 @@ End RemoteAttestationAlgorithms.
 Module Type RemoteAttestationHash
   (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
   (π2 : KeyGenParams π1)
-  (π3 : RemoteAttestationParams π1)
   (KGc : KeyGen_code π1 π2)
-  (Alg : SignatureAlgorithms π1 π2 KGc)  
-  (RAA : RemoteAttestationAlgorithms π1 π2 π3 KGc Alg)
-  (SP : SignaturePrimitives π1 π2 KGc Alg).
+  (Alg : SignatureAlgorithms π1 π2 KGc)
+  (RAA : RemoteAttestationAlgorithms π1 π2 KGc).
 
-
+  Module π3 := RemoteAttestationParams π1.
+  Module SP := SignaturePrimitives π1 π2 KGc Alg.
   Import π1 π2 π3 KGc Alg RAA SP.
-  Import KGc.KGP Alg.KG.
-
-
+  Import KGc.KGP SP.KG.
 
 
   Definition attest_loc_long  : Location := ('set (chSignature × chState × chChallenge) ; 2%N).
