@@ -48,7 +48,6 @@ Notation " 'set t " := (chSet t) (at level 2): package_scope.
 Definition tt := Datatypes.tt.
 
 Module Type SignatureParams.
-    (*Parameter SecKey : forall (A : Type), A -> finType.*)
     Parameter SecKey PubKey Signature Message Challenge : finType.
 End SignatureParams.
 
@@ -138,9 +137,7 @@ Module Type SignatureAlgorithms
     (π2 : KeyGenParams π1)
     (π3 : KeyGen_code π1 π2).
 
-  (* Import π1 π2 π3. *)
-  (* Module KG := KeyGen π1 π2 π3. *)
-  Import π3 π3.KGP (* KG *).
+  Import π3 π3.KGP.
 
   Parameter Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature.
 
@@ -335,14 +332,14 @@ Module SignaturePrimitives
                   ----- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
                   ----- move => l.
                   rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
-                  ssprove_invariant.                      
+                  ssprove_invariant.
                   move: l_not_in_Key_locs.
                   rewrite fset_cons.
                   apply/fdisjointP.
                   rewrite fdisjointUl.
                   apply/andP.
-                  split; 
-                  (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset). 
+                  split;
+                  (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset).
                   ----- move => l v l_not_in_Key_locs. ssprove_invariant.
                   ---- case => a0 s0; case => a1 s1. case => l r. by [split].
         --- intro a.

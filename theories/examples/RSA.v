@@ -365,38 +365,31 @@ Module RSA_KeyGen <: KeyGenParams RSA_params.
   Definition sig0 : Signature := 1%g.
   Definition m0 : Message := 1%g.
   Definition chal0 : Challenge := 1%g.
-(*  Definition ss0 :Sample_space := 1%g. *)
-
 
   #[export] Instance SecKey_pos : Positive #|SecKey|.
   Proof.
     apply /card_gt0P. exists sk0. auto.
   Qed.
-  (* Definition SecKey_pos : Positive #|SecKey| := _ . *)
 
   #[export] Instance PubKey_pos : Positive #|PubKey|.
   Proof.
     apply /card_gt0P. exists pk0. auto.
   Qed.
-  (* Definition PubKey_pos : Positive #|PubKey| := _. *)
 
   #[export] Instance Signature_pos : Positive #|Signature|.
   Proof.
     apply /card_gt0P. exists sig0. auto.
   Qed.
-  (* Definition Signature_pos: Positive #|Signature| := _. *)
 
   #[export] Instance Message_pos : Positive #|Message|.
   Proof.
     apply /card_gt0P. exists m0. auto.
   Qed.
-  (* Definition Message_pos : Positive #|Message| := _. *)
 
   #[export] Instance Challenge_pos : Positive #|Challenge|.
   Proof.
     apply /card_gt0P. exists chal0. auto.
   Qed.
-  (* Definition Challenge_pos : Positive #|Challenge| := _. *)
 
   Definition chSecKey  : choice_type := 'fin #|SecKey|.
   Definition chPubKey : choice_type := 'fin #|PubKey|.
@@ -407,7 +400,6 @@ Module RSA_KeyGen <: KeyGenParams RSA_params.
   Definition i_sk := #|SecKey|.
   Definition i_pk := #|PubKey|.
   Definition i_sig := #|Signature|.
-  (* Definition i_ss := #|Sample_space|.*)
 
 End RSA_KeyGen.
 
@@ -418,8 +410,7 @@ Module RSA_KeyGen_code <: KeyGen_code RSA_params RSA_KeyGen.
   Import Padding.
   Import RSA_params RSA_KeyGen.
   Module KGP := KeyGenParams_extended RSA_params RSA_KeyGen.
-  (* Module KG := RSA_KeyGen π1. *)
-  Import KGP (* KG *).
+  Import KGP.
   Module π1 := RSA_params.
 
   Import PackageNotation.
@@ -770,29 +761,6 @@ Module RSA_KeyGen_code <: KeyGen_code RSA_params RSA_KeyGen.
     }.
 
 End RSA_KeyGen_code.
-
-
-(* Module Type A. *)
-(*   Parameter some_F_on_A: nat. *)
-(* End A. *)
-
-(* Module Type B (π:A). *)
-(*   Import π. *)
-(*   Parameter some_F_on_B: some_F_on_A == 5. *)
-(* End B. *)
-
-(* Module Type C. *)
-(*   Parameter some_F: nat. *)
-(* End C. *)
-
-(* Module A1 (π:C) <: A. *)
-(*   Definition some_F_on_A := 5. *)
-(* End A1. *)
-
-
-(* Module B1 <: B (A1 C). *)
-
-(* Module B1 <: B. *)
 
 
 Module RSA_SignatureAlgorithms <: SignatureAlgorithms
