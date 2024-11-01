@@ -238,16 +238,6 @@ Section Facts.
   Lemma getm_def_seq_step {S T:ordType} {a₀:S*T} {a₁: seq.seq (S*T)} {a₂:S} :
     getm_def (fset (a₀ :: a₁)) a₂ = getm_def (a₀ :: (fset a₁)) a₂.
   Proof.
-    Set Printing Coercions.
-    Search FSet.fsval.
-    rewrite /FSet.fsval //=.
-    case E: (fset (a₀ :: a₁)) => [a₁' s].
-    case: a₁' s E => //=.
-    (*
-      TODO
-      The first goal is false because of [E].
-      In the second goal, we can recover [a₀ = a] and [a₁ = l] from [E].
-     *)
   Admitted.
 
   Lemma rem_unit {S T:ordType} {X:eqType} (s:{fmap (S*T) -> X}) (x₁:S) (x₂:T):
