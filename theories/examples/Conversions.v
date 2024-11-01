@@ -54,7 +54,6 @@ Proof.
   rewrite /intoZp'/fromZp => x.
   rewrite /eq_rect_r/eq_rect //=.
   case: x => m m_lt_p //=.
-  Check Zp_cast.
   case: (Zp_cast (p:=p) p_gt1); rewrite /Zp_trunc => Zp_eq_p //=.
   Fail rewrite Zp_eq_p.
 Abort.
@@ -73,10 +72,6 @@ Definition intoZp'' (q:nat) : 'I_q.+2 -> 'Z_q.+2 := fun x => x.
 Definition z (q:nat) : 'Z_q -> 'Z_q.-2.+2 := fun x => x.
 Definition y (q:nat) : 'Z_q -> 'I_q.-2.+2 := fun x => x.
 
-Check False_rect.
-Check False_rec.
-Check Bool.diff_false_true.
-
 (* This fails because it requires a rewrite of [H]. *)
 Fail Definition into (q:nat) (H: (1 < q)%N) : 'I_q -> 'I_q.-2.+2 :=
   match q with
@@ -90,15 +85,11 @@ Definition into {q:nat} : (1 < q)%N -> 'I_q -> 'I_q.-2.+2 :=
   | _ => fun H => False_rect _ (Bool.diff_false_true H)
   end.
 
-Print into.
-
 Definition into' {q:nat} : (1 < q)%N -> 'I_q -> 'I_q.-2.+2.
 Proof.
   case: q => //=.
   case => //=.
 Defined.
-
-Print into'.
 
 Definition into'' {q:nat} : (1 < q)%N -> 'I_q -> 'I_q.-2.+2.
 Proof.
@@ -108,8 +99,6 @@ Proof.
     + move => H. inversion H.
     + move => n H. exact id.
 Defined.
-
-Print into''.
 
 (** Lesson learned
     Creating functions with tactics results in really complex terms.

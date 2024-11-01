@@ -7,9 +7,9 @@ cryptography. It is like the version used on the RATLS paper.
     VERIFIER                             PROVER
 Generates a chal-
   lenge 'chal'
-                   -----chal----->    
+                   -----chal----->
                                        Attestation
-                                       (using TPM) 
+                                       (using TPM)
                    <-----res------
 Validity check
   of proof
@@ -60,7 +60,7 @@ From vRATLS Require Import extructurespp.ord.
 From vRATLS Require Import extructurespp.fmap.
 From vRATLS Require Import extructurespp.fset.
 
-Module Type RemoteAttestationParams (π2 : SignatureConstraints).
+Module RemoteAttestationParams (π2 : SignatureParams).
 
   Import π2.
 
@@ -68,21 +68,18 @@ Module Type RemoteAttestationParams (π2 : SignatureConstraints).
   Definition Attestation : choice_type := 'fin (mkpos pos_n).
   Definition chMessage   : choice_type := 'fin (mkpos pos_n).
 
-  Parameter Challenge : finType.
-  Parameter Challenge_pos : Positive #|Challenge|.
-  #[local] Existing Instance Challenge_pos.
-  Definition chChallenge := 'fin #|Challenge|.
 
 End RemoteAttestationParams.
 
 Module Type RemoteAttestationAlgorithms
   (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
-  (π2 : SignatureConstraints)
-  (π3 : RemoteAttestationParams π2)
-  (KG : KeyGeneration π1 π2)
-  (Alg : SignatureAlgorithms π1 π2 KG).
+  (π2 : KeyGenParams π1)
+  (KGc : KeyGen_code π1 π2)
+  (* (Alg : SignatureAlgorithms π1 π2 KGc) *).
 
-  Import π1 π2 π3 KG Alg.
+  Module π3 := RemoteAttestationParams π1.
+  Import π1 π2 π3 KGc (* Alg *).
+  Import KGc.KGP (* Alg.KG *).
 
   Local Open Scope package_scope.
 
@@ -93,7 +90,7 @@ Module Type RemoteAttestationAlgorithms
   Notation " 'attest "    := Attestation    (in custom pack_type at level 2).
 
   Definition state_loc   : Location := ('state    ; 9%N).
-  Definition attest_loc  : Location := ('set (Signature × chMessage) ; 10%N).
+  Definition attest_loc  : Location := ('set (chSignature × chMessage) ; 10%N).
   Definition verify_att  : nat := 11.
   Definition attest      : nat := 12.
   Definition get_pk_att  : nat := 13.
@@ -104,17 +101,19 @@ Module Type RemoteAttestationAlgorithms
 End RemoteAttestationAlgorithms.
 
 Module Type RemoteAttestationHash
-  (π1 : SignatureParams)
-  (π2 : SignatureConstraints)
-  (π3 : RemoteAttestationParams π2)
-  (KG : KeyGeneration π1 π2)
-  (Alg : SignatureAlgorithms π1 π2 KG)
-  (RAA : RemoteAttestationAlgorithms π1 π2 π3 KG Alg)
-  (SP : SignaturePrimitives π1 π2 KG Alg).
+  (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
+  (π2 : KeyGenParams π1)
+  (KGc : KeyGen_code π1 π2)
+  (Alg : SignatureAlgorithms π1 π2 KGc)
+  (RAA : RemoteAttestationAlgorithms π1 π2 KGc).
 
-  Import π1 π2 π3 KG Alg RAA SP.
+  Module π3 := RemoteAttestationParams π1.
+  Module SP := SignaturePrimitives π1 π2 KGc Alg.
+  Import π1 π2 π3 KGc Alg RAA SP.
+  Import KGc.KGP SP.KG.
 
-  Definition attest_loc_long  : Location := ('set (Signature × chState × chChallenge) ; 2%N).
+
+  Definition attest_loc_long  : Location := ('set (chSignature × chState × chChallenge) ; 2%N).
 
   Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
   Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc_long ].
@@ -279,11 +278,32 @@ Module Type RemoteAttestationHash
     simplify_eq_rel x.
     all: ssprove_code_simpl.
     - simplify_linking.
-      ssprove_sync_eq.
-      ssprove_sync_eq.
-      ssprove_sync_eq => pk_loc.
-      eapply r_ret.
-      intuition eauto.
+      ssprove_code_simpl.
+      rewrite /cast_fun/eq_rect_r/eq_rect.
+      simplify_linking.
+      ssprove_code_simpl.
+      eapply rsame_head_alt_pre.
+      
+      -- pose xxx ( t : heap * heap) := match t with | (s₀, s₁) => s₀ = s₁ end.
+         apply (rpost_weaken_rule _ 
+           (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ xxx (s₀, s₁) )).
+        --- apply (rpre_weaken_rule (λ '(s₀, s₁), xxx (s₀, s₁) )).
+          ----  eapply r_reflexivity_alt.
+            ----- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
+            ----- move => l. unfold xxx.
+                  rewrite /Key_locs => l_not_in_Key_locs.     
+                  unfold get_pre_cond.
+                  intros s0 s1. intros h. rewrite h. reflexivity.                  
+            ----- move => l v l_not_in_Key_locs.
+                  unfold xxx. unfold put_pre_cond.
+                  intros s0 s1 h. rewrite h. reflexivity.
+          ---- unfold xxx. intros s0 s1 h. exact h.
+        --- intros a0 a1. destruct a0. destruct a1. split.
+            + destruct H. unfold xxx in H0. exact H0.
+            + destruct H. exact H.
+      -- intros a. destruct a. repeat ssprove_sync_eq. intros a1. apply r_ret. intros s0' s1' h.
+         split. ++ reflexivity.
+                ++ exact h.
     - destruct x.
       ssprove_swap_lhs 0.
       ssprove_sync_eq => state.
@@ -370,7 +390,7 @@ Module Type RemoteAttestationHash
   Definition Att_ideal_locp_heap := Attestation_locs_ideal.
   Definition Aux_prim_ideal_heap := Comp_locs.
 
-  Definition attest_set := 'set (Signature × chState × chChallenge).
+  Definition attest_set := 'set (chSignature × chState × chChallenge).
   Definition sign_set := 'set ('signature × 'message).
 
   (* Normally, this would be located in a Functor.
@@ -1198,22 +1218,45 @@ Module Type RemoteAttestationHash
                  (λ '(b₀, s₀) '(b₁, s₁), b₀ = b₁ /\ full_heap_eq' (s₀,s₁))).
       2:{ case => b₀ s₀; case  => b₁ s₁. by [rewrite -/(full_heap_eq' (s₀,s₁))]. }
     - Fail ssprove_sync.
-      (* I have to reshape the precondition into:
-           [λ '(s0, s1), full_heap_eq' (s0, s1)]
-       *)
-      rewrite -(reshape_pair_id full_heap_eq').
+      ssprove_code_simpl.
+      rewrite /cast_fun/eq_rect_r/eq_rect.
+      simplify_linking.
+      ssprove_code_simpl.
+      eapply rsame_head_alt_pre.
+      --  apply (rpost_weaken_rule _
+      (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ full_heap_eq' (s₀, s₁)  )).
+        ----  rewrite -(reshape_pair_id full_heap_eq').  
+              eapply r_reflexivity_alt.
+            ----- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
+             ----- move => l.
+                  rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
+                  ssprove_invariant.
+                  rewrite fset_cons.
+                  rewrite fdisjointUl.
+                  apply/andP.
+                  split; 
+                  (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset). 
+            ----- move => l v l_not_in_Key_locs. ssprove_invariant.
+                  unfold Key_locs.
+                  ssprove_invariant.
+                  rewrite fset_cons.
+                  rewrite fdisjointUl.
+                  apply/andP.
+                  split; 
+                  (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset). 
+        ---- case => a0 s0; case => a1 s1. case => l r. by [split].
+      -- intro a.       
+         destruct a.
+         rewrite -(reshape_pair_id full_heap_eq').
+         ssprove_sync. 2: apply (@l_in_lSet sk_loc).
+          1: rewrite -fset1E fdisjoints1; auto_in_fset.
 
-      (* TODO: This is simpler than below! Check it! *)
-      ssprove_sync. 2: apply (@l_in_lSet sk_loc).
-      1: rewrite -fset1E fdisjoints1; auto_in_fset.
+          ssprove_sync. 2: apply (@l_in_lSet pk_loc).
+          1: rewrite -fset1E fdisjoints1; auto_in_fset.
+          ssprove_sync. 2: apply (@l_in_lSet pk_loc).
+          1: rewrite -fset1E fdisjoints1; auto_in_fset.
 
-      ssprove_sync. 2: apply (@l_in_lSet pk_loc).
-      1: rewrite -fset1E fdisjoints1; auto_in_fset.
-
-      ssprove_sync. 2: apply (@l_in_lSet pk_loc).
-      1: rewrite -fset1E fdisjoints1; auto_in_fset.
-
-      move => a; by [apply r_ret].
+          move => a; by [apply r_ret].
     - ssprove_swap_rhs 0%N.
       sync_sig_att. 1: auto_in_fset.
       move => state.
@@ -1221,7 +1264,7 @@ Module Type RemoteAttestationHash
       + ssprove_invariant.
       + move => state_loc.
 
-        (* I think this is from above and not needed anymore.
+      (* I think this is from above and not needed anymore.
       rewrite put_bind.
       rewrite [in X in ⊢ ⦃ _ ⦄ _ ≈ X ⦃ _ ⦄ ]put_bind.
       (* The below fails because the post condition is [b₀ = b₁ /\ pre (s₀, s₁)]
@@ -1369,140 +1412,139 @@ Module Type RemoteAttestationHash
     - by [].
   Qed.
 
-
   Lemma concat_3 :
-    fset [:: pk_loc; state_loc]
-      :|: (fset [:: pk_loc; sk_loc]
-      :|: fset [:: sign_loc]
-      :|: fset [:: pk_loc; sk_loc])
-    = fset [:: pk_loc; state_loc; pk_loc; sk_loc; sign_loc].
-  Proof.
-    (* LHS *)
-    repeat rewrite fset_fsetU_norm2.
-    repeat rewrite -fsetUA. (* base shape *)
+  fset [:: pk_loc; state_loc]
+    :|: (fset [:: pk_loc; sk_loc]
+    :|: fset [:: sign_loc]
+    :|: fset [:: pk_loc; sk_loc])
+  = fset [:: pk_loc; state_loc; pk_loc; sk_loc; sign_loc].
+Proof.
+  (* LHS *)
+  repeat rewrite fset_fsetU_norm2.
+  repeat rewrite -fsetUA. (* base shape *)
 
-    (* stategy: deduplicate by moving same items to the left. *)
-    (* shift item on index 4 to the right (index starts from 0) *)
-    do 2! rewrite fsetUA.
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
-    rewrite fsetUid.
+  (* stategy: deduplicate by moving same items to the left. *)
+  (* shift item on index 4 to the right (index starts from 0) *)
+  do 2! rewrite fsetUA.
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
+  rewrite fsetUid.
 
-    rewrite fsetUC.
-    repeat rewrite -fsetUA.
+  rewrite fsetUC.
+  repeat rewrite -fsetUA.
 
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
-    rewrite fsetUid.
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
+  rewrite fsetUid.
 
-    do 1! rewrite fsetUA.
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
-    rewrite fsetUid.
+  do 1! rewrite fsetUA.
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
+  rewrite fsetUid.
 
-    (* final order *)
-    do 1! rewrite fsetUA.
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
+  (* final order *)
+  do 1! rewrite fsetUA.
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
 
-    (* do 0! rewrite fsetUA. *)
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
+  (* do 0! rewrite fsetUA. *)
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
 
-    rewrite fsetUC.
-    repeat rewrite -fsetUA.
+  rewrite fsetUC.
+  repeat rewrite -fsetUA.
 
-    (* collapse into fset *)
-    repeat rewrite -fset_cat cat1s.
+  (* collapse into fset *)
+  repeat rewrite -fset_cat cat1s.
 
-    (* RHS *)
-    apply esym.
+  (* RHS *)
+  apply esym.
 
-    repeat rewrite fset_fsetU_norm5. (* normalize *)
-    repeat rewrite -fsetUA. (* base shape *)
+  repeat rewrite fset_fsetU_norm5. (* normalize *)
+  repeat rewrite -fsetUA. (* base shape *)
 
-    rewrite fsetUC.
-    repeat rewrite -fsetUA.
+  rewrite fsetUC.
+  repeat rewrite -fsetUA.
 
-    (* do 0! rewrite fsetUA. *)
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
-    rewrite fsetUid.
+  (* do 0! rewrite fsetUA. *)
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
+  rewrite fsetUid.
 
-    (* final order *)
+  (* final order *)
 
-    (* do 0! rewrite fsetUA. *)
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
+  (* do 0! rewrite fsetUA. *)
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
 
-    (* do 0! rewrite fsetUA. *)
-    rewrite [X in _ :|: X]fsetUC.
-    repeat rewrite -fsetUA.
+  (* do 0! rewrite fsetUA. *)
+  rewrite [X in _ :|: X]fsetUC.
+  repeat rewrite -fsetUA.
 
-    rewrite fsetUC.
-    repeat rewrite -fsetUA.
+  rewrite fsetUC.
+  repeat rewrite -fsetUA.
 
-    (* collapse into fset *)
-    by repeat rewrite -fset_cat cat1s.
-  Qed.
+  (* collapse into fset *)
+  by repeat rewrite -fset_cat cat1s.
+Qed.
 
 
-  Theorem RA_unforg LA A :
-      ValidPackage LA Att_interface A_export A →
-      fdisjoint LA (Sig_real_locp).(locs) →
-      fdisjoint LA (Sig_ideal_locp).(locs) →
-      fdisjoint LA Aux_locs →
-      fdisjoint LA (Att_real_locp).(locs) →
-      fdisjoint LA (Att_ideal_locp).(locs) →
-      (AdvantageE (Att_ideal_c) (Att_real_c) A
-        <= AdvantageE (Aux ∘ Sig_ideal ∘ Key_Gen) (Aux ∘ Sig_real_c) A)%R.
-  Proof.
-    move => va H1 H2 H3 H4 H5.
-    rewrite Advantage_sym.
-    simpl in *|-.
-    ssprove triangle (Att_real ∘ Key_Gen) [::
-      Aux ∘ Sig_real ∘ Key_Gen ;
-      Aux ∘ Sig_ideal ∘ Key_Gen
-      ] (Att_ideal ∘ Key_Gen) A as ineq.
-    eapply le_trans.
-    1: { exact: ineq. }
-    clear ineq.
-    rewrite sig_real_vs_att_real.
+Theorem RA_unforg LA A :
+    ValidPackage LA Att_interface A_export A →
+    fdisjoint LA (Sig_real_locp).(locs) →
+    fdisjoint LA (Sig_ideal_locp).(locs) →
+    fdisjoint LA Aux_locs →
+    fdisjoint LA (Att_real_locp).(locs) →
+    fdisjoint LA (Att_ideal_locp).(locs) →
+    (AdvantageE (Att_ideal_c) (Att_real_c) A
+      <= AdvantageE (Aux ∘ Sig_ideal ∘ Key_Gen) (Aux ∘ Sig_real_c) A)%R.
+Proof.
+  move => va H1 H2 H3 H4 H5.
+  rewrite Advantage_sym.
+  simpl in *|-.
+  ssprove triangle (Att_real ∘ Key_Gen) [::
+    Aux ∘ Sig_real ∘ Key_Gen ;
+    Aux ∘ Sig_ideal ∘ Key_Gen
+    ] (Att_ideal ∘ Key_Gen) A as ineq.
+  eapply le_trans.
+  1: { exact: ineq. }
+  clear ineq.
+  rewrite sig_real_vs_att_real.
 
-    2: exact: H4.
-    2: {
-      rewrite fdisjointUr.
-      apply/andP; split; assumption.
-    }
-    rewrite GRing.add0r.
-    rewrite [X in (_ + X <= _)%R]Advantage_sym.
+  2: exact: H4.
+  2: {
+    rewrite fdisjointUr.
+    apply/andP; split; assumption.
+  }
+  rewrite GRing.add0r.
+  rewrite [X in (_ + X <= _)%R]Advantage_sym.
 
-    (* Set Typeclasses Debug Verbosity 2. *)
+  (* Set Typeclasses Debug Verbosity 2. *)
 
-    rewrite sig_ideal_vs_att_ideal.
-    (* Type class resolution failed because of the [Att_interface_f].
-       Both advantages need to be on the same interface!
-     *)
-    2: exact: H5.
-    2: {
-      (* TODO There should be a tactic for discharging such [fdisjoint] goals! *)
-      rewrite /Comp_locs.
-      rewrite /Aux_locs in H3.
-      rewrite /Sig_locs_ideal in H2.
-      (* This feels like a silly construction. Is there a better way to arrive at this [Prop]? *)
-      rewrite /is_true in H3; rewrite /is_true in H2.
-      have prim_aux : true && true by [].
-      rewrite -[X in X && _]H3  -[X in _ && X]H2 in prim_aux.
+  rewrite sig_ideal_vs_att_ideal.
+  (* Type class resolution failed because of the [Att_interface_f].
+     Both advantages need to be on the same interface!
+   *)
+  2: exact: H5.
+  2: {
+    (* TODO There should be a tactic for discharging such [fdisjoint] goals! *)
+    rewrite /Comp_locs.
+    rewrite /Aux_locs in H3.
+    rewrite /Sig_locs_ideal in H2.
+    (* This feels like a silly construction. Is there a better way to arrive at this [Prop]? *)
+    rewrite /is_true in H3; rewrite /is_true in H2.
+    have prim_aux : true && true by [].
+    rewrite -[X in X && _]H3  -[X in _ && X]H2 in prim_aux.
 
-      move: prim_aux; rewrite -fdisjointUr (* -/fset_cat *) /=.
+    move: prim_aux; rewrite -fdisjointUr (* -/fset_cat *) /=.
 
-      (* TODO move below into extructurespp and extend. *)
-      rewrite /Sig_locs_real/Key_locs.
+    (* TODO move below into extructurespp and extend. *)
+    rewrite /Sig_locs_real/Key_locs.
 
-      exact: id.
-    }
-    rewrite GRing.addr0.
-    by [rewrite Advantage_sym].
-  Qed.
+    exact: id.
+  }
+  rewrite GRing.addr0.
+  by [rewrite Advantage_sym].
+Qed.
 
 End RemoteAttestationHash.

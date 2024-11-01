@@ -235,4 +235,60 @@ Section Facts.
     by [rewrite (eq_map eid) map_id].
   Qed.
 
+  Lemma getm_def_seq_step {S T:ordType} {a₀:S*T} {a₁: seq.seq (S*T)} {a₂:S} :
+    getm_def (fset (a₀ :: a₁)) a₂ = getm_def (a₀ :: (fset a₁)) a₂.
+  Proof.
+  Admitted.
+
+  Lemma rem_unit {S T:ordType} {X:eqType} (s:{fmap (S*T) -> X}) (x₁:S) (x₂:T):
+    (x₁, x₂) \in domm s -> x₁ \in domm (mkfmap (domm s)).
+  Proof.
+    move: x₁ x₂.
+    elim/fmap_ind : s => /=.
+    - move => x₁ x₂.
+      by rewrite domm0 in_fset0.
+    - move => s iH [x₁ x₂] v x_notin_s x₁' x₂'.
+      rewrite mem_domm mem_domm.
+
+      rewrite setmE.
+      rewrite domm_set mkfmapE -fset_cons getm_def_seq_step /getm_def.
+      rewrite -/(getm_def _ x₁') -mkfmapE /=.
+
+      case H: ((x₁',x₂') == (x₁,x₂)).
+      -- move/eqP:H => H; inversion H.
+         rewrite ifT //=.
+      -- rewrite -mem_domm => x'_in_s.
+         case H_x₁: (x₁' == x₁).
+         --- by [].
+         --- specialize (iH x₁' x₂' x'_in_s).
+             rewrite mem_domm in iH.
+             exact: iH.
+  Qed.
+
+  Lemma rem_unit' {S T:ordType} {X:eqType} (s:{fmap (S*T) -> X}) (x₁:S):
+    x₁ \in domm (mkfmap (domm s)) -> exists (x₂:T), (x₁, x₂) \in domm s.
+  Proof.
+    move: x₁.
+    elim/fmap_ind : s => /=.
+    - move => x₁.
+      rewrite mem_domm mkfmapE domm0 //=.
+    - move => s iH [x₁ x₂] v x_notin_s x₁'.
+      rewrite mem_domm.
+
+      rewrite domm_set mkfmapE -fset_cons getm_def_seq_step /getm_def -/(getm_def _ x₁') -mkfmapE /=.
+
+      case H_x₁: (x₁' == x₁).
+      -- move => x_in_s.
+         exists x₂.
+         move/eqP:H_x₁ => H_x₁; rewrite H_x₁ //=.
+         rewrite in_fset.
+         exact: mem_head.
+      -- rewrite -mem_domm => x₁'_in_s.
+         specialize (iH x₁' x₁'_in_s).
+         case: iH => x₂' iH.
+         exists x₂'.
+         rewrite /domm in iH.
+         by rewrite fset_cons in_fsetU1; apply/orP; right.
+  Qed.
+
 End Facts.

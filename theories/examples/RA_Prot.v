@@ -45,33 +45,33 @@ From vRATLS Require Import examples.Signature.
 From vRATLS Require Import examples.RA.
 
 Module Protocol
-    (π1 : SignatureParams)
-    (π2 : SignatureConstraints)
-    (RAP : RemoteAttestationParams π2)
-    (KG : KeyGeneration π1 π2)
-    (Alg : SignatureAlgorithms π1 π2 KG)
-    (RAA : RemoteAttestationAlgorithms π1 π2 RAP KG Alg)
-    (SP : SignaturePrimitives π1 π2 KG Alg)
-    (RAH : RemoteAttestationHash π1 π2 RAP KG Alg RAA SP)
-    .
+  (π1 : SignatureParams)
+  (π2 : KeyGenParams π1)
+  (KGc : KeyGen_code π1 π2)
+  (Alg : SignatureAlgorithms π1 π2 KGc)
+  (RAA : RemoteAttestationAlgorithms π1 π2  KGc)
+  (RAH : RemoteAttestationHash π1 π2 KGc Alg RAA).
 
-  Import π1 π2 RAP KG Alg RAA SP RAH.
+  Module π3 := RemoteAttestationParams π1.
+  Module SP := SignaturePrimitives π1 π2 KGc Alg.
+  Import π1 π2 π3 KGc Alg RAA SP RAH.
+  Import KGc.KGP SP.KG.
 
   Definition i_chal := #|Challenge|.
   Definition att : nat := 50.
 
-  Definition RA_prot_interface := 
-    [interface #val #[att] : 'unit → 'pubkey × ('attest × 'bool) ].
+  Definition RA_prot_interface :=
+    [interface #val #[att] : 'unit → 'pubkey × ('signature × 'bool) ].
 
-  Definition Att_prot : package Attestation_locs_real 
+  Definition Att_prot : package Attestation_locs_real
      Att_interface RA_prot_interface
   := [package
-    #def  #[att] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
+    #def  #[att] ( _ : 'unit) : 'pubkey × ('signature × 'bool)
     {
       #import {sig #[get_pk_att] : 'unit →  'pubkey } as get_pk_att ;;
       #import {sig #[attest] : 'challenge → ('signature × 'message)  } as attest ;;
       #import {sig #[verify_att] : ('challenge × 'signature) → 'bool } as verify_att ;;
-  
+
       (* Protocol *)
       pk ← get_pk_att tt ;;
       chal ← sample uniform i_chal ;;
@@ -132,8 +132,8 @@ Module Protocol
 
   (* This prop is different from the RA prop, because it has much more inputs *)
   Parameter RA_prop:
-    ∀ (l: {fmap (Signature * chState * chChallenge ) -> 'unit}) 
-      (s s' s'' : chState) (pk : PubKey) (sk : SecKey) (chal : chChallenge) (h  : chMessage),
+    ∀ (l: {fmap (chSignature * chState * chChallenge ) -> 'unit}) 
+      (s s' s'' : chState) (pk : 'pubkey) (sk : 'seckey) (chal : chChallenge) ,
     Ver_sig pk (Sign sk (Hash s chal)) (Hash s' chal) 
     = ((Sign sk (Hash s chal), s'', chal) \in domm l).
 
@@ -157,26 +157,50 @@ Module Protocol
     ssprove_code_simpl.
     ssprove_code_simpl_more.
     ssprove_code_simpl; simplify_linking.
-    ssprove_sync.
-    ssprove_sync.
-    ssprove_sync => pk.
-    ssprove_sync => chal.
-    ssprove_sync => sk.
-    ssprove_sync => state.
-    apply r_get_remember_rhs => a.
-    apply r_get_remember_lhs => pk'.
-    apply r_get_remember_lhs => state'.
-    eapply r_put_rhs.
-    ssprove_restore_mem.
-    -- ssprove_invariant.
-    -- eapply r_get_remember_rhs => a'.
+    rewrite /cast_fun/eq_rect_r/eq_rect.
+      simplify_linking.
+      ssprove_code_simpl.
+      eapply rsame_head_alt_pre.
+      -- apply (rpost_weaken_rule _
+      (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ heap_ignore (fset [:: attest_loc_long]) (s₀, s₁))).
+        --- eapply r_reflexivity_alt.
+          ---- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
+          ---- move => l.
+          rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
+          ssprove_invariant.                      
+          move: l_not_in_Key_locs.
+          rewrite fset_cons.
+          apply/fdisjointP.
+          rewrite fdisjointUl.
+          apply/andP.
+          split; 
+          (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset). 
+          ---- move => l v l_not_in_Key_locs. ssprove_invariant.
+        --- case => a0 s0; case => a1 s1. case => l r. by [split].
+    --intro a.
+      ssprove_code_simpl.
+      ssprove_code_simpl_more.
+      destruct a.
+      ssprove_sync.
+      ssprove_sync.
+      ssprove_sync => pk.
+      ssprove_sync => chal.
+      ssprove_sync => sk.
+      ssprove_sync => state.
+      apply r_get_remember_rhs => a.
+      apply r_get_remember_lhs => pk'.
+      apply r_get_remember_lhs => state'.
+      eapply r_put_rhs.
+      ssprove_restore_mem.
+    --- ssprove_invariant.
+    --- eapply r_get_remember_rhs => a'.
        apply r_get_remember_rhs => state''.
-       eapply r_ret => s0 s1 pre //=.
+       eapply r_ret => s2 s1 pre //=.
        split.
-    --- repeat f_equal.
-        eapply RA_prop. intuition eauto. 
-    ---move: pre.
-       by repeat case.
+    ---- repeat f_equal.
+         eapply RA_prop. 
+    ---- move: pre.
+         by repeat case.
     Qed.       
     
 End Protocol.

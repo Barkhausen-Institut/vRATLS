@@ -48,45 +48,42 @@ Notation " 'set t " := (chSet t) (at level 2): package_scope.
 Definition tt := Datatypes.tt.
 
 Module Type SignatureParams.
-
-    Parameter fSecKey : finType.
-    Parameter SecKey_pos : Positive #|fSecKey|.
-    #[local] Existing Instance SecKey_pos.
-    Definition SecKey := 'fin #|fSecKey|.
-    Definition i_sk := #|fSecKey|.
-    Lemma pos_i_sk : Positive i_sk.
-    Proof.
-    rewrite /i_sk. apply SecKey_pos.
-    Qed.
-
-    Definition PubKey := SecKey.
-    Definition Signature : choice_type := chFin(mkpos pos_n).
-    (*
-    Definition SecKey    : choice_type := chFin(mkpos pos_n).
-    Definition PubKey    : choice_type := chFin(mkpos pos_n).
-    *)
-
+    Parameter SecKey PubKey Signature Message Challenge : finType.
 End SignatureParams.
-
-Module Type SignatureConstraints.
-  Definition chMessage : choice_type := 'fin (mkpos pos_n).
-End SignatureConstraints.
 
 (** |     KEY      |
     |  GENERATION  | **)
 
-Module Type KeyGeneration
-    (π1 : SignatureParams)
-    (π2 : SignatureConstraints).
+Module Type KeyGenParams (π1 : SignatureParams).
+  Import π1.
 
+  Parameter SecKey_pos : Positive #|SecKey|.
+  Parameter PubKey_pos : Positive #|PubKey|.
+  Parameter Signature_pos : Positive #|Signature|.
+  Parameter Message_pos : Positive #|Message|.
+  Parameter Challenge_pos : Positive #|Challenge|.
+
+End KeyGenParams.
+
+Module KeyGenParams_extended (π1 : SignatureParams) (π2 : KeyGenParams π1).
   Import π1 π2.
 
-  Notation " 'pubkey "    := PubKey (in custom pack_type at level 2).
-  Notation " 'pubkey "    := PubKey (at level 2): package_scope.
-  Notation " 'seckey "    := SecKey (in custom pack_type at level 2).
-  Notation " 'seckey "    := SecKey (at level 2): package_scope.
+  #[local] Existing Instance SecKey_pos.
+  #[local] Existing Instance PubKey_pos.
+  #[local] Existing Instance Signature_pos.
+  #[local] Existing Instance Message_pos.
+  #[local] Existing Instance Challenge_pos.
 
-  Parameter KeyGen : (SecKey × PubKey).
+  Definition chSecKey    := 'fin #|SecKey|.
+  Definition chPubKey    := 'fin #|PubKey|.
+  Definition chSignature := 'fin #|Signature|.
+  Definition chMessage   := 'fin #|Message|.
+  Definition chChallenge := 'fin #|Challenge|.
+
+  Notation " 'pubkey "    := chPubKey (in custom pack_type at level 2).
+  Notation " 'pubkey "    := chPubKey (at level 2): package_scope.
+  Notation " 'seckey "    := chSecKey (in custom pack_type at level 2).
+  Notation " 'seckey "    := chSecKey (at level 2): package_scope.
 
   Definition pk_loc : Location := ('pubkey ; 0%N).
   Definition sk_loc : Location := ('seckey ; 1%N).
@@ -95,28 +92,25 @@ Module Type KeyGeneration
   Definition apply   : nat := 3.
   Definition Key_locs := fset [:: pk_loc ; sk_loc].
 
-  (*
-  "failed attempt to define apply function as enclave
-  for secret key"
+End KeyGenParams_extended.
 
-  Context (T : choice_type).
-  Notation " 't " := T (in custom pack_type at level 2).
-  Notation " 't " := T (at level 2): package_scope.
+Module Type KeyGen_code (π1 : SignatureParams) (π2 : KeyGenParams π1).
+  Import π1 π2.
+  Module KGP := KeyGenParams_extended π1 π2.
+  Import KGP.
 
-  Context (L : {fset Location}).
-  Definition M L T := code L [interface] T.
-  Notation " 'm " := M (in custom pack_type at level 2).
-  Notation " 'm " := M (at level 2): package_scope.
+  Parameter KeyGen :
+      code Key_locs [interface] (chPubKey × chSecKey).
 
-  Definition Apply := mkopsig apply ('m L 'seckey) ('m L T).
+End KeyGen_code.
 
-  Definition KeyGen_ifce T := fset (cons
-    (*(pair key_gen (pair 'unit 'pubkey)) *)
+Module KeyGen
+  (π1 : SignatureParams)
+  (π2 : KeyGenParams π1)
+  (π3 : KeyGen_code π1 π2).
 
-    (pair apply (pair Apply T))
-    (*#val #[apply] : ('m L 'seckey → 'm L 't) → 't *)
-  nil).
-  *)
+  Import π1 π2 π3.
+  Import π3.KGP.
 
   Definition KeyGen_ifce := [interface
     #val #[key_gen] : 'unit → ('seckey × 'pubkey)
@@ -124,56 +118,53 @@ Module Type KeyGeneration
 
   Definition Key_Gen : package Key_locs [interface] KeyGen_ifce
   := [package
-       #def  #[key_gen] (_ : 'unit) : ('seckey × 'pubkey)
-       {
-         let (sk, pk) := KeyGen in
-         #put sk_loc := sk ;;
-         #put pk_loc := pk ;;
+      #def  #[key_gen] (_ : 'unit) : ('seckey × 'pubkey)
+      {
+        '(pk, sk) ← KeyGen ;;
+        #put sk_loc := sk ;;
+        #put pk_loc := pk ;;
+        ret (sk, pk)
+      }
+    ].
 
-         ret (sk, pk)
-       }
-     ].
-
-End KeyGeneration.
+End KeyGen.
 
 (** |  SIGNATURE  |
     |   SCHEME    | **)
 
 Module Type SignatureAlgorithms
     (π1 : SignatureParams)
-    (π2 : SignatureConstraints)
-    (π3 : KeyGeneration π1 π2).
+    (π2 : KeyGenParams π1)
+    (π3 : KeyGen_code π1 π2).
 
-  Import π1 π2 π3.
+  Import π3 π3.KGP.
 
-  Parameter Sign : ∀ (sk : SecKey) (m : chMessage), Signature.
+  Parameter Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature.
 
-  Parameter Ver_sig : ∀ (pk :  PubKey) (sig : Signature) (m : chMessage),
+  Parameter Ver_sig : ∀ (pk :  chPubKey) (sig : chSignature) (m : chMessage),
    'bool.
 
-  (* TODO: fmap (Signature * A * A ) -> (Signature * A * A )  triggert endless loop  *)
-
-  (* Final proposition for a signature scheme to be indistinguishable *)
-  Parameter Signature_prop:
-    ∀ (l: {fmap (Signature  * chMessage ) -> 'unit})
-      (s : Signature) (pk : PubKey) (m  : chMessage),
-      Ver_sig pk s m = ((s,m) \in domm l).
-
   (* Functional correctness property for signatures *)
-  Parameter Signature_correct: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
+  Parameter Signature_correct : ∀ pk sk msg seed,
+    Some (pk,sk) = Run sampler KeyGen seed ->
+    Ver_sig pk (Sign sk msg) msg == true.
 
 End SignatureAlgorithms.
 
-Module Type SignaturePrimitives
+Module SignaturePrimitives
   (π1 : SignatureParams)
-  (π2 : SignatureConstraints)
-  (KG : KeyGeneration π1 π2)
-  (Alg : SignatureAlgorithms π1 π2 KG).
+  (π2 : KeyGenParams π1)
+  (π3 : KeyGen_code π1 π2)
+  (π4 : SignatureAlgorithms π1 π2 π3).
 
-  Import π1 π2 KG Alg.
+  Import π1 π2 π3 π4.
+  Import π3.KGP.
 
-  Notation " 'signature " := Signature   (in custom pack_type at level 2).
-  Notation " 'signature " := Signature   (at level 2): package_scope.
+  Module KG := KeyGen π1 π2 π3.
+  Import KG.
+
+  Notation " 'signature " := chSignature   (in custom pack_type at level 2).
+  Notation " 'signature " := chSignature   (at level 2): package_scope.
   Notation " 'message "   := chMessage     (in custom pack_type at level 2).
   Notation " 'message "   := chMessage     (at level 2): package_scope.
 
@@ -257,8 +248,8 @@ Module Type SignaturePrimitives
       rewrite fset_cons.
       apply fsetUS.
       apply fsubsetxx.
-    - rewrite /Key_locs/Sig_locs_real/Key_locs.
-    rewrite fset_cons.
+    - rewrite /Sig_locs_real/Key_locs.  
+      rewrite fset_cons. 
       apply fsetUS.
       rewrite fset_cons.
       apply fsetUS.
@@ -287,6 +278,25 @@ Module Type SignaturePrimitives
       apply fsub0set.
   Qed.
 
+
+  (*
+    This axiom cannot be instantiated.
+    The problem is the missing link between [l] and the LHS of the
+    equality.
+    Even if [Ver_sig] is instantiated, this axiom remains unprovable.
+    See [RSA] for reference.
+
+    This is a key finding in our development:
+    The proof of existential unforgability can only be done on the
+    protocol itself but __not__ on the library level.
+    Please see [Sig_prot] for an axiom-free proof of existential
+    unforgability.
+   *)
+  Axiom Signature_prop:
+    ∀ (l: {fmap (chSignature  * chMessage ) -> 'unit})
+      (s : chSignature) (pk : chPubKey) (m  : chMessage),
+      Ver_sig pk s m = ((s,m) \in domm l).
+
   Lemma ext_unforge:
   Sig_real_c ≈₀ Sig_ideal_c.
   Proof.
@@ -300,26 +310,61 @@ Module Type SignaturePrimitives
       apply fsetUS.
       apply fsubsetxx.
     - simplify_eq_rel x.
-    -- simplify_linking.
-       ssprove_sync.
-       ssprove_sync.
-       ssprove_sync => pk_loc.
-       eapply r_ret.
-       intuition eauto.
-    -- repeat ssprove_sync.
-       intros.
-       eapply r_get_remember_rhs => sign_loc.
-       eapply r_put_rhs.
-       ssprove_restore_mem.
-      --- ssprove_invariant.
-      --- eapply r_ret => s0 s1 pre //=.
-    -- case x => s m.
-      eapply r_get_remember_lhs => pk.
-      eapply r_get_remember_rhs => S.
-      eapply r_ret => s0 s1 pre //=.
-      split.
-      ---- eapply Signature_prop.
-      ---- by [move: pre; rewrite /inv_conj; repeat case].
+      -- simplify_linking.
+         ssprove_code_simpl.
+         rewrite /cast_fun/eq_rect_r/eq_rect.
+         simplify_linking.
+         ssprove_code_simpl.
+         eapply rsame_head_alt_pre.
+         --- Fail eapply r_reflexivity_alt.
+             (*
+               This really needs a tactic.
+               This postcondition has the wrong shape.
+               It needs [b0 = b1 /\ f (s0, s1)].
+               But we have [f (s0, s1) /\ b0 = b1].
+               The rewrite is a bit more evolved though because
+               we would need setoid_rewrite to rewrite under binders.
+               The SSProvers instead provide the following way:
+              *)
+             apply (rpost_weaken_rule _
+                       (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ heap_ignore (fset [:: sign_loc]) (s₀, s₁))).
+             ---- eapply r_reflexivity_alt.
+                  ----- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
+                  ----- move => l.
+                  rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
+                  ssprove_invariant.
+                  move: l_not_in_Key_locs.
+                  rewrite fset_cons.
+                  apply/fdisjointP.
+                  rewrite fdisjointUl.
+                  apply/andP.
+                  split;
+                  (( try rewrite -fset1E); rewrite fdisjoint1s; auto_in_fset).
+                  ----- move => l v l_not_in_Key_locs. ssprove_invariant.
+                  ---- case => a0 s0; case => a1 s1. case => l r. by [split].
+        --- intro a.
+            ssprove_code_simpl.
+            ssprove_code_simpl_more.
+            destruct a.
+            ssprove_sync.
+            ssprove_sync.
+            ssprove_sync => pk_loc.
+            eapply r_ret.
+            intuition eauto.
+      -- repeat ssprove_sync.
+        intros.
+        eapply r_get_remember_rhs => sign_loc.
+        eapply r_put_rhs.
+        ssprove_restore_mem.
+        --- ssprove_invariant.
+        --- eapply r_ret => s0 s1 pre //=.
+      -- case x => s m.
+        eapply r_get_remember_lhs => pk.
+        eapply r_get_remember_rhs => S.
+        eapply r_ret => s0 s1 pre //=.
+        split.
+        --- eapply Signature_prop.
+        --- by [move: pre; rewrite /inv_conj; repeat case].
   Qed.
 
 End SignaturePrimitives.
