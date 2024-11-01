@@ -870,8 +870,8 @@ Module RSA_SignatureAlgorithms
     rewrite -[X in X = _ -> _](@modn_small _ pq).
     - rewrite -[X in _ = X -> _](@modn_small _ pq).
 
-    + have eee : nat_of_ord pq = (p' * q')%N by subst.
-        rewrite (rsa_correct'' eee) /=.
+    + have noo_pq : nat_of_ord pq = (p' * q')%N by subst.
+        rewrite (rsa_correct'' noo_pq) /=.
         * move => msg_eq. subst.
           repeat rewrite modn_small in msg_eq.
           ** by apply ord_inj.
