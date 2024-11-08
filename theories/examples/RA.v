@@ -3,7 +3,8 @@ Introduction:
 Here we will look at the remote attestation that is using a TPM for secure hardware 
 cryptography. It is like the version used on the RATLS paper.
 
-(** REMOTE ATTESTATION
+REMOTE ATTESTATION:
+------------------
     VERIFIER                             PROVER
 Generates a chal-
   lenge 'chal'
@@ -13,7 +14,6 @@ Generates a chal-
                    <-----res------
 Validity check
   of proof
-  *)
 
 *)
 
@@ -404,8 +404,6 @@ Module Type RemoteAttestationHash
     by [move => S T T' f; case => a b].
   Qed.
 
-  Require Import extructures.fmap.
-
   Definition fmap_kmap' {S} {T T':ordType} (f: T->T') (m:{fmap T -> S}) : {fmap T' -> S} :=
     mapm2 f id m.
 
@@ -424,22 +422,6 @@ Module Type RemoteAttestationHash
         get_heap s0 state_loc = get_heap s1 state_loc /\
         hash_eq (get_heap s0 attest_loc_long) (get_heap s1 sign_loc) /\
         (forall {l:Location}, l \notin Attestation_locs_ideal → l \notin Comp_locs → get_heap s0 l = get_heap s1 l).
-
-  Lemma disjoint_noteq:
-    forall {T:ordType} {l0} {L0: {fset T}}, l0 \notin L0 -> forall {l0'}, l0' \in L0 -> l0 != l0'.
-  Proof.
-    move => T l L H l'.
-    move: H; elim/fset_ind: L.
-    - by [].
-    - move => x s x_notin_s iH.
-      move/fsetU1P.
-      rewrite boolp.not_orP.
-      case; move/eqP => l_not_x.
-      move/negP => l_notin_s.
-      move/fsetU1P. case.
-      + by [move => l'_eq_x; rewrite l'_eq_x].
-      + move => l'_in_s; apply: (iH l_notin_s l'_in_s).
-  Qed.
 
   Lemma INV'_full_heap_eq:
     INV' Attestation_locs_ideal Comp_locs full_heap_eq.
@@ -751,131 +733,9 @@ Module Type RemoteAttestationHash
       injective f -> (* if this is bijective then I would not end up in omap! *)
       fmap_kmap' f (setm m k v) = setm (fmap_kmap' f m) (f k) v.
   Proof.
-    move => f k v m inj_f.
     rewrite /fmap_kmap'.
-    Fail rewrite [X in _ = setm _ X]mapm2E.
-    (* TODO *)
-    (* rewrite -eq_fmap. *)
-
-   (** * Approach 1:
-
-    elim/fmap_ind H: (setm m k v) => [|m0 iH k0 v0 k0_notin].
-    - admit.
-    - rewrite -iH. f_equal.
-
-      Using the
-        [iH : mapm2 (T:=T) (T':=T') f id m0 = setm (T:=T') (mapm2 (T:=T) (T':=T') f id m) (f k) v]
-      works here but the [iH] looks strange and so does the goal then:
-        [setm (T:=T) m0 k0 v0 = m0]
-      I can only prove this if I would have that
-        [m0 k0 = v0].
-      But that is certainly not the case:
-        [k0_notin : k0 \notin domm (T:=T) (S:=S) m0].
-      *)
-
-    (** * Approach 2:
-
-    move: k v.
-    elim/fmap_ind H: m => [|m0 iH k0 v0 k0_notin].
-    - by [].
-    - move => k v.
-
-      The induction hypothesis looks good:
-       [iH : ∀ (k : T) (v : S),
-         mapm2 (T:=T) (T':=T') f id (setm (T:=T) m0 k v) = setm (T:=T') (mapm2 (T:=T) (T':=T') f id m0) (f k) v]
-      but I did not really gain anything towards my goal:
-       [mapm2 (T:=T) (T':=T') f id (setm (T:=T) (setm (T:=T) m0 k0 v0) k v) =
-          setm (T:=T') (mapm2 (T:=T) (T':=T') f id (setm (T:=T) m0 k0 v0)) (f k) v]
-      I just added another [setm].
-      I could say now that [case: k0 == k].
-      But even that would not buy me anything because
-        [k0_notin : k0 \notin domm (T:=T) (S:=S) m0]
-      only talks about [m0] so I would have to cover both cases.
-     *)
-
-
-    (** * Possible inductions via [seq]: *)
-
-    rewrite /mapm2.
-
-    (** * Approach 3:
-
-    elim: (FMap.fmval m).
-    2 goals (ID 30990)
-
-    S : Type
-    T, T' : ordType
-    f : T -> T'
-    k : T
-    v : S
-    m : {fmap T -> S}
-    inj_f : injective f
-    ============================
-    mkfmap (T:=T') [seq (f p.1, p.2) | p <- setm (T:=T) m k v] =
-    setm (T:=T') (mkfmap (T:=T') [seq (f p.1, p.2) | p <- [::]]) (f k) v
-
-  goal 2 (ID 30991) is:
-   ∀ (a : T * S) (l : seq.seq (T * S)),
-     mkfmap (T:=T') [seq (f p.1, p.2) | p <- setm (T:=T) m k v] =
-     setm (T:=T') (mkfmap (T:=T') [seq (f p.1, p.2) | p <- l]) (f k) v ->
-     mkfmap (T:=T') [seq (f p.1, p.2) | p <- setm (T:=T) m k v] =
-     setm (T:=T') (mkfmap (T:=T') [seq (f p.1, p.2) | p <- a :: l]) (f k) v
-
-     This does not work either because it covers only the RHS of the equality.
-     The LHS has [FMap.fmval (setm (T:=T) m k v)].
-
-     *)
-
-    (** * Approach 4:
-        I get around the problem of approach 3 using the path
-        of the proof for [mapm2E] which basically throws away the ordering proof by destructuring the map [m].
-        Then, I can just do the induction on the sequence [m] and it works on both sides of the equality.
-     *)
-
-    case: m => [/= m _].
-    move: k v.
-    elim: m => [k v |[x' y] m IH k v].
-    - by [].
-    - (* Unset Printing Notations. *)
-
-      rewrite [in RHS]/seq.map.
-      move => //=.
-      rewrite -/(setm_def (T:=T) ((x', y) :: m) k v).
-      rewrite -[in RHS]/(seq.map _ m).
-      case E: (x' == k).
-      + move: E; move/eqP => E.
-        rewrite E.
-        rewrite setmxx.
-        rewrite -IH.
-
-        (* TODO move into own lemmas *)
-
-        rewrite (@setm_def_seq_cons_eq' _ _ _ _ y).
-        move => //=.
-        rewrite ifF /=.
-        * rewrite ifT //= ifF /=.
-          ** rewrite ifT //=.
-          ** apply: Ord.ltxx.
-        * apply: Ord.ltxx.
-      + move: E; move/eqP => E.
-        move => //=.
-        case k_lt_x': (k < x')%ord.
-        * by [].
-        * move/eqP/negPf: E; rewrite eqtype.eq_sym => E; rewrite ifF //=.
-          rewrite setmC.
-          ** f_equal. exact: IH.
-          ** rewrite /injective in inj_f.
-             (* TODO lift/move into lemma *)
-             have neq_inj a b (inj_f': injective f) (a_neq_b: a != b) : f a != f b.
-             1: {
-               case H: (f a == f b) => //=.
-               move/eqP/(inj_f' a b):H => a_eq_b.
-               rewrite a_eq_b in a_neq_b.
-               move/negPf: a_neq_b => b_neq_b; rewrite -b_neq_b //=.
-             }
-             move/eqP/eqP: E; rewrite eqtype.eq_sym => x'_neq_k.
-             exact: (neq_inj x' k inj_f x'_neq_k).
-  Qed.
+    apply mapm2_setm.
+ Qed.
 
   Definition prod_dist (A B C : Type) (n: A*B*C) : (A*(B*C)) :=
     let (m,c) := n in let (a,b) := m in (a,(b,c)).
