@@ -291,56 +291,56 @@ Section Facts.
          by rewrite fset_cons in_fsetU1; apply/orP; right.
   Qed.
 
+  Lemma mapm2_setm {A': ordType}:
+    forall (f: A -> A') (k:A) (v:B) (m: {fmap A -> B}),
+      (* k \notin domm m -> *)
+      injective f -> (* if this is bijective then I would not end up in omap! *)
+      mapm2 f id (setm m k v) = setm (mapm2 f id m) (f k) v.
+  Proof.
+    move => f k v m inj_f.
+    rewrite /mapm2.
+    case: m => [/= m _].
+    move: k v.
+    elim: m => [k v |[x' y] m IH k v].
+    - by [].
+    - rewrite [in RHS]/seq.map.
+      move => //=.
+      rewrite -/(setm_def (T:=A) ((x', y) :: m) k v).
+      rewrite -[in RHS]/(seq.map _ m).
+      case E: (x' == k).
+      + move: E; move/eqP => E.
+        rewrite E.
+        rewrite setmxx.
+        rewrite -IH.
+
+        (* TODO move into own lemmas *)
+
+        rewrite (@setm_def_seq_cons_eq' k y v m).
+        move => //=.
+        rewrite ifF /=.
+        * rewrite ifT //= ifF /=.
+          ** rewrite ifT //=.
+          ** apply: Ord.ltxx.
+        * apply: Ord.ltxx.
+      + move: E; move/eqP => E.
+        move => //=.
+        case k_lt_x': (k < x')%ord.
+        * by [].
+        * move/eqP/negPf: E; rewrite eqtype.eq_sym => E; rewrite ifF //=.
+          rewrite setmC.
+          ** f_equal. exact: IH.
+          ** rewrite /injective in inj_f.
+             (* TODO lift/move into lemma *)
+             have neq_inj a b (inj_f': injective f) (a_neq_b: a != b) : f a != f b.
+             1: {
+               case H: (f a == f b) => //=.
+               move/eqP/(inj_f' a b):H => a_eq_b.
+               rewrite a_eq_b in a_neq_b.
+               move/negPf: a_neq_b => b_neq_b; rewrite -b_neq_b //=.
+             }
+             move/eqP/eqP: E; rewrite eqtype.eq_sym => x'_neq_k.
+             exact: (neq_inj x' k inj_f x'_neq_k).
+  Qed.
 
 End Facts.
 
-Lemma mapm2_setm {S} {T T': ordType}:
-  forall (f: T -> T') (k:T) (v:S) (m: {fmap T -> S}),
-    (* k \notin domm m -> *)
-    injective f -> (* if this is bijective then I would not end up in omap! *)
-    mapm2 f id (setm m k v) = setm (mapm2 f id m) (f k) v.
-Proof.
-  move => f k v m inj_f.
-  rewrite /mapm2.
-  case: m => [/= m _].
-  move: k v.
-  elim: m => [k v |[x' y] m IH k v].
-  - by [].
-  - rewrite [in RHS]/seq.map.
-    move => //=.
-    rewrite -/(setm_def (T:=T) ((x', y) :: m) k v).
-    rewrite -[in RHS]/(seq.map _ m).
-    case E: (x' == k).
-    + move: E; move/eqP => E.
-      rewrite E.
-      rewrite setmxx.
-      rewrite -IH.
-
-      (* TODO move into own lemmas *)
-
-      rewrite (@setm_def_seq_cons_eq' T S k y v m).
-      move => //=.
-      rewrite ifF /=.
-      * rewrite ifT //= ifF /=.
-        ** rewrite ifT //=.
-        ** apply: Ord.ltxx.
-      * apply: Ord.ltxx.
-    + move: E; move/eqP => E.
-      move => //=.
-      case k_lt_x': (k < x')%ord.
-      * by [].
-      * move/eqP/negPf: E; rewrite eqtype.eq_sym => E; rewrite ifF //=.
-        rewrite setmC.
-        ** f_equal. exact: IH.
-        ** rewrite /injective in inj_f.
-           (* TODO lift/move into lemma *)
-           have neq_inj a b (inj_f': injective f) (a_neq_b: a != b) : f a != f b.
-           1: {
-             case H: (f a == f b) => //=.
-             move/eqP/(inj_f' a b):H => a_eq_b.
-             rewrite a_eq_b in a_neq_b.
-             move/negPf: a_neq_b => b_neq_b; rewrite -b_neq_b //=.
-           }
-           move/eqP/eqP: E; rewrite eqtype.eq_sym => x'_neq_k.
-           exact: (neq_inj x' k inj_f x'_neq_k).
-Qed.
