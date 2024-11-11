@@ -54,6 +54,7 @@ Notation " 'set t " := (chSet t) (at level 2): package_scope.
 
 Definition tt := Datatypes.tt.
 
+
 (** Extracted from the Signature file **)
 (** Parameters **)
 Module Type SignatureParams.
@@ -100,6 +101,8 @@ Module KeyGenParams_extended (π1 : SignatureParams) (π2 : KeyGenParams π1).
 
   Definition key_gen : nat := 2.  (* Routine for initial key generation. *)
   Definition apply   : nat := 3.
+
+
   Definition Key_locs := fset [:: pk_loc ; sk_loc].
 
 End KeyGenParams_extended.
@@ -149,7 +152,8 @@ End KeyGen.
 
   Import π3 π3.KGP.
 
-  Parameter KeyGen : (chSecKey × chPubKey).
+  (*Parameter KeyGen : (chSecKey × chPubKey). *)
+
 
   Parameter Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature.
 
@@ -158,17 +162,10 @@ End KeyGen.
 
   (* Functional correctness property for signatures *)
   Parameter Signature_correct : ∀ pk sk msg seed,
-    Some (pk,sk) = Run sampler KeyGen seed ->
+    Some (pk,sk) = Run sampler KeyGen_code seed ->
     Ver_sig pk (Sign sk msg) msg == true.
 
 End SignatureAlgorithms.
-
-
-
-
-
-
-
 
 
 
@@ -217,15 +214,20 @@ Module Type KeyGeneration
   Notation " 'seckey "    := SecKey (in custom pack_type at level 2).
   Notation " 'seckey "    := SecKey (at level 2): package_scope.
 
-  Parameter KeyGen : (SecKey × PubKey).
+ (* Parameter KeyGen : (SecKey × PubKey). *)
 
   Definition pk_loc : Location := ('pubkey ; 0%N).
   Definition sk_loc : Location := ('seckey ; 1%N).
 
+  (*
   Definition key_gen : nat := 2.  (* Routine for initial key generation. *)
   Definition apply   : nat := 3.
+  *)
+
   Definition Key_locs := fset [:: pk_loc ; sk_loc].
 
+  (* Define KeyGen_code as a sampler *)
+  
 
   Definition KeyGen_ifce := [interface
     #val #[key_gen] : 'unit → ('seckey × 'pubkey)
