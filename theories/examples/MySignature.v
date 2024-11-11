@@ -55,7 +55,128 @@ Notation " 'set t " := (chSet t) (at level 2): package_scope.
 Definition tt := Datatypes.tt.
 
 (** Extracted from the Signature file **)
+(** Parameters **)
+Module Type SignatureParams.
+  Parameter SecKey PubKey Signature Message Challenge : finType.
+End SignatureParams.
 
+(** |     KEY      |
+    |  GENERATION  | **)
+
+Module Type KeyGenParams (π1 : SignatureParams).
+  Import π1.
+
+  Parameter SecKey_pos : Positive #|SecKey|.
+  Parameter PubKey_pos : Positive #|PubKey|.
+  Parameter Signature_pos : Positive #|Signature|.
+  Parameter Message_pos : Positive #|Message|.
+  Parameter Challenge_pos : Positive #|Challenge|.
+
+End KeyGenParams.
+
+
+Module KeyGenParams_extended (π1 : SignatureParams) (π2 : KeyGenParams π1).
+  Import π1 π2.
+
+  #[local] Existing Instance SecKey_pos.
+  #[local] Existing Instance PubKey_pos.
+  #[local] Existing Instance Signature_pos.
+  #[local] Existing Instance Message_pos.
+  #[local] Existing Instance Challenge_pos.
+
+  Definition chSecKey    := 'fin #|SecKey|.
+  Definition chPubKey    := 'fin #|PubKey|.
+  Definition chSignature := 'fin #|Signature|.
+  Definition chMessage   := 'fin #|Message|.
+  Definition chChallenge := 'fin #|Challenge|.
+
+  Notation " 'pubkey "    := chPubKey (in custom pack_type at level 2).
+  Notation " 'pubkey "    := chPubKey (at level 2): package_scope.
+  Notation " 'seckey "    := chSecKey (in custom pack_type at level 2).
+  Notation " 'seckey "    := chSecKey (at level 2): package_scope.
+
+  Definition pk_loc : Location := ('pubkey ; 0%N).
+  Definition sk_loc : Location := ('seckey ; 1%N).
+
+  Definition key_gen : nat := 2.  (* Routine for initial key generation. *)
+  Definition apply   : nat := 3.
+  Definition Key_locs := fset [:: pk_loc ; sk_loc].
+
+End KeyGenParams_extended.
+
+Module Type KeyGen_code (π1 : SignatureParams) (π2 : KeyGenParams π1).
+  Import π1 π2.
+  Module KGP := KeyGenParams_extended π1 π2.
+  Import KGP.
+
+  Parameter KeyGen :
+      code Key_locs [interface] (chPubKey × chSecKey).
+
+End KeyGen_code.
+
+Module KeyGen
+  (π1 : SignatureParams)
+  (π2 : KeyGenParams π1)
+  (π3 : KeyGen_code π1 π2).
+
+  Import π1 π2 π3.
+  Import π3.KGP.
+
+  Definition KeyGen_ifce := [interface
+    #val #[key_gen] : 'unit → ('seckey × 'pubkey)
+  ].
+
+  Definition Key_Gen : package Key_locs [interface] KeyGen_ifce
+  := [package
+      #def  #[key_gen] (_ : 'unit) : ('seckey × 'pubkey)
+      {
+        '(pk, sk) ← KeyGen ;;
+        #put sk_loc := sk ;;
+        #put pk_loc := pk ;;
+        ret (sk, pk)
+      }
+    ].
+
+End KeyGen.
+
+(** |  SIGNATURE  |
+    |   SCHEME    | **)
+
+    Module Type SignatureAlgorithms
+    (π1 : SignatureParams)
+    (π2 : KeyGenParams π1)
+    (π3 : KeyGen_code π1 π2).
+
+  Import π3 π3.KGP.
+
+  Parameter KeyGen : (chSecKey × chPubKey).
+
+  Parameter Sign : ∀ (sk : chSecKey) (m : chMessage), chSignature.
+
+  Parameter Ver_sig : ∀ (pk :  chPubKey) (sig : chSignature) (m : chMessage),
+   'bool.
+
+  (* Functional correctness property for signatures *)
+  Parameter Signature_correct : ∀ pk sk msg seed,
+    Some (pk,sk) = Run sampler KeyGen seed ->
+    Ver_sig pk (Sign sk msg) msg == true.
+
+End SignatureAlgorithms.
+
+
+
+
+
+
+
+
+
+
+
+
+
+(*****************************************************)
+(** Extracted from the Signature file **)
 (** Parameters **)
 Module Type SignatureParams.
 
@@ -135,7 +256,7 @@ Module Type SignatureAlgorithms
 
   (*Parameter Kgen : ∀ (pk: PubKey)  (sk: SecKey), pair. *)
   (*Parameter KGen : ∀ (l : nat), ((pk: PubKey) * (sk: SecKey)). *)
-  Parameter KGen : (SecKey × PubKey).
+  Parameter KeyGen : (SecKey × PubKey).
   Parameter Sign : ∀ (sk : SecKey) (m : chMessage), Signature.
 (*Parameter Ver_sig : ∀ (pk :  PubKey) (m : chMessage)  (sig : Signature), 'bool.*)
   Parameter Ver_sig : ∀ (pk :  PubKey) (sig : Signature) (m : chMessage), 'bool.
@@ -187,13 +308,17 @@ Module signature_correct (ss : SignatureScheme) : Prop :=
 
   Parameter Signature_correct3 : 
   forall (msg : chMessage),
-  let (pk, sk) := KGen in 
+  let (pk, sk) := KeyGen in 
   Ver_sig pk (Sign sk msg) msg = true.
 
   Parameter Signature_correct:
   forall (pk : PubKey) (sk : SecKey) (msg : chMessage),
-  let (pk, sk) := KGen in 
+  let (pk, sk) := KeyGen in 
   Ver_sig pk (Sign sk msg) msg = true.
+
+  Theorem Signature_correctness pk sk msg seed :
+    Some (sk, pk) = Run sampler KeyGen seed ->
+    Ver_sig pk (Sign sk msg) msg = true. 
 
 
   (*Axiom correctness :
