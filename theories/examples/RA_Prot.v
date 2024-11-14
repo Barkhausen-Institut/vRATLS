@@ -243,10 +243,15 @@ Check attest.
     ].
     Next Obligation.
     ssprove_valid.
-    - unfold Attestation_locs_ideal, Attestation_locs_real. Print fsetU. Search fsetU.
-    rewrite  in_fset; auto.
-  
+    - unfold Attestation_locs_ideal, Attestation_locs_real. 
+    Search fsetU. Print in_fsetU.  rewrite in_fsetU.  rewrite in_fset. rewrite in_fset.  
 
+    case: state_loc => [  ]. move=> x0 p. apply/orP. 
+    left. apply/orP. right. apply/orP. right.  apply/eqP; auto. 
+    (*case: ((x0; p) == (x0; p)).    reflexivity. *)
+    assert (H: (x0; p) == (x0; p) = true).
+    { apply/eqP. reflexivity.  } rewrite H. simpl. done.
+  
   Equations Aux_real :   
     package 
       Attestation_locs_real 
