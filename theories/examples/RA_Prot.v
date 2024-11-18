@@ -63,15 +63,15 @@ Module Type Protocol
   Import π1 π2 RAP KG Alg RAA SP RAH SigP.
 
   Definition i_chal := #|Challenge|.
-  Definition att : nat := 50.
+  Definition ra_protocol : nat := 50.
 
   Definition RA_prot_interface := 
-    [interface #val #[att] : 'unit → 'pubkey × ('attest × 'bool) ].
+    [interface #val #[ra_protocol] : 'unit → 'pubkey × ('attest × 'bool) ].
 
   Definition Att_prot : package Attestation_locs_real 
      Att_interface RA_prot_interface
   := [package
-    #def  #[att] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
+    #def  #[ra_protocol] ( _ : 'unit) : 'pubkey × ('attest × 'bool)
     {
       #import {sig #[get_pk_att] : 'unit →  'pubkey } as get_pk_att ;;
       #import {sig #[attest] : 'challenge → ('signature × 'message)  } as attest ;;
@@ -183,17 +183,6 @@ Module Type Protocol
     ---move: pre.
        by repeat case.
     Qed.       
-  
-  Print Module Type SignatureProt.
-  Print Sig_prot_ideal.
-  Print Sig_prot_ifce.
-  Print RA_prot_interface.
-
-  (*Definition convert_signature_to_attest (s:'signature) : 'attest := sig : 'attest. *)
-
-    Print attest. Print signature.
-
-   (*Definition convert_signature_to_attest (sig : Signature) : 'attest := sig. *)
 
    (** attest is not a type here, So, I'll use Signature as both input and output type 
   Definition convert_signature_to_attest (sig : Signature) : Signature := sig. **)
@@ -211,26 +200,25 @@ Module Type Protocol
       }
     ]. *)
 
-Check attest.
-
   (*
   I cannot define this because the Challenge space and the Message space
   are abstract.
   There is only a single connection between these two spaces:
   the [Hash] function.
   *)
-  Fail Definition xxx : chChallenge -> chMessage := id.
+
+  Definition Att_prot_locs_ideal := Sig_locs_ideal :|: fset [:: state_loc ].
 
   Equations Aux_ideal :   
     package 
-      Attestation_locs_ideal 
-      Sig_ifce 
+      Att_prot_locs_ideal 
+      Sig_prot_ifce
       RA_prot_interface
       := 
     Aux_ideal :=
     [package
 
-      #def #[att] (_ : 'unit) : 'pubkey × ('attest × 'bool) 
+      #def #[ra_protocol] (_ : 'unit) : 'pubkey × ('attest × 'bool) 
       {
         #import {sig #[protocol] : 'message → 'pubkey × ('signature × 'bool) } as prot_sig ;;
 
@@ -242,37 +230,51 @@ Check attest.
       }
     ].
     Next Obligation.
-    ssprove_valid.
-    - unfold Attestation_locs_ideal, Attestation_locs_real. 
-    Search fsetU. Print in_fsetU.  rewrite in_fsetU.  rewrite in_fset. rewrite in_fset.  
+      ssprove_valid.
+      rewrite /Att_prot_locs_ideal in_fsetU. apply/orP. 
+      right; auto_in_fset.
+    Qed.
 
-    case: state_loc => [  ]. move=> x0 p. apply/orP. 
-    left. apply/orP. right. apply/orP. right.  apply/eqP; auto. 
-    (*case: ((x0; p) == (x0; p)).    reflexivity. *)
-    assert (H: (x0; p) == (x0; p) = true).
-    { apply/eqP. reflexivity.  } rewrite H. simpl. done.
-  
-  Equations Aux_real :   
+    Parameter connect_msg_chal : Signature.pos_n <= #|Challenge|.
+
+    Definition Att_prot_locs_real := Sig_locs_real :|: fset [:: state_loc ].
+
+    Equations message_to_challenge (m:'message) : 'challenge :=
+      message_to_challenge m := _.
+    Next Obligation.
+      Unset Printing Notations.
+      Print π2.chMessage.
+      rewrite /π2.chMessage /chChallenge.
+      simpl.
+      apply widen_ord.
+      exact connect_msg_chal.
+    Qed.
+
+    Equations Aux_real :   
     package 
-      Attestation_locs_real 
-      Sig_ifce 
-      RA_prot_interface
+      Att_prot_locs_real 
+      Sig_prot_ifce 
+      Sig_prot_ifce
       := 
     Aux_real :=
     [package
 
-      #def #[att] (_ : 'unit) : 'pubkey × ('attest × 'bool) 
+      #def #[protocol] (msg : 'message) : 'pubkey × ('attest × 'bool) 
       {
         #import {sig #[protocol] : 'message → 'pubkey × ('signature × 'bool) } as prot_sig ;;
 
-        chal ← sample uniform i_chal ;;
         state ← get state_loc ;;
-        let msg := Hash state chal in
-        '(pk, (sig, bool)) ←  prot_sig msg ;;
+        let chal' := message_to_challenge msg in
+        let msg' := Hash state chal' in
+        '(pk, (sig, bool)) ←  prot_sig msg' ;;
         ret (pk, (sig, bool))
       }
     ].
-
+    Next Obligation. 
+      ssprove_valid.
+      rewrite /Att_prot_locs_real in_fsetU. apply/orP. 
+      right; auto_in_fset.
+    Qed.
 
   (* Definition pred (n:nat) : nat :=
       match n with
@@ -290,16 +292,89 @@ Check attest.
       pred' O      := O;
       pred' (S n') := n'. *)
 
-  Equations? Aux_Sig_prot_ideal : package Attestation_locs_ideal [interface] RA_prot_interface :=
-      Aux_Sig_prot_ideal := {package Aux ∘ Sig_prot_ideal }.
+  Equations Aux_Sig_prot_ideal : package Att_prot_locs_ideal [interface] RA_prot_interface :=
+      Aux_Sig_prot_ideal := {package Aux_ideal ∘ Sig_prot_ideal }.   
+  Next Obligation.
       ssprove_valid.
-    
+      - apply fsubsetxx.
+      - rewrite /Att_prot_locs_ideal/Att_prot_locs_real.
+        (*apply/fsubsetP.  *)
+        apply/fsubsetP => x Hx.
+        rewrite in_fsetU.
+        apply/orP; left. 
+        done.       
+  Qed.
+
+  Equations Aux_Sig_prot_real : package Att_prot_locs_real [interface] Sig_prot_ifce :=
+    Aux_Sig_prot_real := {package Aux_real ∘ Sig_prot_real }.   
+  Next Obligation.
+    ssprove_valid.
+    - apply fsubsetxx.
+    - rewrite /Att_prot_locs_real.
+      (*apply/fsubsetP.  *)
+      apply/fsubsetP => x Hx.
+      rewrite in_fsetU.
+      by apply/orP; left.      
+Qed.
+
+Lemma ra_prot_real_indist_sig_prot_real: 
+  Att_prot_real ≈₀ Aux_Sig_prot_real.
+Proof.
+  eapply eq_rel_perf_ind_eq.
+  simplify_eq_rel x.
+  all: ssprove_code_simpl.
+  simplify_linking.
+
+  ssprove_swap_rhs 1.
+  ssprove_swap_rhs 2.
+  ssprove_swap_rhs 0%N.
+  ssprove_swap_rhs 1.
+  ssprove_sync_eq.
+  ssprove_sync_eq.
+  ssprove_swap_rhs 1.
+  ssprove_swap_rhs 0.
+  ssprove_sync_eq. auto.
+  
+  simpl. unfold uniform in *. intros H. 
+  ssprove_sync_eq => state_loc.
+  ssprove_swap_rhs 0. 
+  ssprove_sync_eq => sk.
+  ssprove_swap_lhs 1.
+  ssprove_contract_get_lhs.
+  ssprove_sync_eq => state.
+  ssprove_sync_eq => pk.
+  by apply r_ret.
+Qed.
+
+
+
+(*Definition attest_sign_invariant (h0 h1 : heap) :=
+  forall sig m c,
+    (sig, m, c) \in domm *)
+
+
   Lemma ra_prot_ideal_indist_sig_prot_ideal: 
     Att_prot_ideal ≈₀ Aux_Sig_prot_ideal.
+  Proof.
+    eapply eq_rel_perf_ind_eq.
+    simplify_eq_rel x.
+    all: ssprove_code_simpl.
+    simplify_linking.
+    ssprove_swap_rhs 1.
+    ssprove_swap_rhs 2.
+    ssprove_swap_rhs 0%N.
+    ssprove_swap_rhs 1.
+    ssprove_sync_eq.
+    ssprove_sync_eq.
+    ssprove_swap_rhs 1.
+    ssprove_swap_rhs 0.
+    ssprove_swap_rhs 2.
+    ssprove_sync_eq. auto=> //=. 
+    intros H.
+    ssprove_sync_eq.
+    
 
 
-    Lemma ra_prot_ideal_indist_sig_prot_ideal: 
-    Att_prot_ideal ≈₀ Sig_prot_ideal.
 
 
   Lemma ra_prot_ideal_indist_sig_prot_ideal: 
