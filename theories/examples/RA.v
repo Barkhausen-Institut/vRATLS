@@ -118,10 +118,13 @@ Module Type RemoteAttestationHash
   Definition Attestation_locs_real := fset [:: pk_loc ; sk_loc; state_loc ].
   Definition Attestation_locs_ideal := Attestation_locs_real :|: fset [:: attest_loc_long ].
 
+  Definition ra_protocol : nat := 50.
+
   Definition Att_interface := [interface
     #val #[get_pk_att] : 'unit → 'pubkey ;
     #val #[attest] : 'challenge → ('signature × 'message) ;
     #val #[verify_att] : ('challenge × 'signature) → 'bool
+    (* #val #[ra_protocol] : 'message → 'pubkey × ('attest × 'bool) *)
   ].
 
   Definition Att_real : package Attestation_locs_real KeyGen_ifce
