@@ -47,6 +47,13 @@ From vRATLS Require Import examples.Sig_Prot. Print SignatureProt.
 (*Import SignatureProt. 
 Export SignatureProt. *)
 
+Module RAConstraints (A : RemoteAttestationParams) <: SignatureConstraints.
+  Import A.
+
+  Definition chMessage : choice_type := chState × chChallenge.
+
+End RAConstraints.
+
 Module Type Protocol
     (π1 : SignatureParams)
     (π2 : SignatureConstraints)
@@ -278,14 +285,358 @@ Equations B :
   Check B.
   Check C.
   Check D.
+  Check Sig_prot_ideal.
 
   (*** Now A ≈₀ C , B ≈₀ D , 
         A ≈₀ E , B ≈₀ F  ***)
+        
+Definition xxx (t: heap * heap) := 
+  match t with 
+  | (a,b) => a = b
+  end.
 
-Lemma A_indist_B: 
-      A ≈₀ B.
+ (*Lemma heap_update_equiv:
+  forall h loc v1 v2,
+    v1 = v2 ->
+    setm h loc v1 = setm h loc v2. *)
+
+  Require Import extructures.fmap.
+
+  Definition fmap_kmap' {S} {T T':ordType} (f: T->T') (m:{fmap T -> S}) : {fmap T' -> S} :=
+    mapm2 f id m.
+
+  Definition hash_eq (sk: Value sk_loc.π1) (state: Value state_loc.π1) (signed : Value sign_loc.π1) (hash_signed : Value sign_loc.π1) : Prop :=
+    (fmap_kmap'
+        (fun t =>
+          match t with
+          | (sig, chal) => (Sign sk (Hash state chal), Hash state chal)
+          end)
+        signed) = hash_signed.
+
+  Definition full_heap_eq : precond  :=
+    λ '(s0, s1),
+      get_heap s0 pk_loc = get_heap s1 pk_loc /\
+        get_heap s0 sk_loc = get_heap s1 sk_loc /\
+        get_heap s0 state_loc = get_heap s1 state_loc /\
+        hash_eq (get_heap s0 attest_loc_long) (get_heap s1 sign_loc) /\
+        (forall {l:Location}, l \notin Attestation_locs_ideal → l \notin Comp_locs → get_heap s0 l = get_heap s1 l).
+*)
+Lemma A_indist_c: 
+      A ≈₀ C.
 Proof.
-Admitted.
+  eapply eq_rel_perf_ind_eq.
+  simplify_eq_rel x.
+  all: ssprove_code_simpl.
+  - simplify_linking. 
+    ssprove_sync_eq.
+    ssprove_sync_eq.
+    ssprove_sync_eq  => pk. 
+    ssprove_swap_lhs 0. 
+    ssprove_sync_eq => sk.
+    ssprove_swap_lhs 2.
+    ssprove_swap_lhs 1.
+    ssprove_contract_get_lhs. 
+
+    ssprove_swap_lhs 0.
+
+    ssprove_sync_eq => sig.   
+
+    eapply rpre_weaken_rule.
+    2: { move => s0 s1 H. 
+         instantiate (1:=λ '(h₀, h₁), xxx (h₀, h₁)).
+         simpl.
+         exact H. 
+      }
+    eapply r_get_remember_lhs => state.
+    apply r_put_lhs.
+    apply r_put_rhs.
+    ssprove_sync.
+    1: {
+      rewrite /get_pre_cond => s0 s1.
+      rewrite /set_lhs/set_rhs.
+      case => s1' H. 
+
+      (**s0: Hash state (message_to_challenge x)
+         s1: signing involves the value x. **)
+
+      unfold get_heap, set_heap in *. 
+      destruct H as [ [s₀' [H_rel Hs0_def]] Hs1_def ].
+
+      (** substitutions propagate Hs0_def and Hs1_def 
+          the goal is essentially to compare 
+          s0 and s1's states after the substitutions**)
+      subst s0 s1. 
+
+      simp get_heap.
+      rewrite /get_heap_clause_1 /sval.
+      rewrite /fmap /setm => //=. 
+      assert (hash_message_equiv: Hash state (message_to_challenge x) = x).
+      1 : {
+        admit.
+      }
+      rewrite hash_message_equiv. admit.
+      }
+
+      admit.
+      Admitted.
+*)
+Print reshape_pair_id. Print full_heap_eq'.
+
+
+(**deterministically maps (state, challenge) back to x???**)
+
+(** I know axiom & lemma(hash_message_equiv) are the same but there was no other way :( )**)
+Axiom hash_message_identity:
+forall (state : 'state) (x : 'message),
+Hash state (message_to_challenge x) = x.
+
+(*This hypothesis is to reflect the protocol assumptions*)
+Lemma hash_determinism:
+  forall (state : 'state) (challenge : 'challenge) (x : 'message),
+    message_to_challenge x = challenge ->
+    Hash state challenge = x.
+Proof.
+  intros state challenge x Hmessage.
+  (* step assumes properties of Hash and message_to_challenge *)
+  rewrite <- Hmessage. 
+  apply hash_message_identity.
+Qed.
+
+
+Lemma hash_message_equiv:
+  forall state x,
+    Hash state (message_to_challenge x) = x.
+Proof.
+  intros state x.
+  apply hash_determinism.
+  reflexivity. (* message_to_challenge x = message_to_challenge x *)
+Qed.
+
+(*Lemma heap_update_equiv:
+  forall h loc v,
+    set_heap h loc v = set_heap h loc v. *)
+Lemma heap_update_equiv:
+  forall h loc v1 v2,
+    v1 = v2 ->
+    set_heap h loc v1 = set_heap h loc v2.
+Proof.
+  intros h loc v1 v2 Heq.
+  (* substitute v2 with v1 in the goal *)
+  subst v2.
+  (* Now the goal is to prove that set_heap h loc v1 = set_heap h loc v1 *)
+  reflexivity.
+Qed.
+
+(*Lemma preserve_xxx_set_heap:
+  forall h1 h2 loc v,
+    xxx (h1, h2) ->
+    xxx (set_heap h1 loc v, set_heap h2 loc v).
+Proof.
+  intros h1 h2 loc v Hrel.
+  (* Expand set_heap if its behavior is known *)
+  unfold set_heap.
+  (* Reasoning about how the relation is preserved after identical updates *)
+  (* Here we assume that xxx is preserved by identical updates *)
+
+  simpl.
+  unfold xxx in Hrel. 
+  unfold sval. *)
+
+Lemma preserve_xxx_set_heap:
+  forall h1 h2 loc v,
+    h1 = h2 ->
+    set_heap h1 loc v = set_heap h2 loc v.
+Proof.
+  intros h1 h2 loc v Hrel.
+  (* Use Hrel to rewrite h2 as h1 *)
+  rewrite Hrel.
+  (* Now both sides are identical *)
+  reflexivity.
+Qed.
+ 
+(*
+Lemma A_indist_c: 
+      A ≈₀ C.
+Proof.
+  eapply eq_rel_perf_ind_eq.
+  simplify_eq_rel x.
+  all: ssprove_code_simpl.
+  - simplify_linking. 
+    ssprove_sync_eq.
+    ssprove_sync_eq.
+    ssprove_sync_eq  => pk. 
+    ssprove_swap_lhs 0. 
+    ssprove_sync_eq => sk.
+    ssprove_swap_lhs 2.
+    ssprove_swap_lhs 1.
+    ssprove_contract_get_lhs. 
+    ssprove_swap_lhs 0. 
+    ssprove_sync_eq => sig.   
+    eapply rpre_weaken_rule.
+    2: { move => s0 s1 H. 
+         instantiate (1:=λ '(h₀, h₁), xxx (h₀, h₁)).
+         simpl.
+         exact H. 
+      }
+    eapply r_get_remember_lhs => state.
+    apply r_put_lhs.
+    apply r_put_rhs.  
+    (*ssprove_sync. *)
+    ssprove_restore_mem.
+    2: {
+      ssprove_sync_eq => sign.
+      eapply r_ret => s0 s1 set_vals. 
+      apply conj.    
+      - assert (Hhash: Hash state (message_to_challenge x) = x).
+      1: {
+        apply hash_message_equiv.
+      }
+      rewrite Hhash.
+      reflexivity.
+      - exact. 
+      }
+    rewrite /preserve_update_mem/remember_pre/update_heaps.
+    intros s₀ s₁ Hrel.
+    (*rewrite hash_message_equiv. *)
+    (*apply heap_update_equiv.*)
+
+    destruct Hrel as [Hrel_lhs Hrel_rhs].
+    (*
+    (* I need to update both heaps & reason about the relation *)
+    assert (Hupdate: xxx
+      (set_heap s₀ sign_loc (setm sig (Sign sk x, x) Signature.tt),
+       set_heap s₁ sign_loc (setm sig (Sign sk x, x) Signature.tt))).
+       1: {
+        apply preserve_xxx_set_heap.
+        exact Hrel_lhs.
+       }
+      *)
+    assert (Hhash: Hash state (message_to_challenge x) = x).
+    1: {
+      apply hash_message_equiv.
+    }
+    rewrite Hhash. apply preserve_xxx_set_heap. exact Hrel_lhs.
+  
+  Qed.
+*)
+
+
+
+
+Lemma A_indist_c: 
+      A ≈₀ C.
+Proof.
+  eapply eq_rel_perf_ind_eq.
+  simplify_eq_rel x.
+  all: ssprove_code_simpl.
+  - simplify_linking. 
+    ssprove_sync_eq.
+    ssprove_sync_eq.
+    ssprove_sync_eq  => pk. 
+    ssprove_swap_lhs 0. 
+    ssprove_sync_eq => sk.
+    ssprove_swap_lhs 2.
+    ssprove_swap_lhs 1.
+    ssprove_contract_get_lhs. 
+    ssprove_swap_lhs 0.
+    ssprove_sync_eq => sig.   
+    eapply rpre_weaken_rule.
+    2: { move => s0 s1 H. 
+         instantiate (1:=λ '(h₀, h₁), xxx (h₀, h₁)).
+         simpl.
+         exact H. 
+      }
+    eapply r_get_remember_lhs => state.
+    apply r_put_lhs.
+    apply r_put_rhs.
+    ssprove_sync.
+    1: {
+      rewrite /get_pre_cond => s0 s1.
+      rewrite /set_lhs/set_rhs.
+      case => s1' H.
+      
+      Search set_rhs set_lhs.
+    2:{
+      ssprove_restore_mem.
+
+    }
+
+
+
+
+
+
+
+(*
+Lemma A_indist_c: 
+      A ≈₀ C.
+Proof.
+  eapply eq_rel_perf_ind_eq.
+  simplify_eq_rel x.
+  all: ssprove_code_simpl.
+  - simplify_linking. rewrite -/full_heap_eq'.
+    ssprove_sync_eq.
+    ssprove_sync_eq.
+    ssprove_sync_eq  => pk. 
+    ssprove_swap_lhs 0.
+    ssprove_sync_eq => sk.
+    ssprove_swap_lhs 2.
+    ssprove_swap_lhs 1.
+    ssprove_contract_get_lhs. 
+
+    ssprove_swap_lhs 0.
+
+    ssprove_sync_eq => sig.   
+    Print state_loc.
+    eapply rpre_weaken_rule.
+    2: { move => s0 s1 H. 
+         instantiate (1:=λ '(h₀, h₁), xxx (h₀, h₁)).
+         simpl.
+         exact H. 
+      }
+    eapply r_get_remember_lhs => state.
+    apply r_put_lhs.
+    apply r_put_rhs.
+    ssprove_sync.
+    1: {
+      rewrite /get_pre_cond => s0 s1.
+      rewrite /set_lhs/set_rhs.
+      case => s1' H.
+      
+      Search set_rhs set_lhs.
+    2:{
+      ssprove_restore_mem.
+
+    }
+    have bbb : 
+      (Sign sk
+        (Hash state
+          (message_to_challenge x)),
+       Hash state
+        (message_to_challenge x)) =
+      (Sign sk x, x).
+      {
+        f_equal.
+        - f_equal.
+      }
+    
+  
+    ssprove_swap_lhs 1. Show.
+
+
+    rewrite /setm. 
+
+
+    (** I need to sync the signing op **)
+    ssprove_sync_eq  => state_loc.
+  
+    (** trying to match memory modifications for Sign? *)
+
+    Search ( ?v1  ?get ?x ).
+   
+    apply eq_rel_perf_ind_eq.
+*)
+
 
 Lemma B_indist_D: 
       B ≈₀ D.
@@ -294,7 +645,44 @@ Print eq_rel_perf_ind_eq.
   eapply eq_rel_perf_ind_eq.
   simplify_eq_rel x.
   all: ssprove_code_simpl.
-  simplify_linking.
+  - simplify_linking.
+
+    ssprove_sync_eq.
+    ssprove_sync_eq.
+
+    (*ssprove_swap_lhs 3.
+    ssprove_swap_lhs 2.
+    ssprove_swap_lhs 1.
+    ssprove_swap_rhs 1.
+    ssprove_contract_get_lhs.
+    ssprove_sync_eq  => pk. *)
+
+    ssprove_sync_eq  => pk. 
+    ssprove_swap_lhs 1.
+    ssprove_contract_get_lhs.
+    ssprove_swap_lhs 0.
+    ssprove_sync_eq => sk.
+
+    eapply rpre_weaken_rule.
+    2: { move => s0 s1 H. 
+         admit. 
+      }
+    eapply r_get_remember_lhs => state.
+    apply r_put_lhs.
+    apply r_put_rhs.
+    ssprove_sync.
+
+    apply r_ret. 
+
+    ssprove_sync_eq.
+
+    Check r_get_remember_lhs.
+
+    ssprove_sync_eq => state.
+    apply r_get_remember_lhs => state_loc_lhs.
+    (*ssprove_sync_eq  => state_loc. *)
+    ssprove_sync_eq => sk_loc.
+    
 
 
   

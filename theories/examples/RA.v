@@ -60,9 +60,7 @@ From vRATLS Require Import extructurespp.ord.
 From vRATLS Require Import extructurespp.fmap.
 From vRATLS Require Import extructurespp.fset.
 
-Module Type RemoteAttestationParams (π2 : SignatureConstraints).
-
-  Import π2.
+Module Type RemoteAttestationParams.
 
   Definition chState     : choice_type := 'fin (mkpos pos_n).
   Definition Attestation : choice_type := 'fin (mkpos pos_n).
@@ -77,7 +75,7 @@ End RemoteAttestationParams.
 Module Type RemoteAttestationAlgorithms
   (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
   (π2 : SignatureConstraints)
-  (π3 : RemoteAttestationParams π2)
+  (π3 : RemoteAttestationParams)
   (KG : KeyGeneration π1 π2)
   (Alg : SignatureAlgorithms π1 π2 KG).
 
@@ -105,7 +103,7 @@ End RemoteAttestationAlgorithms.
 Module Type RemoteAttestationHash
   (π1 : SignatureParams)
   (π2 : SignatureConstraints)
-  (π3 : RemoteAttestationParams π2)
+  (π3 : RemoteAttestationParams)
   (KG : KeyGeneration π1 π2)
   (Alg : SignatureAlgorithms π1 π2 KG)
   (RAA : RemoteAttestationAlgorithms π1 π2 π3 KG Alg)
