@@ -1321,6 +1321,7 @@ Module Type RemoteAttestationHash
 
         (* gets *)
         Fail eapply r_get_remember_lhs.
+        
         (* I have to reshape the precondition into:
            [λ '(s0, s1), full_heap_eq' (s0, s1)]
          *)

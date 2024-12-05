@@ -61,7 +61,7 @@ Module Type KeyGenParams (π1 : SignatureParams).
   Parameter PubKey_pos : Positive #|PubKey|.
   Parameter Signature_pos : Positive #|Signature|.
   Parameter Message_pos : Positive #|Message|.
-  Parameter Challenge_pos : Positive #|Challenge|.
+  Parameter Challenge_pos : Positive #|Challenge|. (* FIXME does not belong here! *)
 
 End KeyGenParams.
 
