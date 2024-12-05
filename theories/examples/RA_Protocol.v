@@ -397,8 +397,6 @@ Proof.
 
   Qed.
 
-
-
 Lemma B_indist_F : B ≈₀ F.
 Proof.
 eapply eq_rel_perf_ind_eq.
@@ -409,20 +407,74 @@ eapply eq_rel_perf_ind_eq.
     simplify_linking.
     ssprove_code_simpl; simpl.
     ssprove_swap_rhs 0%N.
-    1: { apply rreflexivity_rule. 
+    2: {destruct KeyGen. apply prog_valid.  }
+    1: {
+      unfold Key_locs, cmd_locs.
+      apply/fdisjointP => A.
+      rewrite fset.fset_fsetU_norm2.
+      move/fsetUP.
+      case; 
+        rewrite -fset1E; move/fset1P => E; rewrite E in_fset1; by [apply/eqP].
+      }
+    eapply rsame_head_alt_pre.
+    1: {
+        set xxx := fun '(s0,s1) => s0 = s1. 
+        rewrite -(reshape_pair_id xxx).
+        apply (rpost_weaken_rule _
+                       (λ '(a₀, s₀) '(a₁, s₁), a₀ = a₁ /\ (xxx (s₀, s₁)) )).
+          -- eapply r_reflexivity_alt.
+          --- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
+          --- move => l.
+          rewrite /Key_locs/xxx. 
+          unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
+          rewrite /get_pre_cond.
+          by intros s0 s1 [=->].
+      --- intros.
+          rewrite /xxx/put_pre_cond.
+          by intros s0 s1 [=->].
+      -- intro a. 
+           intro a1.
+           simplify_linking.
+           destruct a. destruct a1. intros H. destruct H.
+           by split.
+      }
+    intros a.
+    ssprove_code_simpl.
+    ssprove_code_simpl_more.
+    destruct a.
+    ssprove_swap_lhs 2.
+    ssprove_swap_lhs 1.
+    ssprove_swap_lhs 0.
+    ssprove_swap_lhs 4.
+    ssprove_swap_lhs 3.
+    ssprove_swap_lhs 2.
+    ssprove_swap_lhs 1.
+    ssprove_contract_get_lhs.
+    ssprove_sync_eq.
+    intros a.
+    ssprove_sync_eq.
+    ssprove_sync_eq.
+    ssprove_sync_eq => pk.
+    ssprove_sync_eq => sk.
+    ssprove_code_simpl_more.
+    ssprove_sync_eq => pk'.
+    by apply r_ret.
 
-    }
+  Qed.  
+
+
+    
 
 
 
   Theorem red la a:
     ValidPackage LA Att_interface A_export a →
     (* TODO *)
-    fdisjoint LA (Sig_real_locp).(locs) →
-    fdisjoint LA (Sig_ideal_locp).(locs) →
+    fdisjoint LA (A_locp).(locs) →
+    fdisjoint LA (B_locp).(locs) →
     fdisjoint LA Aux_locs →
-    fdisjoint LA (Att_real_locp).(locs) →
-    fdisjoint LA (Att_ideal_locp).(locs) →
+    fdisjoint LA (E_locp).(locs) →
+    fdisjoint LA (F_locp).(locs) →
     AdvantageE A B a <= AdvantageE C D (a ∘ AuxProt).
 
   Theorem RA_prot_perf_indist:
@@ -435,7 +487,7 @@ eapply eq_rel_perf_ind_eq.
 
 
 
-    
+
 
 
 
