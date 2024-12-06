@@ -460,22 +460,30 @@ eapply eq_rel_perf_ind_eq.
     ssprove_sync_eq => pk'.
     by apply r_ret.
 
-  Qed.  
+  Qed.
 
-
-    
-
-
-
-  Theorem red la a:
-    ValidPackage LA Att_interface A_export a →
+Theorem red LA' A' (l:{fset Location}):
+  ValidPackage LA' Att_interface A_export A' →
     (* TODO *)
-    fdisjoint LA (A_locp).(locs) →
-    fdisjoint LA (B_locp).(locs) →
-    fdisjoint LA Aux_locs →
-    fdisjoint LA (E_locp).(locs) →
-    fdisjoint LA (F_locp).(locs) →
-    AdvantageE A B a <= AdvantageE C D (a ∘ AuxProt).
+    fdisjoint LA' Att_prot_locs_ideal →
+    fdisjoint LA' Att_prot_locs_real →
+    fdisjoint LA' Sig_locs_ideal →
+    LA' :#: Sig_locs_real →
+    LA' :#: Aux_locs_prot →
+    (AdvantageE A B A' <= AdvantageE C D (A'∘ (@Aux_Prot l)))%R.
+Proof.
+  move => va H1 H2 H3 H4 H5.
+  
+
+  rewrite Advantage_sym.
+  simpl in *|-. Print Att_prot_locs_real. Print Att_prot_locs_ideal.
+  ssprove triangle ((@Aux_Prot Sig_locs_ideal) ∘ Sig_prot ∘ Sig_ideal_c ) [::
+    Sig_prot_ideal ;
+    Sig_prot_real
+    ] ((@Aux_Prot Sig_locs_real) ∘ Sig_prot ∘ Sig_real_c) A as ineq.
+
+
+
 
   Theorem RA_prot_perf_indist:
     forall Attacker,
