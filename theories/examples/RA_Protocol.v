@@ -107,8 +107,6 @@ Definition AuxPrim_ideal :
     can selecet the chall or we can say that it can influnce the protocol. 
     So that's why chall is derived from the adversary's input msg  **)
 
-Parameter connect_msg_chal : Signature.pos_n <= #|Challenge|.
-
 Definition Att_prot_locs_real := Sig_locs_real :|: Aux_locs_prot.
 Definition Att_prot_locs_ideal := Sig_locs_ideal :|: Aux_locs_prot.
 

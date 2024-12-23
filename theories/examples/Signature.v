@@ -367,4 +367,209 @@ Module SignaturePrimitives
         --- by [move: pre; rewrite /inv_conj; repeat case].
   Qed.
 
+
+(** There was mismatch, bc sign_loc was defined as a set of 
+(chSignature × chMessage) but internally represented using a map to units.
+So, I needed to convert the retrieved value to a proper set, & used the 
+domain of the map to extract the keys. **)
+
+Definition sig_inv : precond :=
+  λ '(s0, s1),
+    get_heap s0 pk_loc = get_heap s1 pk_loc /\
+    get_heap s0 sk_loc = get_heap s1 sk_loc /\
+    (forall (m : chMessage) (sig1 sig2 : chSignature), 
+      let sign_set := domm (get_heap s1 sign_loc) in
+      if (sig1, m) \in sign_set
+      then sig1 = Sign (get_heap s1 sk_loc) m /\
+           sig2 = Sign (get_heap s1 sk_loc) m /\
+           sig1 = sig2
+      else sig1 = Sign (get_heap s1 sk_loc) m /\
+           sig2 = Sign (get_heap s1 sk_loc) m /\
+           sig1 != sig2) /\
+           (forall {l:Location}, l \notin Sig_locs_ideal → get_heap s0 l = get_heap s1 l).
+
+
+Definition sig_inv' : precond := λ '(s0, s1),
+  (s0 == empty_heap /\ s1 == empty_heap) \/
+  (get_heap s0 pk_loc = get_heap s1 pk_loc /\
+   get_heap s0 sk_loc = get_heap s1 sk_loc /\
+   (forall (m : chMessage) (sig1 sig2 : chSignature),
+     let sign_set := domm (get_heap s1 sign_loc) in
+     if (sig1, m) \in sign_set then
+       sig1 = Sign (get_heap s1 sk_loc) m /\
+       sig2 = Sign (get_heap s1 sk_loc) m /\
+       sig1 = sig2
+     else
+       sig1 = Sign (get_heap s1 sk_loc) m /\
+       sig2 = Sign (get_heap s1 sk_loc) m /\
+       sig1 != sig2) /\
+   (forall {l:Location}, l \notin Sig_locs_ideal →
+     get_heap s0 l = get_heap s1 l)). 
+
+Lemma disjoint_noteq:
+    forall {T:ordType} {l0} {L0: {fset T}}, l0 \notin L0 -> forall {l0'}, l0' \in L0 -> l0 != l0'.
+  Proof.
+    move => T l L H l'.
+    move: H; elim/fset_ind: L.
+    - by [].
+    - move => x s x_notin_s iH.
+      move/fsetU1P.
+      rewrite boolp.not_orP.
+      case; move/eqP => l_not_x.
+      move/negP => l_notin_s.
+      move/fsetU1P. case.
+      + by [move => l'_eq_x; rewrite l'_eq_x].
+      + move => l'_in_s; apply: (iH l_notin_s l'_in_s).
+Qed.
+
+
+
+
+Lemma INV'_full_heap_eq:
+  INV' Sig_locs_real Sig_locs_ideal sig_inv.
+Proof.
+  split.
+  -rewrite /sig_inv.   
+    case => pk_loc_eq;
+    case => sk_loc_eq.
+    case => sig_loc_prop other_eq.
+    move => l notin_real notin_ideal.
+    case in_real: (l \in Sig_locs_real).
+    + move: in_real; move/idP => in_real.
+    (*move/negP: notin_real => notin_real; contradiction.*)
+      move: notin_real; move/negP => //=.
+    + case in_ideal: (l \in Sig_locs_ideal). 
+      * move: in_ideal; move/idP => in_ideal.
+        move: notin_ideal; move/negP=> //=.
+      * apply (other_eq l notin_ideal).
+ - rewrite /sig_inv.
+    case => pk_loc_eq;
+    case => sk_loc_eq.
+    case => sig_loc_prop other_eq.
+    move => l v notin_real notin_ideal.
+    (*intros sig_inv_lem l v notin_real notin_ideal.*)
+    repeat split.
+  + case in_real: (l \in Sig_locs_real).
+    * move: in_real; move/idP => in_real.
+      move: notin_real; move/negP => //=.
+    * case in_ideal: (l \in Sig_locs_ideal).
+      ** move: in_ideal; move/idP => in_ideal.
+      move: notin_ideal; move/negP=> //=.
+      ** (*clear in_real in_ideal.*)
+         have pk_loc_in: pk_loc \in Sig_locs_ideal.
+        {
+          clear.
+          rewrite /Sig_locs_ideal /Sig_locs_real /Key_locs.
+          rewrite in_fsetU.
+          apply /orP. left; auto_in_fset. 
+        }
+        have pk_not_eq_l: pk_loc != l.
+        { rewrite eqtype.eq_sym. apply (disjoint_noteq notin_ideal pk_loc_in).  }
+        by [do 2! rewrite (get_set_heap_neq _ _ _ _ pk_not_eq_l)].
+    + (* same as above but for  [sk_loc] *)
+      case in_real: (l \in Sig_locs_real). 
+      * move: in_real; move/idP => in_real.
+        move: notin_real; move/negP => //=.
+      * case in_ideal: (l \in Sig_locs_ideal).
+        ** move: in_ideal; move/idP => in_ideal.
+           move: notin_ideal; move/negP=> //=.
+        ** (*clear in_real in_ideal.*)
+           have sk_loc_in_ideal: sk_loc \in Sig_locs_ideal.
+           {
+            clear.
+            rewrite /Sig_locs_ideal /Sig_locs_real /Key_locs.
+            rewrite in_fsetU.
+            apply /orP. left; auto_in_fset. 
+           }
+           have sk_not_eq_l: sk_loc != l.
+           { rewrite eqtype.eq_sym. apply (disjoint_noteq notin_ideal sk_loc_in_ideal).  }
+           by [do 2! rewrite (get_set_heap_neq _ _ _ _ sk_not_eq_l)].
+  + (**  sig_inv**)
+    case in_real: (l \in Sig_locs_real).
+    * move: in_real; move/idP => in_real.
+      move: notin_real; move/negP => //=.
+    * case in_ideal: (l \in Sig_locs_ideal).
+      ** move: in_ideal; move/idP => in_ideal.
+      move: notin_ideal; move/negP=> //=.
+      ** (*clear in_real in_ideal.*)
+         move=> m sig1 sig2.
+         have sign_loc_in_ideal: sign_loc \in Sig_locs_ideal.
+         {
+            (*clear.*)
+            rewrite /Sig_locs_ideal /Sig_locs_real. 
+            rewrite in_fsetU.
+             apply /orP. right; auto_in_fset. 
+           }
+           have sign_not_eq_l: sign_loc != l.
+           { rewrite eqtype.eq_sym. apply (disjoint_noteq notin_ideal sign_loc_in_ideal). }
+           rewrite (get_set_heap_neq _ _ _ _ sign_not_eq_l).
+           have sk_loc_in_ideal: sk_loc \in Sig_locs_ideal.
+          {
+            rewrite /Sig_locs_ideal /Sig_locs_real /Key_locs.
+            rewrite in_fsetU.
+            apply /orP. left; auto_in_fset.
+          }
+          have sk_not_eq_l: sk_loc != l.
+            { rewrite eqtype.eq_sym. apply (disjoint_noteq notin_ideal sk_loc_in_ideal). }
+            rewrite (get_set_heap_neq _ _ _ _ sk_not_eq_l).
+            exact: sig_loc_prop.
+  + move => l' l'_not_in_ideal.
+    case E : (l == l').
+    * move: E. move/eqP => l_eq_l'.  
+      rewrite -l_eq_l'.
+      by [do 2! (rewrite get_set_heap_eq)].
+    * move: E; move/negP/idP; rewrite eqtype.eq_sym => l_neq_l'.
+      do 2! rewrite (get_set_heap_neq _ _ _ _ l_neq_l').
+      apply: (other_eq l' l'_not_in_ideal).
+Qed.
+
+
+Lemma domm_empty_heap : domm (get_heap empty_heap sign_loc) = fset0.
+Proof.
+rewrite /get_heap /empty_heap.
+rewrite domm0.
+reflexivity.
+Qed. 
+
+(*
+Definition sig_inv'' : precond :=
+  λ '(s0, s1),
+    get_heap s0 pk_loc = get_heap s1 pk_loc /\
+    get_heap s0 sk_loc = get_heap s1 sk_loc /\
+    (forall (m : chMessage) (sig1 : chSignature),
+      (sig1, m) \in domm (get_heap s1 sign_loc) -> sig1 = Sign (get_heap s1 sk_loc) m) /\
+    (forall (m : chMessage) (sig1 : chSignature),
+      (sig1, m) \notin domm (get_heap s1 sign_loc) -> False) /\
+    (forall {l:Location}, l \notin Sig_locs_ideal → get_heap s0 l = get_heap s1 l).
+*)
+
+
+Lemma Invariant_heap_eq_ideal:
+        Invariant Sig_locs_real Sig_locs_ideal sig_inv.
+  Proof.
+    split.
+    - by [apply INV'_full_heap_eq].
+    - rewrite /sig_inv.
+      repeat split.  
+      move => m sig1 sig2. rewrite domm_empty_heap. rewrite in_fset0. 
+      repeat split. 
+      + remember (get_heap empty_heap sk_loc) as x.
+      move: Heqx.
+      Search get_heap empty_heap.
+      rewrite get_empty_h
+      eap.
+      rewrite /heap_init.
+      rewrite /empty_heap.
+      simp get_heap. simpl. case.
+
+ .......
+
+  Qed.
+    
+
+    
+
+
+
+
 End SignaturePrimitives.
