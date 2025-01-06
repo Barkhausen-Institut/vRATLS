@@ -367,6 +367,11 @@ Module SignaturePrimitives
         --- by [move: pre; rewrite /inv_conj; repeat case].
   Qed.
 
+(*
+
+Here we tried to transport the fact that signatures
+should only be created by [sign] via the invariant.
+We failed to so because you will have to prove this.
 
 (** There was mismatch, bc sign_loc was defined as a set of 
 (chSignature × chMessage) but internally represented using a map to units.
@@ -568,7 +573,7 @@ Lemma Invariant_heap_eq_ideal:
     
 
     
-
+*)
 
 
 
