@@ -1,6 +1,10 @@
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_ssreflect ssrnat ssreflect
-  ssrfun ssrbool ssrnum eqtype seq.
+(* From mathcomp Require Import all_ssreflect ssrnat ssreflect *)
+(*   ssrfun ssrbool ssrnum eqtype seq. *)
+From mathcomp Require Import all_ssreflect
+  ssrnat ssreflect ssrfun ssrbool ssrnum
+  eqtype seq
+  classical.boolp.
 Set Warnings "notation-overridden,ambiguous-paths".
 
 From Coq Require Import Utf8.
@@ -78,3 +82,20 @@ Section fset_help.
 End fset_help.
 
 (* TODO create a normalization tactic for [fset] where [fsetU] is the normal form.*)
+
+Lemma disjoint_noteq:
+  forall {T:ordType} {l0} {L0: {fset T}}, l0 \notin L0 -> forall {l0'}, l0' \in L0 -> l0 != l0'.
+Proof.
+  move => T l L H l'.
+  move: H; elim/fset_ind: L.
+  - by [].
+  - move => x s x_notin_s iH.
+    move/fsetU1P.
+    Require Import Coq.Init.Logic.
+    rewrite boolp.not_orP.
+    case; move/eqP => l_not_x.
+    move/negP => l_notin_s.
+    move/fsetU1P. case.
+    + by [move => l'_eq_x; rewrite l'_eq_x].
+    + move => l'_in_s; apply: (iH l_notin_s l'_in_s).
+Qed.
