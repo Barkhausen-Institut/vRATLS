@@ -346,5 +346,4 @@ Module Type RemoteAttestationHash
   Definition attest_set := 'set (chSignature × chState × chChallenge).
   Definition sign_set := 'set ('signature × 'message).
 
-
 End RemoteAttestationHash.

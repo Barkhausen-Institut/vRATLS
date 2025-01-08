@@ -56,7 +56,7 @@ Notation " 'set t " := (chSet t) (at level 2): package_scope.
 
 Definition tt := Datatypes.tt.
 
-Module Type SignatureProt
+Module SignatureProt
   (π1 : SignatureParams)
   (π2 : KeyGenParams π1)
   (π3 : KeyGen_code π1 π2)
