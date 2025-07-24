@@ -56,11 +56,8 @@ Obligation Tactic := idtac.
 From vRATLS Require Import examples.Signature.
 From vRATLS Require Import examples.RA.
 From vRATLS Require Import examples.Sig_Prot.  
-
-From vRATLS Require Import examples.Sig_Prot.
 From vRATLS Require Import examples.RA_Facts.
-(*Import SignatureProt.
-Export SignatureProt. *)
+
 
 Module Protocol
   (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
@@ -73,7 +70,8 @@ Module Protocol
   Module π3 := RemoteAttestationParams π1.
   Module SP := SignaturePrimitives π1 π2 KGc Alg.
   Module SigProt := SignatureProt π1 π2 KGc Alg.
-  Import π1 π2 π3 KGc Alg RAA RAH SP SigProt.
+  Module Unforge := Unforgability π1 π2 KGc Alg RAA RAH.
+  Import π1 π2 π3 KGc Alg RAA RAH SP SigProt Unforge.
   Import KGc.KGP SP.KG.
  
   Definition i_chal := #|Challenge|.
