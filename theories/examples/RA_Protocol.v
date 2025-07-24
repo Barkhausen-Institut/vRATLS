@@ -57,6 +57,10 @@ From vRATLS Require Import examples.Signature.
 From vRATLS Require Import examples.RA.
 From vRATLS Require Import examples.Sig_Prot.  
 
+From vRATLS Require Import examples.Sig_Prot.
+From vRATLS Require Import examples.RA_Facts.
+(*Import SignatureProt.
+Export SignatureProt. *)
 
 Module Protocol
   (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
@@ -189,16 +193,16 @@ Equations Att_prot :
   *******)
 
 (*
-A:	Fully ideal package: ideal attestation primitives & ideal signature scheme
+Fully ideal package: ideal attestation primitives & ideal signature scheme
 *)
 
-Equations A : 
+Equations IdealRAPackage : 
   package 
     Att_prot_locs_ideal
     [interface]
     RA_prot_interface 
   :=
-  A := 
+  IdealRAPackage := 
   {package Att_prot ∘  AuxPrim_ideal ∘ Sig_ideal_c }.
   Next Obligation.
   ssprove_valid.
@@ -228,16 +232,16 @@ Equations A :
     
   (****** Equations for Real *******)
 (*
-B: Fully real package: real attestation primitives & real signature implementation
+Fully real package: real attestation primitives & real signature implementation
 *)
 
-Equations B : 
+Equations RealRAPackage : 
   package 
     Att_prot_locs_real 
     [interface] 
     RA_prot_interface 
   :=
-  B := 
+  RealRAPackage := 
   {package Att_prot ∘ AuxPrim_real ∘ Sig_real_c  }.
   Next Obligation.
     ssprove_valid.
@@ -246,8 +250,8 @@ Equations B :
     unfold Att_prot_locs_real. apply fsubsetUl.
   Qed.
 
-  Definition C := Sig_prot_ideal.
-  Definition D := Sig_prot_real.
+  Definition IdealSigProt := Sig_prot_ideal.
+  Definition RealSigProt := Sig_prot_real.
 
   Equations Aux_Prot  :
     package 
@@ -270,16 +274,16 @@ Equations B :
     ].
 
 (*
-E: Ideal package factored: wraps signature protocol abstraction (Sig_prot)
+Ideal package factored: wraps signature protocol abstraction (Sig_prot)
 *)
 
-Equations E : 
+Equations IdealRA_Sig : 
   package 
   (Sig_locs_ideal :|: Aux_locs_prot)
     [interface]
     RA_prot_interface 
   :=
-  E := 
+  IdealRA_Sig := 
   {package @Aux_Prot  ∘ Sig_prot ∘ Sig_ideal_c }.
   Next Obligation.
   ssprove_valid. 
@@ -291,15 +295,15 @@ Equations E :
   Qed.
   
 (*
-F: Real package factored with signature protocol abstraction
+Real package factored with signature protocol abstraction
 *)
-Equations F : 
+Equations RealRA_Sig : 
   package 
   (Sig_locs_real :|: Aux_locs_prot)
     [interface]
     RA_prot_interface 
   :=
-  F := 
+  RealRA_Sig := 
   {package @Aux_Prot ∘ Sig_prot ∘ Sig_real_c }.
   Next Obligation.
   ssprove_valid. 
@@ -451,8 +455,11 @@ eapply r_swap_scheme_locs_cmd => //= ; ssprove_valid
   This equivalence allows us to switch between the two representations during game-based 
   security proofs without affecting adversarial advantage, 
   simplifying the modular reasoning of the ideal world setting.
+
+  Ideal RA full package is indistinguishable from ideal modular RA.
 *)
-Lemma A_indist_E : A ≈₀ E.
+
+Lemma IdealRAPackage_indist_IdealRA_Sig : IdealRAPackage ≈₀ IdealRA_Sig.
 Proof.
   eapply eq_rel_perf_ind_eq.
   simplify_eq_rel chal.
@@ -524,7 +531,7 @@ Proof.
   Qed.
 
 (*
-  This lemma formalizes that the fully composed real RA protocol package (B)
+  This lemma formalizes that the fully composed real RA protocol package (RealRAPackage)
   is perfectly indistinguishable from the modular real package (F) that factors the 
   signature protocol abstraction.
 
@@ -534,7 +541,7 @@ Proof.
   Together with A_indist_E, it supports interchangeability between fully composed and modular package views.
 *)
 
-Lemma B_indist_F : B ≈₀ F.
+Lemma RealRAPackage_indist_RealRA_Sig : RealRAPackage ≈₀ RealRA_Sig.
 Proof.
 eapply eq_rel_perf_ind_eq.
   simplify_eq_rel x.
@@ -602,7 +609,7 @@ Qed.
 (*
 This theorem Red performs the main reduction step in the security proof.
 It shows that the adv of any adversary distinguishing 
-the real and ideal RA protocol (B and A)
+the real and ideal RA protocol (RealRAPackage and A)
 is bounded above by the advantage of distinguishing 
 the real and ideal signature protocol abstractions (D and C).
 
@@ -617,20 +624,20 @@ Theorem red LA' A' :
     fdisjoint LA' Sig_locs_ideal →
     LA' :#: Sig_locs_real →
     LA' :#: Aux_locs_prot →
-    (AdvantageE A B A' <= AdvantageE C D (A'∘ (@Aux_Prot (*l*))))%R.
+    (AdvantageE IdealRAPackage RealRAPackage A' <= AdvantageE IdealSigProt RealSigProt (A'∘ (@Aux_Prot (*l*))))%R.
 Proof.
   move => va H1 H2 H3 H4 H5.
   rewrite Advantage_link. 
-  ssprove triangle A [:: (@Aux_Prot  ∘ C) ; (@Aux_Prot  ∘ D)] B A' as ineq.
+  ssprove triangle IdealRAPackage [:: (@Aux_Prot  ∘ IdealSigProt) ; (@Aux_Prot  ∘ RealSigProt)] RealRAPackage A' as ineq.
   eapply le_trans.
   1: { exact: ineq. } 
-  erewrite A_indist_E. 
+  erewrite IdealRAPackage_indist_IdealRA_Sig. 
   3: { exact H1. } 
   3: { rewrite -/Att_prot_locs_ideal. exact H1. }
   2: { exact va. }
   rewrite GRing.Theory.add0r.
-  rewrite (Advantage_sym (Aux_Prot ∘ D) B A').   
-  rewrite B_indist_F.
+  rewrite (Advantage_sym (Aux_Prot ∘ RealSigProt) RealRAPackage A').   
+  rewrite RealRAPackage_indist_RealRA_Sig.
   2: { exact H2. } 
   2: { exact H2. } 
   by rewrite GRing.Theory.addr0.
@@ -647,11 +654,11 @@ ValidPackage LA' RA_prot_interface A_export A' →
   fdisjoint LA' Sig_locs_ideal →
   LA' :#: Sig_locs_real →
   LA' :#: Aux_locs_prot →
-  (AdvantageE A B A' <= 0)%R.
+  (AdvantageE IdealRAPackage RealRAPackage A' <= 0)%R.
 Proof.
   intros va H1 H2 H3 H4 H5. 
   eapply le_trans. 1: {apply (red LA' A'  va H1 H2 H3 H4 H5). }
-  rewrite /C/D.
+  rewrite /IdealSigProt/RealSigProt.
   rewrite Advantage_sym.
   have xxx: fset [:: state_loc] :#: π5.Sig_locs_real.
   {

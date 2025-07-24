@@ -10,9 +10,18 @@
     mathcomp-extra.url = github:sertel/mathcomp-extra/nix;
     mathcomp-extra.inputs.nixpkgs.follows = "nixpkgs";
     mathcomp-extra.inputs.flake-utils.follows = "flake-utils";
+
+#    vscoq = {
+#        url="github:coq/vscoq";
+#        inputs.nixpkgs.follows="nixpkgs";
+#    };
+
+
  };
   outputs = { self, nixpkgs, flake-utils
-            , ssprove , mathcomp-extra }:
+            , ssprove , mathcomp-extra
+#            , vscoq
+            }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -31,6 +40,9 @@
 
         mathcomp-extra' = mathcomp-extra.mkDrv
           { inherit coqPackages coq; version = "0.1.0"; };
+
+        vscoq-lang-server = coqPackages.vscoq-language-server;
+
       in {
         packages.default = coqPackages.mkCoqDerivation {
           pname = "vRATLS";
@@ -39,12 +51,12 @@
 
           src = ./.;
 
-          buildInputs =
+          propagatedBuildInputs =
             (with ocamlPackages; [ dune_3 ])
             ++
             (with pkgs; [coq gnumake])
             ++
-            [ssprove' mathcomp-extra'];
+            [ssprove' mathcomp-extra' vscoq-lang-server];
 
           meta = {
             description = "Formal verification of remote attestation";
@@ -57,7 +69,6 @@
 
           shellHook = ''
                     alias ll="ls -lasi"
-                    alias spacemacs="HOME=. emacs"
                     '';
         };
       }
