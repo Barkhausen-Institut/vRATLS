@@ -1,0 +1,24 @@
+# dune build
+# OCAMLPARAM: unset
+# Shared cache: disabled
+# Shared cache location: /home/sara.zain/.cache/dune/db
+# Workspace root: /home/sara.zain/vRATLS
+# Auto-detected concurrency: 12
+# Dune context:
+#  { name = "default"
+#  ; kind = "default"
+#  ; profile = Dev
+#  ; merlin = true
+#  ; fdo_target_exe = None
+#  ; build_dir = In_build_dir "default"
+#  ; installed_env =
+#      map
+#        { "INSIDE_DUNE" : "/home/sara.zain/vRATLS/_build/default"
+#        ; "OCAML_COLOR" : "always"
+#        ; "OPAMCOLOR" : "always"
+#        }
+#  ; instrument_with = []
+#  }
+$ /usr/bin/ocamlc.opt -config > /tmp/nix-shell.w9ozlU/dune_f96f9e_output
+$ /nix/store/51fqh0dc78ggqqy0vp6hhkq242jprpqf-coq-8.18.0/bin/coqc --print-version -boot > /tmp/nix-shell.w9ozlU/dune_d1ba9a_output
+$ /nix/store/51fqh0dc78ggqqy0vp6hhkq242jprpqf-coq-8.18.0/bin/coqc --config > /tmp/nix-shell.w9ozlU/dune_d8e3cc_output

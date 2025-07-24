@@ -152,7 +152,7 @@ Module SignatureProt
         --- eapply r_reflexivity_alt.
           ---- instantiate (1:=Key_locs). destruct KeyGen. exact: prog_valid.
           ---- move => l.
-          rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. 
+          rewrite /Key_locs. unfold Key_locs => l_not_in_Key_locs. (* Why does rewrite fail? *)
           ssprove_invariant.
           move: l_not_in_Key_locs.
           rewrite fset_cons.
@@ -164,6 +164,10 @@ Module SignatureProt
           ---- move => l v l_not_in_Key_locs. ssprove_invariant.
         --- case => a0 s0; case => a1 s1. case => l r. by [split].
       -- intro a.
+         (*
+         ssprove_code_simpl.
+         ssprove_code_simpl_more.
+          *)
          destruct a.
          ssprove_sync.
          ssprove_sync.
@@ -189,6 +193,10 @@ Module SignatureProt
              ---- by [move: H; rewrite /inv_conj; repeat case].
   Qed.
 
+  (* FIXME
+     This is still insufficient!
+     It misses the key generation evidence.
+   *)
   Axiom Signature_correct_fail: forall pk sk msg, Ver_sig pk (Sign sk msg) msg == true.
 
   Lemma ext_unforge_sig_prot_full:
@@ -226,6 +234,10 @@ Module SignatureProt
           ---- move => l v l_not_in_Key_locs. ssprove_invariant.
         --- case => a0 s0; case => a1 s1. case => l r. by [split].
       -- intro a.
+         (*
+         ssprove_code_simpl.
+         ssprove_code_simpl_more.
+          *)
          destruct a.
          ssprove_sync.
          ssprove_sync.
@@ -246,6 +258,8 @@ Module SignatureProt
              rewrite setmE.
              rewrite ifT //=.
              apply/eqP.
+             (* FIXME: even this is not correct.
+                       the correctness property needs evidence that [(pk,sk) = KeyGen] *)
              exact: Signature_correct_fail.
          --- rewrite set_s1.
              rewrite /heap_ignore => l l_notin_sign_loc.

@@ -275,6 +275,36 @@ Module Type RemoteAttestationHash
   (* TODO Why do I need that at all?! *)
   Definition Comp_locs := fset [:: pk_loc ; sk_loc ; state_loc ; sign_loc ].
 
+  (*
+  Definition Aux_ideal : package Aux_locs Sig_ifce Att_interface :=
+  [package
+    #def #[get_pk_att] (_ : 'unit) : 'pubkey
+    {
+      #import {sig #[get_pk] : 'unit  → 'pubkey } as get_pk ;;
+      pk ← get_pk tt ;;
+      ret pk
+    };
+
+    #def #[attest] ( chal : 'challenge ) : ('signature × 'message)
+    {
+      #import {sig #[sign] : 'message  → 'signature } as sign ;;
+      state ← get state_loc ;;
+      let msg := Hash state chal in
+      att ← sign msg ;;
+      ret (att, msg)
+    };
+
+    #def #[verify_att] ('(chal, att) : 'challenge × 'signature) : 'bool
+    {
+      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
+      state ← get state_loc ;;
+      let msg := Hash state chal in
+      b  ← verify (att,msg) ;;
+      ret b
+    }
+  ].
+   *)
+
   Definition Sig_real_locp  := {locpackage Sig_real ∘ Key_Gen}.
   Definition Sig_ideal_locp := {locpackage Sig_ideal ∘ Key_Gen}.
   Definition Att_real_locp  := {locpackage Att_real ∘ Key_Gen}.

@@ -1,15 +1,3 @@
-(*
-  This file formalizes the security guarantees for Remote Attestation (RA) protocols,
-  following the framework and statements in "Formally-verified Security against Forgery of Remote Attestation using SSProve".
-
-  Results:
-  - Theorem 1 (Paper): Signature scheme perfect indistinguishability 
-      -- formalized as ext_unforge_sig_prot_full in Sig_Prot.v
-  - Theorem 3 (Paper): RA protocol perfect indistinguishability
-      -- formalized as RA_prot_perf_indist (below)
-  Supporting lemmas: A_indist_E, B_indist_F, red
-*)
-
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
@@ -55,8 +43,9 @@ Obligation Tactic := idtac.
 
 From vRATLS Require Import examples.Signature.
 From vRATLS Require Import examples.RA.
-From vRATLS Require Import examples.Sig_Prot.  
-
+From vRATLS Require Import examples.Sig_Prot. Print SignatureProt. 
+(*Import SignatureProt. 
+Export SignatureProt. *)
 
 Module Protocol
   (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
@@ -188,10 +177,6 @@ Equations Att_prot :
   required by AuxPrim_ideal, Sig_ideal_c, and Att_prot_ideal
   *******)
 
-(*
-A:	Fully ideal package: ideal attestation primitives & ideal signature scheme
-*)
-
 Equations A : 
   package 
     Att_prot_locs_ideal
@@ -227,9 +212,6 @@ Equations A :
 
     
   (****** Equations for Real *******)
-(*
-B: Fully real package: real attestation primitives & real signature implementation
-*)
 
 Equations B : 
   package 
@@ -269,11 +251,8 @@ Equations B :
       }
     ].
 
-(*
-E: Ideal package factored: wraps signature protocol abstraction (Sig_prot)
-*)
 
-Equations E : 
+  Equations E : 
   package 
   (Sig_locs_ideal :|: Aux_locs_prot)
     [interface]
@@ -290,10 +269,7 @@ Equations E :
     apply fsubsetU; apply/orP;left; apply fsubsetxx.
   Qed.
   
-(*
-F: Real package factored with signature protocol abstraction
-*)
-Equations F : 
+  Equations F : 
   package 
   (Sig_locs_real :|: Aux_locs_prot)
     [interface]
@@ -322,7 +298,8 @@ Definition cmd_locs {A:choiceType} (c:command A) : {fset Location} :=
   end.
 
 Definition pre_fun : heap * heap -> Prop := fun '(s0,s1) => s0 = s1.
-
+Print command.
+Print opsig.
 
 (** This is an assumption of SSProve.
     Imports are resolved before stepping into the
@@ -443,15 +420,6 @@ Hint Extern 40 (⊢ ⦃ _ ⦄ x ← ?s ;; y ← cmd _ ;; _ ≈ _ ⦃ _ ⦄) =>
 eapply r_swap_scheme_locs_cmd => //= ; ssprove_valid
 : ssprove_swap.
 
-(*
-  This lemma formalizes that the fully composed ideal RA protocol package (A)
-  is perfectly indistinguishable from the modular ideal package (E) that explicitly uses 
-  the signature protocol abstraction (Sig_prot).
-
-  This equivalence allows us to switch between the two representations during game-based 
-  security proofs without affecting adversarial advantage, 
-  simplifying the modular reasoning of the ideal world setting.
-*)
 Lemma A_indist_E : A ≈₀ E.
 Proof.
   eapply eq_rel_perf_ind_eq.
@@ -523,17 +491,6 @@ Proof.
 
   Qed.
 
-(*
-  This lemma formalizes that the fully composed real RA protocol package (B)
-  is perfectly indistinguishable from the modular real package (F) that factors the 
-  signature protocol abstraction.
-
-  This step is crucial for modular security proofs, enabling the reduction of real protocol security 
-  to the security of the signature abstraction in a compositional manner.
-
-  Together with A_indist_E, it supports interchangeability between fully composed and modular package views.
-*)
-
 Lemma B_indist_F : B ≈₀ F.
 Proof.
 eapply eq_rel_perf_ind_eq.
@@ -599,16 +556,6 @@ eapply eq_rel_perf_ind_eq.
 
 Qed.
 
-(*
-This theorem Red performs the main reduction step in the security proof.
-It shows that the adv of any adversary distinguishing 
-the real and ideal RA protocol (B and A)
-is bounded above by the advantage of distinguishing 
-the real and ideal signature protocol abstractions (D and C).
-
-This reduction bridges the protocol-level security to 
-the underlying cryptographic primitive.
-*)
 
 Theorem red LA' A' :
   ValidPackage LA' RA_prot_interface A_export A' →
@@ -635,10 +582,6 @@ Proof.
   2: { exact H2. } 
   by rewrite GRing.Theory.addr0.
 Qed. 
-
-(*
-This is the main security theorem corresponding to Theorem 3 in the paper.
-*)
 
 Theorem RA_prot_perf_indist LA' A' :
 ValidPackage LA' RA_prot_interface A_export A' →
