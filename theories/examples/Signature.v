@@ -278,7 +278,7 @@ Module SignaturePrimitives
       apply fsub0set.
   Qed.
 
-  (*
+  (**
     This axiom cannot be instantiated.
     The problem is the missing link between [l] and the LHS of the
     equality.
@@ -294,7 +294,7 @@ Module SignaturePrimitives
   Axiom Signature_prop:
     ∀ (l: {fmap (chSignature  * chMessage ) -> 'unit})
       (s : chSignature) (pk : chPubKey) (m  : chMessage),
-      Ver_sig pk s m = ((s,m) \in domm l).
+      Ver_sig pk s m = ((s,m) \in domm l). 
 
   Lemma ext_unforge:
   Sig_real_c ≈₀ Sig_ideal_c.
