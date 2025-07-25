@@ -68,14 +68,13 @@ Module RemoteAttestationParams (π2 : SignatureParams).
   Definition Attestation : choice_type := 'fin (mkpos pos_n).
   Definition chMessage   : choice_type := 'fin (mkpos pos_n).
 
-
 End RemoteAttestationParams.
+
 
 Module Type RemoteAttestationAlgorithms
   (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
   (π2 : KeyGenParams π1)
-  (KGc : KeyGen_code π1 π2)
-  (* (Alg : SignatureAlgorithms π1 π2 KGc) *).
+  (KGc : KeyGen_code π1 π2).
 
   Module π3 := RemoteAttestationParams π1.
   Import π1 π2 π3 KGc (* Alg *).
@@ -181,13 +180,7 @@ Module Type RemoteAttestationHash
         ret b
       }
     ].
-    (*
-    Next Obligation.
-      ssprove_valid; rewrite /Attestation_locs_ideal/Attestation_locs_real in_fsetU; apply /orP.
-      1,5,6: right; auto_in_fset.
-      all: left; auto_in_fset.
-    Defined.
-    *)
+
     Next Obligation.
       ssprove_valid; rewrite /Attestation_locs_ideal/Attestation_locs_real in_fsetU/Key_locs; apply /orP.
       1,5,6: right; auto_in_fset.
@@ -197,8 +190,6 @@ Module Type RemoteAttestationHash
     (* We need a common interface, so we need to define an [AUX] for the
        signature scheme.*)
   Definition Aux_locs := fset [:: pk_loc  ; state_loc ].
-
-  (*Definition Aux_locs := fset [:: pk_loc ; sk_loc ; sign_loc ; state_loc ]. *)
 
   Definition Aux : package Aux_locs Sig_ifce Att_interface :=
     [package
@@ -271,39 +262,7 @@ Module Type RemoteAttestationHash
       apply fsub0set.
   Qed.
 
-
-  (* TODO Why do I need that at all?! *)
   Definition Comp_locs := fset [:: pk_loc ; sk_loc ; state_loc ; sign_loc ].
-
-  (*
-  Definition Aux_ideal : package Aux_locs Sig_ifce Att_interface :=
-  [package
-    #def #[get_pk_att] (_ : 'unit) : 'pubkey
-    {
-      #import {sig #[get_pk] : 'unit  → 'pubkey } as get_pk ;;
-      pk ← get_pk tt ;;
-      ret pk
-    };
-
-    #def #[attest] ( chal : 'challenge ) : ('signature × 'message)
-    {
-      #import {sig #[sign] : 'message  → 'signature } as sign ;;
-      state ← get state_loc ;;
-      let msg := Hash state chal in
-      att ← sign msg ;;
-      ret (att, msg)
-    };
-
-    #def #[verify_att] ('(chal, att) : 'challenge × 'signature) : 'bool
-    {
-      #import {sig #[verify_sig] : ('signature × 'message) → 'bool } as verify ;;
-      state ← get state_loc ;;
-      let msg := Hash state chal in
-      b  ← verify (att,msg) ;;
-      ret b
-    }
-  ].
-   *)
 
   Definition Sig_real_locp  := {locpackage Sig_real ∘ Key_Gen}.
   Definition Sig_ideal_locp := {locpackage Sig_ideal ∘ Key_Gen}.

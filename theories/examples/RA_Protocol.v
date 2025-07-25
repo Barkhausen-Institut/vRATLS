@@ -1,3 +1,21 @@
+(**
+  This file formalizes the security guarantees for Remote Attestation (RA) protocols,
+  following the framework and statements.
+
+  Results:
+  - Theorem 1 (Paper): Signature scheme perfect indistinguishability 
+      -- formalized as ext_unforge_sig_prot_full in Sig_Prot.v
+
+  - Theorem 2 (Paper): Security reduction for RA
+      -- formalized as reduction Theorem. 
+
+  - Theorem 3 (Paper): RA protocol perfect indistinguishability
+      -- formalized as RA_prot_perf_indist
+
+  Supporting lemmas: IdealRAPackage_indist_IdealRA_Sig, 
+                     RealRAPackage_indist_RealRA_Sig. 
+*)
+
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
@@ -20,7 +38,7 @@ Require Import Coq.Init.Logic.
 Require Import List.
 
 Set Equations With UIP.
-(*
+(**
   This is needed to make definitions with Equations transparent.
   Otherwise they are opaque and code simplifications in the
   proofs with [ssprove_code_simpl] do not resolve properly.
@@ -43,10 +61,10 @@ Obligation Tactic := idtac.
 
 From vRATLS Require Import examples.Signature.
 From vRATLS Require Import examples.RA.
-From vRATLS Require Import examples.Sig_Prot.
+From vRATLS Require Import examples.Sig_Prot.  
 From vRATLS Require Import examples.RA_Facts.
-(*Import SignatureProt.
-Export SignatureProt. *)
+From vRATLS Require Import examples.Swap.
+
 
 Module Protocol
   (π1 : SignatureParams) (* TBD This is strange. The reason is because our code depends on signature scheme functions. *)
@@ -71,7 +89,7 @@ Module Protocol
 
   Definition Aux_locs_prot := fset [:: state_loc].
   
-(****** For Ideal *******)
+(** * For Ideal *)
 Definition AuxPrim_ideal : 
   package 
     Aux_locs_prot
@@ -107,14 +125,13 @@ Definition AuxPrim_ideal :
 
 (** The "Att_prot_ideal" is defined in a way that the adv has access & 
     can selecet the chall or we can say that it can influnce the protocol. 
-    So that's why chall is derived from the adversary's input msg  **)
+    So that's why chall is derived from the adversary's input msg  *)
 
 Definition Att_prot_locs_real := Sig_locs_real :|: Aux_locs_prot.
 Definition Att_prot_locs_ideal := Sig_locs_ideal :|: Aux_locs_prot.
 
 
 (****** For Real *******)
-
 Definition AuxPrim_real : 
   package 
     Aux_locs_prot
@@ -172,20 +189,24 @@ Equations Att_prot :
       } 
   ].  
   
-  (****** Equations for Ideal 
+  (** * Equations for Ideal 
   Note: Aux_locs: is the set of memory locations 
   used by the composed package. 
   Also, it is a superset of the memory locations 
   required by AuxPrim_ideal, Sig_ideal_c, and Att_prot_ideal
-  *******)
+  *)
 
-Equations A : 
+(**
+Fully ideal package: ideal attestation primitives & ideal signature scheme
+*)
+
+Equations IdealRAPackage : 
   package 
     Att_prot_locs_ideal
     [interface]
     RA_prot_interface 
   :=
-  A := 
+  IdealRAPackage := 
   {package Att_prot ∘  AuxPrim_ideal ∘ Sig_ideal_c }.
   Next Obligation.
   ssprove_valid.
@@ -213,15 +234,18 @@ Equations A :
   Qed.
 
     
-  (****** Equations for Real *******)
+  (** * Equations for Real *)
+(**
+Fully real package: real attestation primitives & real signature implementation
+*)
 
-Equations B : 
+Equations RealRAPackage : 
   package 
     Att_prot_locs_real 
     [interface] 
     RA_prot_interface 
   :=
-  B := 
+  RealRAPackage := 
   {package Att_prot ∘ AuxPrim_real ∘ Sig_real_c  }.
   Next Obligation.
     ssprove_valid.
@@ -230,8 +254,8 @@ Equations B :
     unfold Att_prot_locs_real. apply fsubsetUl.
   Qed.
 
-  Definition C := Sig_prot_ideal.
-  Definition D := Sig_prot_real.
+  Definition IdealSigProt := Sig_prot_ideal.
+  Definition RealSigProt := Sig_prot_real.
 
   Equations Aux_Prot  :
     package 
@@ -253,14 +277,17 @@ Equations B :
       }
     ].
 
+(**
+Ideal package factored: wraps signature protocol abstraction (Sig_prot)
+*)
 
-  Equations E : 
+Equations IdealRA_Sig : 
   package 
   (Sig_locs_ideal :|: Aux_locs_prot)
     [interface]
     RA_prot_interface 
   :=
-  E := 
+  IdealRA_Sig := 
   {package @Aux_Prot  ∘ Sig_prot ∘ Sig_ideal_c }.
   Next Obligation.
   ssprove_valid. 
@@ -271,13 +298,16 @@ Equations B :
     apply fsubsetU; apply/orP;left; apply fsubsetxx.
   Qed.
   
-  Equations F : 
+(**
+Real package factored with signature protocol abstraction
+*)
+Equations RealRA_Sig : 
   package 
   (Sig_locs_real :|: Aux_locs_prot)
     [interface]
     RA_prot_interface 
   :=
-  F := 
+  RealRA_Sig := 
   {package @Aux_Prot ∘ Sig_prot ∘ Sig_real_c }.
   Next Obligation.
   ssprove_valid. 
@@ -290,139 +320,19 @@ Equations B :
 Qed.
   
 
-(* A more generic definition for swapping codes. *)
-Definition cmd_locs {A:choiceType} (c:command A) : {fset Location} :=
-  match c with
-  | cmd_op _  _ => fset0
-  | cmd_get l => fset1 l
-  | cmd_put l _ => fset1 l
-  | cmd_sample _ => fset0
-  end.
+(**
+  This lemma formalizes that the fully composed ideal RA protocol package (A)
+  is perfectly indistinguishable from the modular ideal package (E) that explicitly uses 
+  the signature protocol abstraction (Sig_prot).
 
-Definition pre_fun : heap * heap -> Prop := fun '(s0,s1) => s0 = s1.
-Print command.
-Print opsig.
+  This equivalence allows us to switch between the two representations during game-based 
+  security proofs without affecting adversarial advantage, 
+  simplifying the modular reasoning of the ideal world setting.
 
-(** This is an assumption of SSProve.
-    Imports are resolved before stepping into the
-    relational Hoare Logic.
-    For reference, check out [ssprove_sync].
- *)
-Definition no_import {A} (c: command A) : Prop :=
-  match c with
-  | cmd_op _ _ => False
-  | _ => True
-  end.
+  Ideal RA full package is indistinguishable from ideal modular RA.
+*)
 
-Lemma swap_get_disjoint {B l v} {c: command B} :
-    no_import c ->
-    fset1 l :#: cmd_locs c
-    -> (forall x:B,
-   ⊢ ⦃ λ '(s0, s1), (pre_fun ⋊ rem_lhs l v) (s0, s1) ⦄
-     ret x
-       ≈
-     ret x
-     ⦃ λ '(a0, s0) '(a1, s1), ( pre_fun ⋊ rem_lhs l v) (s0, s1) /\ a0 = a1 ⦄)
-   ->
-     ⊢ ⦃ λ '(s0, s1), (pre_fun ⋊ rem_lhs l v) (s0, s1) ⦄
-       x ← cmd c ;;
-       ret x
-         ≈
-       x ← cmd c ;;
-       ret x
-       ⦃ λ '(a0, s0) '(a1, s1), (pre_fun ⋊ rem_lhs l v) (s0, s1) /\ a0 = a1 ⦄.
-Proof.
-  elim: c => //=.
-  - move => l1 _ d H1.
-    ssprove_sync.
-    + rewrite /get_pre_cond => s0 s1.
-      rewrite /pre_fun => s0_eq_s1.
-      by rewrite s0_eq_s1.
-    + exact: H1.
-  - move => l1 v0 _.
-    rewrite fdisjoint1s; move/fset1P/eqP => l_neq_l1 H1.
-    ssprove_sync => //=.
-    rewrite /put_pre_cond/pre_fun => s0 s1 pre.
-    by rewrite pre.
-  - move => op _ _ H1.
-    ssprove_sync.
-    exact: H1.
-Qed.
-
-(* TODO move into SSProve. *)
-Lemma r_swap_scheme_locs_cmd :
-  ∀ {A B : choiceType} {S: {fset Location}} (s : raw_code A) (c : command B),
-    no_import c ->
-    S :#: cmd_locs c →
-    ValidCode S [interface] s →
-    ⊢ ⦃ λ '(s₀, s₁), s₀ = s₁ ⦄
-      x ← s ;; y ← cmd c ;; ret (x,y) ≈
-      y ← cmd c ;; x ← s ;; ret (x,y)
-    ⦃ eq ⦄.
-Proof.
-  intros A B S s c noi d h.
-  induction h.
-  - simpl. apply rreflexivity_rule.
-  - eapply fromEmpty. rewrite fset0E. eauto.
-  - simpl in *. eapply r_transR.
-    + eapply (rswap_cmd_eq _ _ _ (cmd_get _) _). simpl.
-      set xxx := fun '(s0,s1) => s0 = s1; rewrite -(reshape_pair_id xxx).
-      eapply r_get_remember_lhs => a0.
-      eapply (rsame_head_cmd_alt c).
-      *
-        (**
-           At this point, I really need to do a case analysis.
-           This really is a more general goal though that only holds when the heaps are disjoint!
-           After all, the comand could be a write in which case I could not just say that reading the
-           value afterwards, it turns out to be the same, as the post condition suggests.
-         *)
-        move/fdisjointP: d => d; specialize (d l H); move: d; rewrite -fdisjoint1s => d.
-        apply (swap_get_disjoint noi d) => x.
-        by apply r_ret.
-      * move => a1. eapply r_get_remind_rhs.
-        ** eapply Remembers_rhs_from_tracked_lhs.
-           *** ssprove_invariant.
-           *** rewrite /xxx; ssprove_invariant.
-        ** ssprove_forget_all. rewrite /xxx.
-           eapply r_ret => s0 s1 s0_eq_s1.
-           repeat f_equal; exact s0_eq_s1.
-    + simpl.
-      ssprove_sync_eq.
-      exact: H1.
-  - simpl in *. eapply r_transR.
-    +
-      (* Fail eapply rswap_cmd_eq. *)
-      instantiate (1 := cmd_bind (cmd_put l v) (fun z => cmd_bind c (fun y => bind k (fun x => ret (pair x y))))).
-      simpl.
-      case: c noi d IHh => //=.
-      * move => l0 _ d IHh.
-        ssprove_swap_lhs 0.
-        ** move/fdisjointP: d => d; specialize (d l H); move: d.
-           by rewrite in_fset1; move/eqP.
-        ** apply rreflexivity_rule.
-      * move => l0 v0 _ d IHh.
-        ssprove_swap_lhs 0.
-        ** move/fdisjointP: d => d; specialize (d l H); move: d.
-           by rewrite in_fset1; move/eqP.
-        ** apply rreflexivity_rule.
-      * move => op _ d IHh.
-        ssprove_swap_lhs 0.
-        apply rreflexivity_rule.
-    + simpl. ssprove_sync_eq.
-      exact: IHh.
-  - simpl in *.
-    eapply r_transR.
-    + eapply (rswap_cmd_eq _ _ _ (cmd_sample _) _). simpl.
-      eapply rsamplerC'_cmd.
-    + simpl. eapply (rsame_head_cmd (cmd_sample _)). intro a.
-      eauto.
-Qed.
-
-Hint Extern 40 (⊢ ⦃ _ ⦄ x ← ?s ;; y ← cmd _ ;; _ ≈ _ ⦃ _ ⦄) =>
-eapply r_swap_scheme_locs_cmd => //= ; ssprove_valid
-: ssprove_swap.
-
-Lemma A_indist_E : A ≈₀ E.
+Lemma IdealRAPackage_indist_IdealRA_Sig : IdealRAPackage ≈₀ IdealRA_Sig.
 Proof.
   eapply eq_rel_perf_ind_eq.
   simplify_eq_rel chal.
@@ -493,7 +403,18 @@ Proof.
 
   Qed.
 
-Lemma B_indist_F : B ≈₀ F.
+(**
+  This lemma formalizes that the fully composed real RA protocol package (RealRAPackage)
+  is perfectly indistinguishable from the modular real package (F) that factors the 
+  signature protocol abstraction.
+
+  This step is crucial for modular security proofs, enabling the reduction of real protocol security 
+  to the security of the signature abstraction in a compositional manner.
+
+  Together with A_indist_E, it supports interchangeability between fully composed and modular package views.
+*)
+
+Lemma RealRAPackage_indist_RealRA_Sig : RealRAPackage ≈₀ RealRA_Sig.
 Proof.
 eapply eq_rel_perf_ind_eq.
   simplify_eq_rel x.
@@ -558,32 +479,46 @@ eapply eq_rel_perf_ind_eq.
 
 Qed.
 
+(**
+This theorem Red performs the main reduction step in the security proof.
+It shows that the adv of any adversary distinguishing 
+the real and ideal RA protocol (RealRAPackage and A)
+is bounded above by the advantage of distinguishing 
+the real and ideal signature protocol abstractions (D and C).
 
-Theorem red LA' A' :
+This reduction bridges the protocol-level security to 
+the underlying cryptographic primitive.
+*)
+
+Theorem reduction LA' A' :
   ValidPackage LA' RA_prot_interface A_export A' →
     fdisjoint LA' Att_prot_locs_ideal →
     fdisjoint LA' Att_prot_locs_real →
     fdisjoint LA' Sig_locs_ideal →
     LA' :#: Sig_locs_real →
     LA' :#: Aux_locs_prot →
-    (AdvantageE A B A' <= AdvantageE C D (A'∘ (@Aux_Prot (*l*))))%R.
+    (AdvantageE IdealRAPackage RealRAPackage A' <= AdvantageE IdealSigProt RealSigProt (A'∘ (@Aux_Prot (*l*))))%R.
 Proof.
   move => va H1 H2 H3 H4 H5.
   rewrite Advantage_link. 
-  ssprove triangle A [:: (@Aux_Prot  ∘ C) ; (@Aux_Prot  ∘ D)] B A' as ineq.
+  ssprove triangle IdealRAPackage [:: (@Aux_Prot  ∘ IdealSigProt) ; (@Aux_Prot  ∘ RealSigProt)] RealRAPackage A' as ineq.
   eapply le_trans.
   1: { exact: ineq. } 
-  erewrite A_indist_E. 
+  erewrite IdealRAPackage_indist_IdealRA_Sig. 
   3: { exact H1. } 
   3: { rewrite -/Att_prot_locs_ideal. exact H1. }
   2: { exact va. }
   rewrite GRing.Theory.add0r.
-  rewrite (Advantage_sym (Aux_Prot ∘ D) B A').   
-  rewrite B_indist_F.
+  rewrite (Advantage_sym (Aux_Prot ∘ RealSigProt) RealRAPackage A').   
+  rewrite RealRAPackage_indist_RealRA_Sig.
   2: { exact H2. } 
   2: { exact H2. } 
   by rewrite GRing.Theory.addr0.
 Qed. 
+
+(**
+This is the main security theorem corresponding to Theorem 3 in the paper.
+*)
 
 Theorem RA_prot_perf_indist LA' A' :
 ValidPackage LA' RA_prot_interface A_export A' →
@@ -592,11 +527,11 @@ ValidPackage LA' RA_prot_interface A_export A' →
   fdisjoint LA' Sig_locs_ideal →
   LA' :#: Sig_locs_real →
   LA' :#: Aux_locs_prot →
-  (AdvantageE A B A' <= 0)%R.
+  (AdvantageE IdealRAPackage RealRAPackage A' <= 0)%R.
 Proof.
   intros va H1 H2 H3 H4 H5. 
-  eapply le_trans. 1: {apply (red LA' A'  va H1 H2 H3 H4 H5). }
-  rewrite /C/D.
+  eapply le_trans. 1: {apply (reduction LA' A'  va H1 H2 H3 H4 H5). }
+  rewrite /IdealSigProt/RealSigProt.
   rewrite Advantage_sym.
   have xxx: fset [:: state_loc] :#: π5.Sig_locs_real.
   {

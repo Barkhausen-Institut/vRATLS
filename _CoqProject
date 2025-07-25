@@ -9,12 +9,13 @@ theories/examples/Conversions.v
 theories/examples/Signature.v
 theories/examples/Sig_Prot.v
 theories/examples/RA.v
-theories/examples/RA_Prot.v
 theories/examples/Hash.v
 theories/examples/RA_Locations.v
 theories/examples/RA_Facts.v
+theories/examples/Swap.v
 theories/examples/RA_Protocol.v
 theories/examples/RSA.v
+
 
 # Omitted
 # theories/examples/sig.v
