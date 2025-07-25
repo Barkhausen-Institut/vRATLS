@@ -682,3 +682,4 @@ Proof.
   - apply xxx.
 Qed.
 
+End Protocol.
