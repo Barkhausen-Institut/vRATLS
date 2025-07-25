@@ -1,14 +1,20 @@
-(*
+(**
   This file formalizes the security guarantees for Remote Attestation (RA) protocols,
-  following the framework and statements in "Formally-verified Security against Forgery of Remote Attestation using SSProve".
+  following the framework and statements.
 
   Results:
   - Theorem 1 (Paper): Signature scheme perfect indistinguishability 
       -- formalized as ext_unforge_sig_prot_full in Sig_Prot.v
+
+  - Theorem 2 (Paper): Security reduction for RA
+      -- formalized as reduction Theorem. 
+
   - Theorem 3 (Paper): RA protocol perfect indistinguishability
-      -- formalized as RA_prot_perf_indist (below)
-  Supporting lemmas: A_indist_E, B_indist_F, red
-*)
+      -- formalized as RA_prot_perf_indist
+
+  Supporting lemmas: IdealRAPackage_indist_IdealRA_Sig, 
+                     RealRAPackage_indist_RealRA_Sig. 
+**)
 
 From Relational Require Import OrderEnrichedCategory GenericRulesSimple.
 
@@ -125,7 +131,6 @@ Definition Att_prot_locs_ideal := Sig_locs_ideal :|: Aux_locs_prot.
 
 
 (****** For Real *******)
-
 Definition AuxPrim_real : 
   package 
     Aux_locs_prot
@@ -615,7 +620,7 @@ This reduction bridges the protocol-level security to
 the underlying cryptographic primitive.
 *)
 
-Theorem red LA' A' :
+Theorem reduction LA' A' :
   ValidPackage LA' RA_prot_interface A_export A' →
     fdisjoint LA' Att_prot_locs_ideal →
     fdisjoint LA' Att_prot_locs_real →
@@ -655,7 +660,7 @@ ValidPackage LA' RA_prot_interface A_export A' →
   (AdvantageE IdealRAPackage RealRAPackage A' <= 0)%R.
 Proof.
   intros va H1 H2 H3 H4 H5. 
-  eapply le_trans. 1: {apply (red LA' A'  va H1 H2 H3 H4 H5). }
+  eapply le_trans. 1: {apply (reduction LA' A'  va H1 H2 H3 H4 H5). }
   rewrite /IdealSigProt/RealSigProt.
   rewrite Advantage_sym.
   have xxx: fset [:: state_loc] :#: π5.Sig_locs_real.
