@@ -1,7 +1,12 @@
-# vRATLS
-A formal specification for RATLS (remote attestation embedded into TLS).
+# vRA
+A formal specification for remote attestation (RA).
 
-We are using [SSProve](https://github.com/SSProve), a framework for security proofs in Coq.
+We are using [SSProve](https://github.com/SSProve), a framework for security proofs in Coq/Rocq.
+
+## Publications
+
+- Our [ESORICS paper](https://www.springerprofessional.de/en/formally-verified-security-against-forgery-of-remote-attestation/51584314) has the general development.
+- For more information, please consult the [arXiv version](https://arxiv.org/abs/2502.17653) in particular the [earlier version](https://arxiv.org/pdf/2502.17653v1).
 
 ## Setup
 
